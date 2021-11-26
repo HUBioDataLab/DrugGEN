@@ -45,7 +45,7 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_rec', type=float, default=10, help='weight for reconstruction loss')
     parser.add_argument('--lambda_gp', type=float, default=10, help='weight for gradient penalty')
     parser.add_argument('--post_method', type=str, default='softmax', choices=['softmax', 'soft_gumbel', 'hard_gumbel'])
-    parser.add_argument('--dim', type=int, default=720 , help='Embedding dimension.')
+    parser.add_argument('--dim', type=int, default=120, help='Embedding dimension.')
     parser.add_argument('--depth', type=int, default=5 , help='Encoder depth.')
     parser.add_argument('--heads', type=int, default=4 , help='Number of head for Attention.')
     parser.add_argument('--mlp_ratio', type=int, default=4 , help='.')
@@ -53,11 +53,11 @@ if __name__ == '__main__':
 
 
     # Training configuration.
-    parser.add_argument('--batch_size', type=int, default=16, help='mini-batch size')
+    parser.add_argument('--batch_size', type=int, default=32, help='mini-batch size')
     parser.add_argument('--num_iters', type=int, default=200000, help='number of total iterations for training D')
-    parser.add_argument('--num_iters_decay', type=int, default=100000, help='number of iterations for decaying lr')
-    parser.add_argument('--g_lr', type=float, default=0.0001, help='learning rate for G')
-    parser.add_argument('--d_lr', type=float, default=0.0001, help='learning rate for D')
+    parser.add_argument('--num_iters_decay', type=int, default=10000, help='number of iterations for decaying lr')
+    parser.add_argument('--g_lr', type=float, default=0.00005, help='learning rate for G')
+    parser.add_argument('--d_lr', type=float, default=0.00005, help='learning rate for D')
     parser.add_argument('--dropout', type=float, default=0., help='dropout rate')
     parser.add_argument('--n_critic', type=int, default=5, help='number of D updates per each G update')
     parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for Adam optimizer')
@@ -73,16 +73,16 @@ if __name__ == '__main__':
     parser.add_argument('--use_tensorboard', type=str2bool, default=False)
 
     # Directories.
-    parser.add_argument('--mol_data_dir', type=str, default='data/gdb9_9nodes.sparsedataset')
-    parser.add_argument('--log_dir', type=str, default='molgan/logs')
-    parser.add_argument('--model_save_dir', type=str, default='molgan/models')
-    parser.add_argument('--sample_dir', type=str, default='molgan/samples')
-    parser.add_argument('--result_dir', type=str, default='molgan/results')
+    parser.add_argument('--mol_data_dir', type=str, default='MolecularTransGAN/data/chembl_smiles_20k.sparsedataset')
+    parser.add_argument('--log_dir', type=str, default='MolecularTransGAN/molgan/logs')
+    parser.add_argument('--model_save_dir', type=str, default='MolecularTransGAN/molgan/models')
+    parser.add_argument('--sample_dir', type=str, default='MolecularTransGAN/molgan/samples')
+    parser.add_argument('--result_dir', type=str, default='MolecularTransGAN/molgan/results')
 
     # Step size.
-    parser.add_argument('--log_step', type=int, default=10)
+    parser.add_argument('--log_step', type=int, default=100)
     parser.add_argument('--sample_step', type=int, default=1000)
-    parser.add_argument('--model_save_step', type=int, default=10000)
+    parser.add_argument('--model_save_step', type=int, default=20000)
     parser.add_argument('--lr_update_step', type=int, default=1000)
 
     config = parser.parse_args()

@@ -87,7 +87,7 @@ class Solver(object):
                            self.data.bond_num_types,
                            self.data.atom_num_types,
                            self.dropout,
-                           dim=720, 
+                           dim=self.dim, 
                            depth=5, 
                            heads=4, 
                            mlp_ratio=4, 
@@ -212,13 +212,13 @@ class Solver(object):
             elif m == 'qed':
                 rr *= MolecularMetrics.quantitative_estimation_druglikeness_scores(mols, norm=True)
             elif m == 'novelty':
-                rr *= MolecularMetrics.novel_scores(mols, data)
+                rr *= MolecularMetrics.novel_scores(mols, self.data)
             elif m == 'dc':
-                rr *= MolecularMetrics.drugcandidate_scores(mols, data)
+                rr *= MolecularMetrics.drugcandidate_scores(mols, self.data)
             elif m == 'unique':
                 rr *= MolecularMetrics.unique_scores(mols)
             elif m == 'diversity':
-                rr *= MolecularMetrics.diversity_scores(mols, data)
+                rr *= MolecularMetrics.diversity_scores(mols, self.data)
             elif m == 'validity':
                 rr *= MolecularMetrics.valid_scores(mols)
             else:
@@ -243,13 +243,13 @@ class Solver(object):
         start_time = time.time()
         for i in range(start_iters, self.num_iters):
             if (i+1) % self.log_step == 0:
-                mols, _, _, a, x, _, _, _, _ = self.data.next_validation_batch()
+                mols, _, _, a, x, _, _, _, _ = self.data.next_validation_batch(self.batch_size)
                 z = self.sample_z(a.shape[0])
                 print('[Valid]', '')
             else:
                 mols, _, _, a, x, _, _, _, _ = self.data.next_train_batch(self.batch_size)
                 z = self.sample_z(self.batch_size)
-
+                
             # =================================================================================== #
             #                             1. Preprocess input data                                #
             # =================================================================================== #
@@ -263,15 +263,23 @@ class Solver(object):
             # =================================================================================== #
             #                             2. Train the discriminator                              #
             # =================================================================================== #
-
+            #print("a_tensor", a_tensor)
+            #print("x_tensor", x_tensor)
             # Compute loss with real images.
             logits_real, features_real = self.D(a_tensor, None, x_tensor)
             d_loss_real = - torch.mean(logits_real)
+            
 
             # Compute loss with fake images.
             edges_logits, nodes_logits = self.G(z)
+            #print("before",edges_logits)
+            #print("before_n", nodes_logits)
             # Postprocess with Gumbel softmax
             (edges_hat, nodes_hat) = self.postprocess((edges_logits, nodes_logits), self.post_method)
+            #print("edges_hat", edges_hat)
+            #print("nodes_hat", nodes_hat)
+            
+            
             logits_fake, features_fake = self.D(edges_hat, None, nodes_hat)
             d_loss_fake = torch.mean(logits_fake)
 
@@ -291,10 +299,10 @@ class Solver(object):
 
             # Logging.
             loss = {}
-            loss['D/loss_real'] = d_loss_real.item()
-            loss['D/loss_fake'] = d_loss_fake.item()
-            loss['D/loss_gp'] = d_loss_gp.item()
-
+            #loss['D/loss_real'] = d_loss_real.item()
+            #loss['D/loss_fake'] = d_loss_fake.item()
+            #loss['D/loss_gp'] = d_loss_gp.item()
+            loss["D/d_loss"] = d_loss.item()
             # =================================================================================== #
             #                               3. Train the generator                                #
             # =================================================================================== #
@@ -331,9 +339,9 @@ class Solver(object):
                 self.g_optimizer.step()
 
                 # Logging.
-                loss['G/loss_fake'] = g_loss_fake.item()
-                loss['G/loss_value'] = g_loss_value.item()
-
+                #loss['G/loss_fake'] = g_loss_fake.item()
+                #loss['G/loss_value'] = g_loss_value.item()
+                loss["G/g_loss"] = g_loss.item()
             # =================================================================================== #
             #                                 4. Miscellaneous                                    #
             # =================================================================================== #
@@ -380,9 +388,9 @@ class Solver(object):
         self.restore_model(self.test_iters)
 
         with torch.no_grad():
-            mols, _, _, a, x, _, _, _, _ = self.data.next_test_batch()
+            mols, _, _, a, x, _, _, _, _ = self.data.next_test_batch(self.batch_size)
             z = self.sample_z(a.shape[0])
-
+            z = torch.from_numpy(z).to(self.device).float()
             # Z-to-target
             edges_logits, nodes_logits = self.G(z)
             # Postprocess with Gumbel softmax
@@ -401,4 +409,6 @@ class Solver(object):
             m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
             m0.update(m1)
             for tag, value in m0.items():
+                log = {}
                 log += ", {}: {:.4f}".format(tag, value)
+                print(log)

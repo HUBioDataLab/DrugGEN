@@ -48,10 +48,6 @@ class Attention(nn.Module):
      
         q, k, v = qkv.permute(2, 0, 3, 1, 4)
 
-
-        
-
-
         dot = (q @ k.transpose(-2, -1)) * self.scale
 
         attn = dot.softmax(dim=-1)
@@ -107,7 +103,7 @@ class GraphConvolution(Module):
     def forward(self, input, adj, activation=None):
         # input : 16x9x9
         # adj : 16x4x9x9
-
+        
         hidden = torch.stack([self.linear1(input) for _ in range(adj.size(1))], 1)
         hidden = torch.einsum('bijk,bikl->bijl', (adj, hidden))
         hidden = torch.sum(hidden, 1) + self.linear1(input)
@@ -119,7 +115,7 @@ class GraphConvolution(Module):
         output = torch.sum(output, 1) + self.linear2(hidden)
         output = activation(output) if activation is not None else output
         output = self.dropout(output)
-
+        
         return output
 
 
@@ -127,10 +123,10 @@ class GraphAggregation(Module):
 
     def __init__(self, in_features, out_features, b_dim, dropout):
         super(GraphAggregation, self).__init__()
-        self.sigmoid_linear = nn.Sequential(nn.Linear(in_features+b_dim, out_features),
+        self.sigmoid_linear = nn.Sequential(nn.Linear(in_features+b_dim+2, out_features),  #  ----- burayı düzeltmek lazım 
                                             nn.Sigmoid())
-        self.tanh_linear = nn.Sequential(nn.Linear(in_features+b_dim, out_features),
-                                         nn.Tanh())
+        self.tanh_linear = nn.Sequential(nn.Linear(in_features+b_dim+2, out_features),  # burayı da. sıkıntı şu atom ve bond 
+                                         nn.Tanh())                                     # dimension uymuyor
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, input, activation):

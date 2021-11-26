@@ -23,7 +23,7 @@ class ResidualBlock(nn.Module):
 
 class Generator(nn.Module):
     """Generator network."""
-    def __init__(self, conv_dims, z_dim, vertexes, edges, nodes, dropout, dim=720, depth=5, heads=4, mlp_ratio=4, drop_rate=0.):
+    def __init__(self, conv_dims, z_dim, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio, drop_rate):
         super(Generator, self).__init__()
 
         self.vertexes = vertexes
@@ -46,9 +46,13 @@ class Generator(nn.Module):
         self.edges_layer = nn.Linear(conv_dims[-1], edges * vertexes * vertexes)
         self.nodes_layer = nn.Linear(conv_dims[-1], vertexes * nodes)
         self.dropoout = nn.Dropout(p=dropout)
-
-        self.Transformer = TransformerEncoder(dim=self.dim, depth=self.depth, heads=self.heads, mlp_ratio=self.mlp_ratio, drop_rate=self.droprate_rate)
         
+        #self.Transformer = TransformerEncoder(dim=self.dim, depth=self.depth, heads=self.heads,
+                                                                    #mlp_ratio=self.mlp_ratio, drop_rate=self.droprate_rate)
+        
+        self.Transformer = torch.nn.DataParallel(TransformerEncoder(dim=self.dim, depth=self.depth, heads=self.heads,
+                                                                    mlp_ratio=self.mlp_ratio, drop_rate=self.droprate_rate))
+        #self.Transformer = torch.nn.DataParallel(self.Transformer)
 
 
     def forward(self, x):
@@ -69,21 +73,21 @@ class Generator(nn.Module):
         nodes_logits = self.nodes_layer(output)
         #print("x before:", type(nodes_logits))
         #print("x before:", nodes_logits.shape)
-        nodes_logits = nodes_logits.view(-1,self.vertexes*self.nodes,self.dim) # (16, 45) ----> (16, 45, 360) 
-       # print("x after:", nodes_logits.shape)
+        nodes_logits = nodes_logits.view(-1,self.vertexes*self.nodes,self.dim) # (16,9,5,720)
+        #print("x after:", nodes_logits.shape)
         #nodes_logits = nodes_logits.view(-1, self.node_dim, self.dim) #16,9,5
         #print("x after:", type(nodes_logits))
         #print("x after:", nodes.shape)
-        nodes_logits = self.Transformer(nodes_logits)
+        nodes_logits = self.Transformer(nodes_logits) #(16,45,720)
         nodes_logits = self.dropoout(nodes_logits)
-        nodes_logits = nodes_logits.view(-1,self.vertexes,self.nodes,self.dim)
+        nodes_logits = nodes_logits.view(-1,self.vertexes,self.nodes,self.dim)  # (16,9,5,720)
         #print("x after_trans:", type(nodes_logits))
-       # print("x after_trans:", nodes_logits.shape)
+        #print("x after_trans:", nodes_logits.shape)
        #print("edge shape:" ,edges_logits.shape)
-        edges_logits = edges_logits.contiguous().view(-1, self.vertexes*self.vertexes*self.nodes,self.dim)
+        edges_logits = edges_logits.contiguous().view(-1, self.vertexes*self.vertexes*self.edges,self.dim)
         edges_logits = self.Transformer(edges_logits)
         edges_logits = self.dropoout(edges_logits)
-        edges_logits = edges_logits.view(-1,self.vertexes,self.vertexes,self.nodes,self.dim)
+        edges_logits = edges_logits.view(-1,self.vertexes,self.vertexes,self.edges,self.dim)
         #print("edges after trans:", edges_logits.shape)
         #print("nodes_logits:",type(nodes_logits))
         #nodes_logits = nodes_logits.view(self.dim)
@@ -94,10 +98,10 @@ class Generator(nn.Module):
         #edges_logits = self.linear(x.permute(0, 2, 1).view(-1, self.dim//16, H, W))
 
 
-        nodes_logits = torch.mean(nodes_logits,-1)
-        edges_logits = torch.mean(edges_logits,-1)
-        print("edges after trans:", edges_logits.shape)
-        print("x after_trans:", nodes_logits.shape)
+        nodes_logits = torch.mean(nodes_logits,-1) #(16,9,5,720)  -------> (16,9,5)
+        edges_logits = torch.mean(edges_logits,-1) #(16,9,9,5,720) ------> (16,9,9,5)
+        #print("last_nodes: ",nodes_logits.shape)
+        #print("last_edges: ", edges_logits.shape)
 
 
         return edges_logits, nodes_logits
@@ -122,7 +126,7 @@ class Discriminator(nn.Module):
 
         self.output_layer = nn.Linear(linear_dim[-1], 1)
 
-    def forward(self, adj, hidden, node, activatation=None):
+    def forward(self, adj, hidden, node, activation=None):
         
         adj = adj[:,:,:,1:].permute(0,3,1,2)
         annotations = torch.cat((hidden, node), -1) if hidden is not None else node
@@ -131,11 +135,11 @@ class Discriminator(nn.Module):
                                  else (h, node), -1)
         h = self.agg_layer(annotations, torch.tanh)
         h = self.linear_layer(h)
-
+        
         # Need to implemente batch discriminator #
         ##########################################
 
         output = self.output_layer(h)
-        output = activatation(output) if activatation is not None else output
-
+        output = activation(output) if activation is not None else output
+        
         return output, h
