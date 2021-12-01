@@ -7,6 +7,7 @@ import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
 from torchvision.utils import save_image
+from torch.utils.tensorboard import SummaryWriter
 
 from utils import *
 from models import Generator, Discriminator
@@ -37,10 +38,10 @@ class Solver(object):
         self.lambda_gp = config.lambda_gp
         self.post_method = config.post_method
         self.dim = config.dim
-        #self.depth = config.depth, 
-        #self.heads = config.heads, 
-        #self.mlp_ratio = config.mlp_ratio, 
-        #self.drop_rate = config.drop_rate
+        self.depth = config.depth 
+        self.heads = config.heads 
+        self.mlp_ratio = config.mlp_ratio
+        self.drop_rate = config.drop_rate
 
         self.metric = 'validity,sas'
 
@@ -88,10 +89,10 @@ class Solver(object):
                            self.data.atom_num_types,
                            self.dropout,
                            dim=self.dim, 
-                           depth=5, 
-                           heads=4, 
-                           mlp_ratio=4, 
-                           drop_rate=0.)
+                           depth=self.depth, 
+                           heads=self.heads, 
+                           mlp_ratio=self.mlp_ratio, 
+                           drop_rate=self.drop_rate)
 
         self.D = Discriminator(self.d_conv_dim, self.m_dim, self.b_dim, self.dropout)
         self.V = Discriminator(self.d_conv_dim, self.m_dim, self.b_dim, self.dropout)
@@ -126,10 +127,14 @@ class Solver(object):
         self.V.load_state_dict(torch.load(V_path, map_location=lambda storage, loc: storage))
 
     def build_tensorboard(self):
-        """Build a tensorboard logger."""
-        from logger import Logger
-        self.logger = Logger(self.log_dir)
-
+        
+        Train_log = SummaryWriter()
+        
+        for iter in self.num_iters:
+            Train_log.add_scalar("Disc. Loss", (), )
+            
+      
+    
     def update_lr(self, g_lr, d_lr):
         """Decay learning rates of the generator and discriminator."""
         for param_group in self.g_optimizer.param_groups:
@@ -177,7 +182,7 @@ class Solver(object):
     def sample_z(self, batch_size):
         return np.random.normal(0, 1, size=(batch_size,self.dim,self.z_dim))
 
-    def postprocess(self, inputs, method, temperature=1.):
+    def postprocess(self, inputs, post_method, temperature=1.):
 
         def listify(x):
             return x if type(x) == list or type(x) == tuple else [x]
@@ -185,11 +190,11 @@ class Solver(object):
         def delistify(x):
             return x if len(x) > 1 else x[0]
 
-        if method == 'soft_gumbel':
+        if post_method == 'soft_gumbel':
             softmax = [F.gumbel_softmax(e_logits.contiguous().view(-1,e_logits.size(-1))
                        / temperature, hard=False).view(e_logits.size())
                        for e_logits in listify(inputs)]
-        elif method == 'hard_gumbel':
+        elif post_method == 'hard_gumbel':
             softmax = [F.gumbel_softmax(e_logits.contiguous().view(-1,e_logits.size(-1))
                        / temperature, hard=True).view(e_logits.size())
                        for e_logits in listify(inputs)]
@@ -360,7 +365,9 @@ class Solver(object):
                 for tag, value in loss.items():
                     log += ", {}: {:.4f}".format(tag, value)
                 print(log)
-
+                
+                
+                
                 if self.use_tensorboard:
                     for tag, value in loss.items():
                         self.logger.scalar_summary(tag, value, i+1)
@@ -382,7 +389,7 @@ class Solver(object):
                 self.update_lr(g_lr, d_lr)
                 print ('Decayed learning rates, g_lr: {}, d_lr: {}.'.format(g_lr, d_lr))
 
-
+      
     def test(self):
         # Load the trained generator.
         self.restore_model(self.test_iters)
@@ -412,3 +419,6 @@ class Solver(object):
                 log = {}
                 log += ", {}: {:.4f}".format(tag, value)
                 print(log)
+
+        
+        
