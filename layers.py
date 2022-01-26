@@ -38,12 +38,13 @@ class Attention(nn.Module):
             nn.Linear(dim, dim),
             nn.Dropout(proj_dropout)
         )
-
+        self.noise_strength_1 = torch.nn.Parameter(torch.zeros([]))
+    
     def forward(self, x):
         b, n, c = x.shape
-        #n = x.shape
-        #qkv = self.qkv(x).chunk(3, dim=-1)
-        #print("qkv:",len(qkv))
+
+        x = x + torch.randn([x.size(0), x.size(1), 1], device=x.device) * self.noise_strength_1
+        
         qkv = self.qkv(x).reshape(b, n, 3, self.heads, c//self.heads)
      
         q, k, v = qkv.permute(2, 0, 3, 1, 4)
@@ -93,8 +94,9 @@ class GraphConvolution(Module):
     def __init__(self, in_features, out_feature_list, b_dim, dropout):
         super(GraphConvolution, self).__init__()
         self.in_features = in_features
+        
         self.out_feature_list = out_feature_list
-
+        
         self.linear1 = nn.Linear(in_features, out_feature_list[0])
         self.linear2 = nn.Linear(out_feature_list[0], out_feature_list[1])
 
@@ -104,10 +106,13 @@ class GraphConvolution(Module):
         # input : 16x9x9
         # adj : 16x4x9x9
         
+
         hidden = torch.stack([self.linear1(input) for _ in range(adj.size(1))], 1)
         hidden = torch.einsum('bijk,bikl->bijl', (adj, hidden))
         hidden = torch.sum(hidden, 1) + self.linear1(input)
         hidden = activation(hidden) if activation is not None else hidden
+        #print("hidden:", hidden.shape)
+        #print("hidden", hidden)
         hidden = self.dropout(hidden)
 
         output = torch.stack([self.linear2(hidden) for _ in range(adj.size(1))], 1)
@@ -121,12 +126,10 @@ class GraphConvolution(Module):
 
 class GraphAggregation(Module):
 
-    def __init__(self, in_features, out_features, b_dim, dropout):
+    def __init__(self, in_features, out_features, m_dim, dropout):
         super(GraphAggregation, self).__init__()
-        self.sigmoid_linear = nn.Sequential(nn.Linear(in_features+b_dim+2, out_features),  #  ----- burayı düzeltmek lazım 
-                                            nn.Sigmoid())
-        self.tanh_linear = nn.Sequential(nn.Linear(in_features+b_dim+2, out_features),  # burayı da. sıkıntı şu atom ve bond 
-                                         nn.Tanh())                                     # dimension uymuyor
+        self.sigmoid_linear = nn.Sequential(nn.Linear(in_features+m_dim, out_features), nn.Sigmoid())
+        self.tanh_linear = nn.Sequential(nn.Linear(in_features+m_dim, out_features), nn.Tanh())                                    
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, input, activation):

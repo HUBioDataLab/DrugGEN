@@ -9,12 +9,13 @@ from rdkit.Chem import QED
 from rdkit.Chem import Crippen
 from rdkit.Chem import AllChem
 from rdkit.Chem import Draw
+import os
 
 import math
 import numpy as np
 
-NP_model = pickle.load(gzip.open('MolecularTransGAN/data/NP_score.pkl.gz'))
-SA_model = {i[j]: float(i[0]) for i in pickle.load(gzip.open('MolecularTransGAN/data/SA_score.pkl.gz')) for j in range(1, len(i))}
+NP_model = pickle.load(gzip.open('MolecularTransGAN-master/data/NP_score.pkl.gz'))
+SA_model = {i[j]: float(i[0]) for i in pickle.load(gzip.open('MolecularTransGAN-master/data/SA_score.pkl.gz')) for j in range(1, len(i))}
 
 
 class MolecularMetrics(object):
@@ -41,7 +42,7 @@ class MolecularMetrics(object):
 
     @staticmethod
     def valid_scores(mols):
-        return np.array(list(map(MolecularMetrics.valid_lambda_special, mols)), dtype=np.float32)
+        return np.array(list(map(MolecularMetrics.valid_lambda_special, mols)), dtype=np.float32).mean()
 
     @staticmethod
     def valid_filter(mols):
@@ -245,13 +246,19 @@ class MolecularMetrics(object):
                                      np.exp(- (x - x_high) ** 2 / decay)],
                          default=np.ones_like(x))
 
-def mols2grid_image(mols, molsPerRow):
+
+
+def mols2grid_image(mols,path):
     mols = [e if e is not None else Chem.RWMol() for e in mols]
+    
+    for i in range(len(mols)):
+        if MolecularMetrics.valid_lambda(mols[i]):
+        #if Chem.MolToSmiles(mols[i]) != '':
+            AllChem.Compute2DCoords(mols[i])
+            Draw.MolToFile(mols[i], os.path.join(path,"{}.png".format(i+1))) 
+        else:
+            continue
 
-    for mol in mols:
-        AllChem.Compute2DCoords(mol)
-
-    return Draw.MolsToGridImage(mols, molsPerRow=molsPerRow, subImgSize=(150, 150))
 
 
 def classification_report(data, model, session, sample=False):
@@ -328,3 +335,29 @@ def all_scores(mols, data, norm=False, reconstruction=False):
           'novel score': MolecularMetrics.novel_total_score(mols, data) * 100}
 
     return m0, m1
+
+def save_smiles_matrices(mols,edges_hard, nodes_hard, path): 
+    mols = [e if e is not None else Chem.RWMol() for e in mols]
+    
+    for i in range(len(mols)):
+        if MolecularMetrics.valid_lambda(mols[i]):
+        #if Chem.MolToSmiles(mols[i]) != '':
+            save_path = os.path.join(path,"{}.txt".format(i+1))
+            with open(save_path, "a") as f:
+                np.savetxt(f, edges_hard[i].cpu().numpy(), header="edge matrix:\n",fmt='%1.2f')
+                f.write("\n")
+                np.savetxt(f, nodes_hard[i].cpu().numpy(), header="node matrix:\n", footer="\nsmiles:",fmt='%1.2f')
+            
+            
+            print(Chem.MolToSmiles(mols[i]), file=open(save_path,"a"))
+        else:
+            continue
+                
+
+
+    
+
+
+        
+    
+        

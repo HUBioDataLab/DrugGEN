@@ -39,7 +39,8 @@ class SparseMolecularDataset():
             self.data = list(filter(lambda x: x is not None, Chem.SDMolSupplier(filename)))
         elif filename.endswith('.smi'):
             self.data = [Chem.MolFromSmiles(line) for line in open(filename, 'r').readlines()]
-
+        l=[i for i,v in enumerate(self.data) if v == None]
+        print(l)
         self.data = list(map(Chem.AddHs, self.data)) if add_h else self.data
         self.data = list(filter(filters, self.data))
         self.data = self.data[:size]
@@ -292,8 +293,8 @@ class SparseMolecularDataset():
 
 if __name__ == '__main__':
     data = SparseMolecularDataset()
-    data.generate('MolecularTransGAN/data/chembl_smiles_20k.smi', filters=lambda x: x.GetNumAtoms() <= 28)
-    data.save('MolecularTransGAN/data/chembl_smiles_20k.sparsedataset')
+    data.generate('MolecularTransGAN-master/data/chembl_smiles.smi', filters=lambda x: x.GetNumAtoms() <= 20)
+    data.save('MolecularTransGAN-master/data/chembl.sparsedataset')
 
     # data = SparseMolecularDataset()
     # data.generate('qm9_5k.smi', validation=0.00021, test=0.00021)  # , filters=lambda x: x.GetNumAtoms() <= 9)

@@ -1,8 +1,9 @@
+from random import randint
 import numpy as np
 import os
 import time
 import datetime
-
+import data.sparse_molecular_dataset as data
 import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
@@ -12,6 +13,8 @@ from torch.utils.tensorboard import SummaryWriter
 from utils import *
 from models import Generator, Discriminator
 from data.sparse_molecular_dataset import SparseMolecularDataset
+from rdkit import Chem
+from skimage.util import random_noise
 
 
 class Solver(object):
@@ -27,7 +30,9 @@ class Solver(object):
 
         # Model configurations.
         self.z_dim = config.z_dim
+        self.feature_matching = config.feature_matching
         self.m_dim = self.data.atom_num_types
+        self.f_dim = self.data.atom_num_types + (self.data.data_F.shape[2] if self.feature_matching is True else 0)
         self.b_dim = self.data.bond_num_types
         self.g_conv_dim = config.g_conv_dim
         self.d_conv_dim = config.d_conv_dim
@@ -42,8 +47,7 @@ class Solver(object):
         self.heads = config.heads 
         self.mlp_ratio = config.mlp_ratio
         self.drop_rate = config.drop_rate
-
-        self.metric = 'validity,sas'
+        self.metrics = config.metrics
 
         # Training configurations.
         self.batch_size = config.batch_size
@@ -55,12 +59,14 @@ class Solver(object):
         self.n_critic = config.n_critic
         self.beta1 = config.beta1
         self.beta2 = config.beta2
+        self.loss_func = config.loss_func
         self.resume_iters = config.resume_iters
 
         # Test configurations.
         self.test_iters = config.test_iters
 
         # Miscellaneous.
+        self.mode = config.mode
         self.use_tensorboard = config.use_tensorboard
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -69,21 +75,21 @@ class Solver(object):
         self.sample_dir = config.sample_dir
         self.model_save_dir = config.model_save_dir
         self.result_dir = config.result_dir
-
         # Step size.
         self.log_step = config.log_step
         self.sample_step = config.sample_step
         self.model_save_step = config.model_save_step
         self.lr_update_step = config.lr_update_step
+        self.noise_strength_2 = torch.nn.Parameter(torch.zeros([]))
+        self.noise_strength_3 = torch.nn.Parameter(torch.zeros([]))
 
-        # Build the model and tensorboard.
         self.build_model()
         if self.use_tensorboard:
             self.build_tensorboard()
-
+                
     def build_model(self):
         """Create a generator and a discriminator."""
-        self.G = Generator(self.g_conv_dim, self.z_dim,
+        self.G = Generator(self.feature_matching, self.g_conv_dim, self.z_dim,
                            self.data.vertexes,
                            self.data.bond_num_types,
                            self.data.atom_num_types,
@@ -93,9 +99,9 @@ class Solver(object):
                            heads=self.heads, 
                            mlp_ratio=self.mlp_ratio, 
                            drop_rate=self.drop_rate)
-
-        self.D = Discriminator(self.d_conv_dim, self.m_dim, self.b_dim, self.dropout)
-        self.V = Discriminator(self.d_conv_dim, self.m_dim, self.b_dim, self.dropout)
+        
+        self.D = Discriminator(self.d_conv_dim, self.f_dim , self.b_dim, self.dropout)
+        self.V = Discriminator(self.d_conv_dim, self.f_dim , self.b_dim, self.dropout)
 
         self.g_optimizer = torch.optim.Adam(list(self.G.parameters())+list(self.V.parameters()),
                                             self.g_lr, [self.beta1, self.beta2])
@@ -119,21 +125,13 @@ class Solver(object):
     def restore_model(self, resume_iters):
         """Restore the trained generator and discriminator."""
         print('Loading the trained models from step {}...'.format(resume_iters))
-        G_path = os.path.join(self.model_save_dir, '{}-G.ckpt'.format(resume_iters))
-        D_path = os.path.join(self.model_save_dir, '{}-D.ckpt'.format(resume_iters))
-        V_path = os.path.join(self.model_save_dir, '{}-V.ckpt'.format(resume_iters))
+        G_path = os.path.join(self.model_directory, '{}-G.ckpt'.format(resume_iters))
+        D_path = os.path.join(self.model_directory, '{}-D.ckpt'.format(resume_iters))
+        V_path = os.path.join(self.model_directory, '{}-V.ckpt'.format(resume_iters))
         self.G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
         self.D.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
         self.V.load_state_dict(torch.load(V_path, map_location=lambda storage, loc: storage))
 
-    def build_tensorboard(self):
-        
-        Train_log = SummaryWriter()
-        
-        for iter in self.num_iters:
-            Train_log.add_scalar("Disc. Loss", (), )
-            
-      
     
     def update_lr(self, g_lr, d_lr):
         """Decay learning rates of the generator and discriminator."""
@@ -154,7 +152,7 @@ class Solver(object):
 
     def gradient_penalty(self, y, x):
         """Compute gradient penalty: (L2_norm(dy/dx) - 1)**2."""
-        weight = torch.ones(y.size()).to(self.device)
+        weight = torch.ones(y.size(),requires_grad=False).to(self.device)
         dydx = torch.autograd.grad(outputs=y,
                                    inputs=x,
                                    grad_outputs=weight,
@@ -163,8 +161,8 @@ class Solver(object):
                                    only_inputs=True)[0]
 
         dydx = dydx.view(dydx.size(0), -1)
-        dydx_l2norm = torch.sqrt(torch.sum(dydx**2, dim=1))
-        return torch.mean((dydx_l2norm-1)**2)
+        gradient_penalty = ((dydx.norm(2, dim=1) - 1) ** 2).mean()
+        return gradient_penalty
 
     def label2onehot(self, labels, dim):
         """Convert label indices to one-hot vectors."""
@@ -180,16 +178,18 @@ class Solver(object):
             return F.cross_entropy(logit, target)
 
     def sample_z(self, batch_size):
-        return np.random.normal(0, 1, size=(batch_size,self.dim,self.z_dim))
+        return np.random.normal(0, 1, size=(batch_size,self.z_dim))
+    
+    
 
     def postprocess(self, inputs, post_method, temperature=1.):
-
+        
         def listify(x):
             return x if type(x) == list or type(x) == tuple else [x]
 
         def delistify(x):
             return x if len(x) > 1 else x[0]
-
+        
         if post_method == 'soft_gumbel':
             softmax = [F.gumbel_softmax(e_logits.contiguous().view(-1,e_logits.size(-1))
                        / temperature, hard=False).view(e_logits.size())
@@ -198,15 +198,15 @@ class Solver(object):
             softmax = [F.gumbel_softmax(e_logits.contiguous().view(-1,e_logits.size(-1))
                        / temperature, hard=True).view(e_logits.size())
                        for e_logits in listify(inputs)]
-        else:
+        elif post_method == 'softmax':
             softmax = [F.softmax(e_logits / temperature, -1)
                        for e_logits in listify(inputs)]
 
-        return [delistify(e) for e in (softmax)]
+        return [delistify(e) for e in (softmax)] 
 
     def reward(self, mols):
         rr = 1.
-        for m in ('logp,sas,qed,unique' if self.metric == 'all' else self.metric).split(','):
+        for m in ('logp,sas,qed,unique' if self.metrics == 'all' else self.metrics).split(','):
 
             if m == 'np':
                 rr *= MolecularMetrics.natural_product_scores(mols, norm=True)
@@ -225,14 +225,24 @@ class Solver(object):
             elif m == 'diversity':
                 rr *= MolecularMetrics.diversity_scores(mols, self.data)
             elif m == 'validity':
-                rr *= MolecularMetrics.valid_scores(mols)
+                rr *= MolecularMetrics.valid_total_score(mols)
             else:
                 raise RuntimeError('{} is not defined as a metric'.format(m))
 
         return rr.reshape(-1, 1)
-
+    
     def train(self):
-
+        
+        self.arguments = "batch{}_zdim{}_glr{}_dlr{}_dim{}_depth{}_heads{}_critic{}_loss-{}_epoch{}".format(self.batch_size,self.z_dim, self.g_lr, self.d_lr, self.dim,self.depth,self.heads,self.n_critic,self.loss_func,self.num_iters)
+        writer = SummaryWriter(log_dir=os.path.join(self.result_dir, self.arguments))
+        self.model_directory= os.path.join(self.model_save_dir,self.arguments)
+        self.sample_directory=os.path.join(self.sample_dir,self.arguments)
+        log_path = os.path.join(self.log_dir, "{}.txt".format(self.arguments))
+        if not os.path.exists(self.model_directory):
+            os.makedirs(self.model_directory)
+        if not os.path.exists(self.sample_directory):
+            os.makedirs(self.sample_directory)         
+        
         # Learning rate cache for decaying.
         g_lr = self.g_lr
         d_lr = self.d_lr
@@ -247,136 +257,209 @@ class Solver(object):
         print('Start training...')
         start_time = time.time()
         for i in range(start_iters, self.num_iters):
+            
             if (i+1) % self.log_step == 0:
-                mols, _, _, a, x, _, _, _, _ = self.data.next_validation_batch(self.batch_size)
+                mols, _, _, a, x, _, f, _, _ = self.data.next_validation_batch(self.batch_size)
                 z = self.sample_z(a.shape[0])
                 print('[Valid]', '')
             else:
-                mols, _, _, a, x, _, _, _, _ = self.data.next_train_batch(self.batch_size)
+                mols, _, _, a, x, _, f, _, _ = self.data.next_train_batch(self.batch_size)
                 z = self.sample_z(self.batch_size)
                 
             # =================================================================================== #
             #                             1. Preprocess input data                                #
             # =================================================================================== #
-
-            a = torch.from_numpy(a).to(self.device).long()            # Adjacency.
-            x = torch.from_numpy(x).to(self.device).long()            # Nodes.
+            
+            
+            a = torch.from_numpy(a).to(self.device).long()          # Adjacency.
+            x = torch.from_numpy(x).to(self.device).long()          # Nodes.
+            f = torch.from_numpy(f).to(self.device).long()          # Features.
+            
+            f = f if self.feature_matching is True else None
             a_tensor = self.label2onehot(a, self.b_dim)
             x_tensor = self.label2onehot(x, self.m_dim)
+            
+            a_tensor = a_tensor + torch.randn([a_tensor.size(0), a_tensor.size(1), a_tensor.size(2),1], device=a_tensor.device) * self.noise_strength_2
+            x_tensor = x_tensor + torch.randn([x_tensor.size(0), x_tensor.size(1),1], device=x_tensor.device) * self.noise_strength_3
+            
             z = torch.from_numpy(z).to(self.device).float()
-
+            
+         
             # =================================================================================== #
             #                             2. Train the discriminator                              #
             # =================================================================================== #
-            #print("a_tensor", a_tensor)
-            #print("x_tensor", x_tensor)
-            # Compute loss with real images.
-            logits_real, features_real = self.D(a_tensor, None, x_tensor)
+            
+            logits_real, features_real = self.D(a_tensor, f, x_tensor)
             d_loss_real = - torch.mean(logits_real)
             
 
             # Compute loss with fake images.
             edges_logits, nodes_logits = self.G(z)
-            #print("before",edges_logits)
-            #print("before_n", nodes_logits)
+            
+            
+
+            
             # Postprocess with Gumbel softmax
-            (edges_hat, nodes_hat) = self.postprocess((edges_logits, nodes_logits), self.post_method)
-            #print("edges_hat", edges_hat)
-            #print("nodes_hat", nodes_hat)
+            
+            (edges_hat, nodes_hat) = self.postprocess((edges_logits,nodes_logits), self.post_method)
+            
+            # =================================================================================== #
+            #                            Feature Matching Only                                    #
+            # =================================================================================== #
+            
+            if self.feature_matching is True:
+                
+                edges_hard, nodes_hard = torch.max(edges_hat, -1)[1], torch.max(nodes_hat, -1)[1]
+            
+                fake_mol = [self.data.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True) 
+                            for e_, n_ in zip(edges_hard, nodes_hard)]
+                features_hat = torch.empty(size=(self.batch_size, f.size(1),f.size(2))).to(self.device).long()
+                for iter in range(len(fake_mol)):
+                    if fake_mol[iter] != None:
+                        features_hat[iter] = torch.from_numpy(self.data._genF(fake_mol[iter]))
+                    elif fake_mol[iter] == None:
+                        features_hat[iter] = torch.zeros(size=(1, f.size(1),f.size(2)))
+            else:
+                features_hat = None       
+            
+            # =================================================================================== #
+            #                            Feature Matching Only                                    #
+            # =================================================================================== #
             
             
-            logits_fake, features_fake = self.D(edges_hat, None, nodes_hat)
+            logits_fake, features_fake = self.D(edges_hat, features_hat, nodes_hat)
             d_loss_fake = torch.mean(logits_fake)
 
             # Compute loss for gradient penalty.
             eps = torch.rand(logits_real.size(0),1,1,1).to(self.device)
             x_int0 = (eps * a_tensor + (1. - eps) * edges_hat).requires_grad_(True)
             x_int1 = (eps.squeeze(-1) * x_tensor + (1. - eps.squeeze(-1)) * nodes_hat).requires_grad_(True)
-            grad0, grad1 = self.D(x_int0, None, x_int1)
-            d_loss_gp = self.gradient_penalty(grad0, x_int0) + self.gradient_penalty(grad1, x_int1)
-
+            x_int2 = ((eps.squeeze(-1) * f + (1. - eps.squeeze(-1)) * features_hat).requires_grad_(True)) if self.feature_matching is True else None
+            
+            grad0, grad1 = self.D(x_int0, x_int2, x_int1)
+            d_loss_gp = self.gradient_penalty(grad0, x_int0) + self.gradient_penalty(grad1, x_int1) 
+          
+          
 
             # Backward and optimize.
             d_loss = d_loss_fake + d_loss_real + self.lambda_gp * d_loss_gp
             self.reset_grad()
-            d_loss.backward()
+            d_loss.backward(retain_graph = True)
             self.d_optimizer.step()
 
             # Logging.
             loss = {}
-            #loss['D/loss_real'] = d_loss_real.item()
-            #loss['D/loss_fake'] = d_loss_fake.item()
-            #loss['D/loss_gp'] = d_loss_gp.item()
+            loss['D/loss_real'] = d_loss_real.item()
+            loss['D/loss_fake'] = d_loss_fake.item()
+            loss['D/loss_gp'] = d_loss_gp.item()
             loss["D/d_loss"] = d_loss.item()
             # =================================================================================== #
             #                               3. Train the generator                                #
             # =================================================================================== #
 
             if (i+1) % self.n_critic == 0:
+                
                 # Z-to-target
+                
                 edges_logits, nodes_logits = self.G(z)
+                
                 # Postprocess with Gumbel softmax
-                (edges_hat, nodes_hat) = self.postprocess((edges_logits, nodes_logits), self.post_method)
-                logits_fake, features_fake = self.D(edges_hat, None, nodes_hat)
-                g_loss_fake = - torch.mean(logits_fake)
+               
+                (edges_hat, nodes_hat) = self.postprocess((edges_logits,nodes_logits), self.post_method)
+                (edges_hard, nodes_hard) = self.postprocess((edges_logits,nodes_logits), "hard_gumbel")
+                edges_hard, nodes_hard = torch.max(edges_hard, -1)[1], torch.max(nodes_hard, -1)[1]   
+                
+                fake_mol = [self.data.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True) 
+                               for e_, n_ in zip(edges_hard, nodes_hard)]    
+               
+            # =================================================================================== #
+            #                            Feature Matching Only                                    #
+            # =================================================================================== # 
+               
+                if self.feature_matching is True:
+                
+                    features_hat = torch.empty(size=(self.batch_size, f.size(1),f.size(2))).to(self.device).long()
+                    for iter in range(len(fake_mol)):
+                        if fake_mol[iter] != None:
+                            features_hat[iter] = torch.from_numpy(self.data._genF(fake_mol[iter]))
+                        elif fake_mol[iter] == None:
+                            features_hat[iter] = torch.zeros(size=(1, f.size(1),f.size(2)))    
+                else:
+                    features_hat = None
+                
+            # =================================================================================== #
+            #                            Feature Matching Only                                    #
+            # =================================================================================== #    
+                logits_fake, features_fake = self.D(edges_hat, features_hat, nodes_hat)
+                g_loss_fake = -torch.mean(logits_fake) 
+                
+                
 
                 # Real Reward
+                
                 rewardR = torch.from_numpy(self.reward(mols)).to(self.device)
+                
                 # Fake Reward
-                (edges_hard, nodes_hard) = self.postprocess((edges_logits, nodes_logits), 'hard_gumbel')
-                edges_hard, nodes_hard = torch.max(edges_hard, -1)[1], torch.max(nodes_hard, -1)[1]
-                mols = [self.data.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True)
-                        for e_, n_ in zip(edges_hard, nodes_hard)]
-                rewardF = torch.from_numpy(self.reward(mols)).to(self.device)
-
+                
+                rewardF = torch.from_numpy(self.reward(fake_mol)).to(self.device)
+                
+                
+                logits_real, features_real = self.D(a_tensor, f, x_tensor)
+                  
+                         
                 # Value loss
-                value_logit_real,_ = self.V(a_tensor, None, x_tensor, torch.sigmoid)
-                value_logit_fake,_ = self.V(edges_hat, None, nodes_hat, torch.sigmoid)
+                value_logit_real,_ = self.V(a_tensor, f, x_tensor, torch.sigmoid)
+                value_logit_fake,_ = self.V(edges_hat, features_hat, nodes_hat, torch.sigmoid)
                 g_loss_value = torch.mean((value_logit_real - rewardR) ** 2 + (
                                            value_logit_fake - rewardF) ** 2)
-                #rl_loss= -value_logit_fake
-                #f_loss = (torch.mean(features_real, 0) - torch.mean(features_fake, 0)) ** 2
-
-                # Backward and optimize.
-                g_loss = g_loss_fake + g_loss_value
+                
+                f_loss = torch.sum((torch.mean(features_real, 0) - torch.mean(features_fake, 0)) ** 2)
+              
+                # Backward and optimize. 
+                g_loss = g_loss_value + g_loss_fake ### burayı feature matching'e göre düzenle
                 self.reset_grad()
                 g_loss.backward()
                 self.g_optimizer.step()
-
+                
                 # Logging.
-                #loss['G/loss_fake'] = g_loss_fake.item()
-                #loss['G/loss_value'] = g_loss_value.item()
+                loss['G/loss_fake'] = g_loss_fake.item()
+                loss['G/loss_value'] = g_loss_value.item() 
+                #loss['G/f_loss'] = f_loss.item()
                 loss["G/g_loss"] = g_loss.item()
+                
+                
             # =================================================================================== #
             #                                 4. Miscellaneous                                    #
             # =================================================================================== #
-
+            
+            
             # Print out training information.
-            if (i+1) % self.log_step == 0:
+            if (i+1) % (self.log_step) == 0:
+                
                 et = time.time() - start_time
                 et = str(datetime.timedelta(seconds=et))[:-7]
                 log = "Elapsed [{}], Iteration [{}/{}]".format(et, i+1, self.num_iters)
 
                 # Log update
-                m0, m1 = all_scores(mols, self.data, norm=True)     # 'mols' is output of Fake Reward
+                m0, m1 = all_scores(fake_mol, self.data, norm=True)     # 'mols' is output of Fake Reward
                 m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
                 m0.update(m1)
                 loss.update(m0)
                 for tag, value in loss.items():
+                    
                     log += ", {}: {:.4f}".format(tag, value)
+                    
                 print(log)
-                
-                
-                
-                if self.use_tensorboard:
-                    for tag, value in loss.items():
-                        self.logger.scalar_summary(tag, value, i+1)
+                logs = open(log_path, "a")
+                logs.write(log)
+                logs.write("\n")
+                logs.close()
 
             # Save model checkpoints.
             if (i+1) % self.model_save_step == 0:
-                G_path = os.path.join(self.model_save_dir, '{}-G.ckpt'.format(i+1))
-                D_path = os.path.join(self.model_save_dir, '{}-D.ckpt'.format(i+1))
-                V_path = os.path.join(self.model_save_dir, '{}-V.ckpt'.format(i+1))
+                G_path = os.path.join(self.model_directory, '{}-G.ckpt'.format(i+1))
+                D_path = os.path.join(self.model_directory, '{}-D.ckpt'.format(i+1))
+                V_path = os.path.join(self.model_directory, '{}-V.ckpt'.format(i+1))
                 torch.save(self.G.state_dict(), G_path)
                 torch.save(self.D.state_dict(), D_path)
                 torch.save(self.V.state_dict(), V_path)
@@ -388,8 +471,39 @@ class Solver(object):
                 d_lr -= (self.d_lr / float(self.num_iters_decay))
                 self.update_lr(g_lr, d_lr)
                 print ('Decayed learning rates, g_lr: {}, d_lr: {}.'.format(g_lr, d_lr))
+            
+            
+            if (i+1) % (self.sample_step) == 0:
+                self.sample_path = os.path.join(self.sample_directory,"{}-iteration".format(i+1))
+                if not os.path.exists(self.sample_path):
+                    os.makedirs(self.sample_path)
+                mols2grid_image(fake_mol,self.sample_path)
+                save_smiles_matrices(fake_mol,edges_hard.detach(), nodes_hard.detach(), self.sample_path)                                 
+                print("Sample molecules are saved.")
+                print("Matrices and smiles are saved")
 
-      
+                
+            
+            
+            if (i+1) % self.n_critic == 0:
+            
+                writer.add_scalar("D/loss_real", d_loss_real.item(), i)
+                writer.add_scalar("D/loss_fake", d_loss_fake.item(), i)
+                writer.add_scalar("D/loss_gp", d_loss_gp.item(), i)
+                writer.add_scalar("D/total_loss", d_loss.item(), i)
+                #writer.add_scalar("G/f_loss", f_loss.item(), i) 
+                writer.add_scalar("G/loss_value", g_loss_value.item(), i)
+                writer.add_scalar("G/total_loss", g_loss.item(), i)
+                writer.add_scalar("G/loss_fake", g_loss_fake.item(), i)
+           
+        
+        writer.close()
+            
+        
+            
+                
+            
+            
     def test(self):
         # Load the trained generator.
         self.restore_model(self.test_iters)
@@ -406,19 +520,19 @@ class Solver(object):
             g_loss_fake = - torch.mean(logits_fake)
 
             # Fake Reward
-            (edges_hard, nodes_hard) = self.postprocess((edges_logits, nodes_logits), 'hard_gumbel')
+            (edges_hard, nodes_hard) = self.postprocess((edges_logits, nodes_logits), self.post_method)
             edges_hard, nodes_hard = torch.max(edges_hard, -1)[1], torch.max(nodes_hard, -1)[1]
             mols = [self.data.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True)
                     for e_, n_ in zip(edges_hard, nodes_hard)]
-
+            
             # Log update
             m0, m1 = all_scores(mols, self.data, norm=True)     # 'mols' is output of Fake Reward
             m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
             m0.update(m1)
+            
+            mols2grid_image(mols)
+                        
+            log = "Test started [{}]".format("now")
             for tag, value in m0.items():
-                log = {}
                 log += ", {}: {:.4f}".format(tag, value)
                 print(log)
-
-        
-        
