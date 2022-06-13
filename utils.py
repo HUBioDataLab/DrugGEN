@@ -1,6 +1,5 @@
 from sklearn.metrics import classification_report as sk_classification_report
 from sklearn.metrics import confusion_matrix
-
 import pickle
 import gzip
 from rdkit import DataStructs
@@ -10,7 +9,6 @@ from rdkit.Chem import Crippen
 from rdkit.Chem import AllChem
 from rdkit.Chem import Draw
 import os
-
 import math
 import numpy as np
 
@@ -64,7 +62,9 @@ class MolecularMetrics(object):
     @staticmethod
     def novel_total_score(mols, data):
         return MolecularMetrics.novel_scores(MolecularMetrics.valid_filter(mols), data).mean()
-
+    @staticmethod
+    def novel_total_score_forsave(mols, data):
+        return MolecularMetrics.novel_scores(MolecularMetrics.valid_filter(mols), data)
     @staticmethod
     def unique_scores(mols):
         smiles = list(map(lambda x: Chem.MolToSmiles(x) if MolecularMetrics.valid_lambda(x) else '', mols))
@@ -76,32 +76,6 @@ class MolecularMetrics(object):
         v = MolecularMetrics.valid_filter(mols)
         s = set(map(lambda x: Chem.MolToSmiles(x), v))
         return 0 if len(v) == 0 else len(s) / len(v)
-
-    # @staticmethod
-    # def novel_and_unique_total_score(mols, data):
-    #     return ((MolecularMetrics.unique_scores(mols) == 1).astype(float) * MolecularMetrics.novel_scores(mols,
-    #                                                                                                       data)).sum()
-    #
-    # @staticmethod
-    # def reconstruction_scores(data, model, session, sample=False):
-    #
-    #     m0, _, _, a, x, _, f, _, _ = data.next_validation_batch()
-    #     feed_dict = {model.edges_labels: a, model.nodes_labels: x, model.node_features: f, model.training: False}
-    #
-    #     try:
-    #         feed_dict.update({model.variational: False})
-    #     except AttributeError:
-    #         pass
-    #
-    #     n, e = session.run([model.nodes_gumbel_argmax, model.edges_gumbel_argmax] if sample else [
-    #         model.nodes_argmax, model.edges_argmax], feed_dict=feed_dict)
-    #
-    #     n, e = np.argmax(n, axis=-1), np.argmax(e, axis=-1)
-    #
-    #     m1 = [data.matrices2mol(n_, e_, strict=True) for n_, e_ in zip(n, e)]
-    #
-    #     return np.mean([float(Chem.MolToSmiles(m0_) == Chem.MolToSmiles(m1_)) if m1_ is not None else 0
-    #             for m0_, m1_ in zip(m0, m1)])
 
     @staticmethod
     def natural_product_scores(mols, norm=False):
@@ -128,7 +102,18 @@ class MolecularMetrics(object):
         return np.array(list(map(lambda x: 0 if x is None else x, [
             MolecularMetrics._avoid_sanitization_error(lambda: QED.qed(mol)) if mol is not None else None for mol in
             mols])))
+    @staticmethod
+    def quantitative_estimation_druglikeness_scores_forsave(mol, norm=False):
+        return np.array([
+            MolecularMetrics._avoid_sanitization_error(lambda: QED.qed(mol))])
+    @staticmethod
+    def water_octanol_partition_coefficient_scores_forsave(mol, norm=False):
+        scores = [MolecularMetrics._avoid_sanitization_error(lambda: Crippen.MolLogP(mol))]
+        scores = np.array(list(map(lambda x: -3 if x is None else x, scores)))
+        scores = np.clip(MolecularMetrics.remap(scores, -2.12178879609, 6.0429063424), 0.0, 1.0) if norm else scores
 
+        return scores        
+        
     @staticmethod
     def water_octanol_partition_coefficient_scores(mols, norm=False):
         scores = [MolecularMetrics._avoid_sanitization_error(lambda: Crippen.MolLogP(mol)) if mol is not None else None
@@ -209,10 +194,17 @@ class MolecularMetrics(object):
         scores = np.clip(MolecularMetrics.remap(scores, 5, 1.5), 0.0, 1.0) if norm else scores
 
         return scores
+    @staticmethod
+    def synthetic_accessibility_score_scores_forsave(mol, norm=False):
+        scores = [MolecularMetrics._compute_SAS(mol)]
+        scores = np.array(list(map(lambda x: 10 if x is None else x, scores)))
+        scores = np.clip(MolecularMetrics.remap(scores, 5, 1.5), 0.0, 1.0) if norm else scores
+
+        return scores
 
     @staticmethod
     def diversity_scores(mols, data):
-        rand_mols = np.random.choice(data.data, 100)
+        rand_mols = np.random.choice(data, 100)
         fps = [Chem.rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, 4, nBits=2048) for mol in rand_mols]
 
         scores = np.array(
@@ -255,100 +247,52 @@ def mols2grid_image(mols,path):
         if MolecularMetrics.valid_lambda(mols[i]):
         #if Chem.MolToSmiles(mols[i]) != '':
             AllChem.Compute2DCoords(mols[i])
-            Draw.MolToFile(mols[i], os.path.join(path,"{}.png".format(i+1))) 
+            Draw.MolToFile(mols[i], os.path.join(path,"{}.png".format(i+1)), size=(1200,1200)) 
         else:
             continue
 
 
-
-def classification_report(data, model, session, sample=False):
-    _, _, _, a, x, _, f, _, _ = data.next_validation_batch()
-
-    n, e = session.run([model.nodes_gumbel_argmax, model.edges_gumbel_argmax] if sample else [
-        model.nodes_argmax, model.edges_argmax], feed_dict={model.edges_labels: a, model.nodes_labels: x,
-                                                            model.node_features: f, model.training: False,
-                                                            model.variational: False})
-    n, e = np.argmax(n, axis=-1), np.argmax(e, axis=-1)
-
-    y_true = e.flatten()
-    y_pred = a.flatten()
-    target_names = [str(Chem.rdchem.BondType.values[int(e)]) for e in data.bond_decoder_m.values()]
-
-    print('######## Classification Report ########\n')
-    print(sk_classification_report(y_true, y_pred, labels=list(range(len(target_names))),
-                                   target_names=target_names))
-
-    print('######## Confusion Matrix ########\n')
-    print(confusion_matrix(y_true, y_pred, labels=list(range(len(target_names)))))
-
-    y_true = n.flatten()
-    y_pred = x.flatten()
-    target_names = [Chem.Atom(e).GetSymbol() for e in data.atom_decoder_m.values()]
-
-    print('######## Classification Report ########\n')
-    print(sk_classification_report(y_true, y_pred, labels=list(range(len(target_names))),
-                                   target_names=target_names))
-
-    print('\n######## Confusion Matrix ########\n')
-    print(confusion_matrix(y_true, y_pred, labels=list(range(len(target_names)))))
-
-
-def reconstructions(data, model, session, batch_dim=10, sample=False):
-    m0, _, _, a, x, _, f, _, _ = data.next_train_batch(batch_dim)
-
-    n, e = session.run([model.nodes_gumbel_argmax, model.edges_gumbel_argmax] if sample else [
-        model.nodes_argmax, model.edges_argmax], feed_dict={model.edges_labels: a, model.nodes_labels: x,
-                                                            model.node_features: f, model.training: False,
-                                                            model.variational: False})
-    n, e = np.argmax(n, axis=-1), np.argmax(e, axis=-1)
-
-    m1 = np.array([e if e is not None else Chem.RWMol() for e in [data.matrices2mol(n_, e_, strict=True)
-                                                                  for n_, e_ in zip(n, e)]])
-
-    mols = np.vstack((m0, m1)).T.flatten()
-
-    return mols
-
-
-def samples(data, model, session, embeddings, sample=False):
-    n, e = session.run([model.nodes_gumbel_argmax, model.edges_gumbel_argmax] if sample else [
-        model.nodes_argmax, model.edges_argmax], feed_dict={
-        model.embeddings: embeddings, model.training: False})
-    n, e = np.argmax(n, axis=-1), np.argmax(e, axis=-1)
-
-    mols = [data.matrices2mol(n_, e_, strict=True) for n_, e_ in zip(n, e)]
-
-    return mols
-
-
-def all_scores(mols, data, norm=False, reconstruction=False):
+def all_scores(mols, data,  norm=False):
     m0 = {k: list(filter(lambda e: e is not None, v)) for k, v in {
-        'NP score': MolecularMetrics.natural_product_scores(mols, norm=norm),
         'QED score': MolecularMetrics.quantitative_estimation_druglikeness_scores(mols),
         'logP score': MolecularMetrics.water_octanol_partition_coefficient_scores(mols, norm=norm),
-        'SA score': MolecularMetrics.synthetic_accessibility_score_scores(mols, norm=norm),
-        'diversity score': MolecularMetrics.diversity_scores(mols, data),
-        'drugcandidate score': MolecularMetrics.drugcandidate_scores(mols, data)}.items()}
+        'SA score': MolecularMetrics.synthetic_accessibility_score_scores(mols, norm=norm)}.items()}
 
     m1 = {'valid score': MolecularMetrics.valid_total_score(mols) * 100,
-          'unique score': MolecularMetrics.unique_total_score(mols) * 100,
-          'novel score': MolecularMetrics.novel_total_score(mols, data) * 100}
-
+          'unique score': MolecularMetrics.unique_total_score(mols) * 100}
+        #             'NP score': MolecularMetrics.natural_product_scores(mols, norm=norm),    
+        # 'novel score': MolecularMetrics.novel_total_score(mols, data) * 100
+        # 'drugcandidate score': MolecularMetrics.drugcandidate_scores(mols, data)
     return m0, m1
+def all_scores_for_print(mols, data,  norm=False):
+    m0 = {'QED score': MolecularMetrics.quantitative_estimation_druglikeness_scores_forsave(mols),
+        'logP score': MolecularMetrics.water_octanol_partition_coefficient_scores_forsave(mols, norm=norm),
+        'SA score': MolecularMetrics.synthetic_accessibility_score_scores_forsave(mols, norm=norm)}
 
-def save_smiles_matrices(mols,edges_hard, nodes_hard, path): 
+
+         #   'diversity score': MolecularMetrics.diversity_scores(mols, data),
+        #'drugcandidate score': MolecularMetrics.drugcandidate_scores(mols, data),
+        #             'NP score': MolecularMetrics.natural_product_scores(mols, norm=norm),    
+        # 'novel score': MolecularMetrics.novel_total_score(mols, data) * 100
+        # 'drugcandidate score': MolecularMetrics.drugcandidate_scores(mols, data)
+    return m0
+def save_smiles_matrices(mols,edges_hard, nodes_hard,path,data_source = None): 
     mols = [e if e is not None else Chem.RWMol() for e in mols]
     
     for i in range(len(mols)):
         if MolecularMetrics.valid_lambda(mols[i]):
+            #m0= all_scores_for_print(mols[i], data_source, norm=False)
         #if Chem.MolToSmiles(mols[i]) != '':
             save_path = os.path.join(path,"{}.txt".format(i+1))
             with open(save_path, "a") as f:
                 np.savetxt(f, edges_hard[i].cpu().numpy(), header="edge matrix:\n",fmt='%1.2f')
                 f.write("\n")
                 np.savetxt(f, nodes_hard[i].cpu().numpy(), header="node matrix:\n", footer="\nsmiles:",fmt='%1.2f')
-            
-            
+                f.write("\n")
+                #f.write(m0)
+                f.write("\n")
+        
+
             print(Chem.MolToSmiles(mols[i]), file=open(save_path,"a"))
         else:
             continue
