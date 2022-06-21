@@ -25,11 +25,11 @@ class DruggenDataset(InMemoryDataset):
     
     @property
     def raw_file_names(self):
-        return ["chembl25.pt","chembl45.pt","qm9.pt"]
+        return ["chembl25.pt","chembl45.pt","qm9.pt","zinc_250k.pt"]
 
     @property
     def processed_file_names(self):
-        return ['chembl25.pt','chembl45.pt','qm9.pt']
+        return ['chembl25.pt','chembl45.pt','qm9.pt',"zinc_250k.pt"]
 
     def _generate_encoders_decoders(self, data):
         self.data = data
@@ -52,19 +52,19 @@ class DruggenDataset(InMemoryDataset):
         print('Created bonds encoder and decoder with {} bond types and 1 PAD symbol!'.format(
             self.bond_num_types - 1))        
         #dataset_names = str(self.dataset_name)
-        atom_encoders = open("MolecularTransGAN-master/data/atom_encoders" + "chembl25" + ".pkl","wb")
+        atom_encoders = open("MolecularTransGAN-master/data/atom_encoders" + "zinc_250k" + ".pkl","wb")
         pickle.dump(self.atom_encoder_m,atom_encoders)
         atom_encoders.close()
         
-        atom_decoders = open("MolecularTransGAN-master/data/atom_decoders" + "chembl25" + ".pkl","wb")
+        atom_decoders = open("MolecularTransGAN-master/data/atom_decoders" + "zinc_250k" + ".pkl","wb")
         pickle.dump(self.atom_decoder_m,atom_decoders)
         atom_decoders.close() 
                
-        bond_encoders = open("MolecularTransGAN-master/data/bond_encoders" + "chembl25" + ".pkl","wb")
+        bond_encoders = open("MolecularTransGAN-master/data/bond_encoders" + "zinc_250k" + ".pkl","wb")
         pickle.dump(self.bond_encoder_m,bond_encoders)
         bond_encoders.close()  
               
-        bond_decoders = open("MolecularTransGAN-master/data/bond_decoders" + "chembl25" + ".pkl","wb")
+        bond_decoders = open("MolecularTransGAN-master/data/bond_decoders" + "zinc_250k" + ".pkl","wb")
         pickle.dump(self.bond_decoder_m,bond_decoders)
         bond_decoders.close()        
         
@@ -109,10 +109,10 @@ class DruggenDataset(InMemoryDataset):
         for start, end in zip(*np.nonzero(edge_labels)):
             if start > end:
                 mol.AddBond(int(start), int(end), bond_decoders[edge_labels[start, end]])
-
+        #mol = self.correct_mol(mol)
         if strict:
             try:
-                #self.check_valency(mol)
+                
                 Chem.SanitizeMol(mol)
             except:
                 mol = None
@@ -129,10 +129,9 @@ class DruggenDataset(InMemoryDataset):
         for start, end in zip(*np.nonzero(edge_labels)):
             if start > end:
                 mol.AddBond(int(start), int(end), bond_decoders[edge_labels[start, end]])
-
+        mol = self.correct_mol(mol)
         if strict:
             try:
-                #self.check_valency(mol)
                 Chem.SanitizeMol(mol)
             except:
                 mol = None
@@ -177,8 +176,10 @@ class DruggenDataset(InMemoryDataset):
                     end = queue[0][3]
                     t = queue[0][1] - 1
                     mol.RemoveBond(start, end)
-                    if t >= 1:
-                        mol.AddBond(start, end, self.decoder_load('bond_decoders')[t])
+        
+                    #if t >= 1:
+                        
+                        #mol.AddBond(start, end, self.decoder_load('bond_decoders')[t])
                     # if '.' in Chem.MolToSmiles(mol, isomericSmiles=True):
                     #     print(tt)
                     #     print(Chem.MolToSmiles(mol, isomericSmiles=True))
@@ -187,8 +188,8 @@ class DruggenDataset(InMemoryDataset):
     
     def process(self, size= None):
         
-        mols = [Chem.MolFromSmiles(line) for line in open("MolecularTransGAN-master/data/chembl_smiles.smi", 'r').readlines()]
-        mols = list(filter(lambda x: x.GetNumAtoms() <= 25, mols))
+        mols = [Chem.MolFromSmiles(line) for line in open("MolecularTransGAN-master/data/zinc_250k.smi", 'r').readlines()]
+        mols = list(filter(lambda x: x.GetNumAtoms() <= 45, mols))
         mols = mols[:size]
         indices = range(len(mols))
         
@@ -226,7 +227,7 @@ class DruggenDataset(InMemoryDataset):
 
         pbar.close()
 
-        torch.save(self.collate(data_list), osp.join(self.processed_dir, "chembl25.pt"))
+        torch.save(self.collate(data_list), osp.join(self.processed_dir, "zinc_250k.pt"))
 
 
 

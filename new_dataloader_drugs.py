@@ -122,7 +122,7 @@ class DruggenDataset_drugs(InMemoryDataset):
 
     def process(self, size= None):
         
-        mols = [Chem.MolFromSmiles(line) for line in open("MolecularTransGAN-master/data/drug_smiles.smi", 'r').readlines()]
+        mols = [Chem.MolFromSmiles(line) for line in open("MolecularTransGAN-master/data/akt1_inhibitors.smi", 'r').readlines()]
         #mols = list(filter(lambda x: x.GetNumAtoms() <= 45, mols))
         mols = mols[:size]
         indices = range(len(mols))

@@ -13,7 +13,7 @@ class GraphTransformerEncoder(nn.Module):
         self.node_embed = node_embed
         self.edge_embed = edge_embed
         self.pos_embed = pos_embed
-        self.pos = nn.Linear(2,dim)
+        self.pos = nn.Linear(3,dim)
         self.dropout = nn.Dropout(0.1)
         
     def laplacian_positional_encoding(self, x):
@@ -22,7 +22,7 @@ class GraphTransformerEncoder(nn.Module):
      
         N = torch.count_nonzero(A, -1)
 
-        L = torch.eye(x.shape[0]) - N * A *N
+        L = N - A
  
 
         EigVal, EigVec = np.linalg.eig(L)
@@ -31,21 +31,21 @@ class GraphTransformerEncoder(nn.Module):
     
         EigVal, EigVec = EigVal[idx], np.real(EigVec[:,idx])
         
-        pos_enc = EigVec[:,1:3]
+        pos_enc = EigVec[:,0:3]
       
         return torch.from_numpy(pos_enc).to("cuda").float()
     
-    def forward(self, node_features,  adj_matrix, edge_features):
+    def forward(self, node_features,  adj_matrix, edge_features, a):
         """Take in and process src and target sequences."""
         # return self.predict(self.encode(src,  adj_matrix, edges_att))
-        return self.encode(node_features, edge_features, adj_matrix)
+        return self.encode(node_features, edge_features, adj_matrix, a)
 
-    def encode(self, node_features, edge_features, adj_matrix):  # (batch, max_length, d_atom+1)
+    def encode(self, node_features, edge_features, adj_matrix, a):  # (batch, max_length, d_atom+1)
         
         # xv.shape = (batch, max_length, d_model)
-        adj_matrix_cpu = adj_matrix.to("cpu")
+        a = a.to("cpu")
      
-        pos_enc = [self.laplacian_positional_encoding(adj_matrix_cpu[i]) for i in range(adj_matrix_cpu.shape[0])]
+        pos_enc = [self.laplacian_positional_encoding(a[i]) for i in range(a.shape[0])]
 
         pos_enc = torch.stack(pos_enc)
 
@@ -163,19 +163,33 @@ class EncoderLayer(nn.Module):
 
 
     def forward(self, node_hidden, edge_hidden, adj_matrix):
+        
         """Follow Figure 1 (left) for connections."""
+        
         # x.shape = (batch, max_length, d_atom)
+        
         node_hidden = self.dropout(self.norm(node_hidden))
+        edge_hidden = self.dropout(self.norm(edge_hidden))
+        
         node_hidden_first, edge_hidden_first = self.self_attn(node_hidden, node_hidden, edge_hidden, adj_matrix)
+        
         # the first residue block
+        
         edge_hidden_first = edge_hidden + self.dropout(self.norm(edge_hidden_first))
+        
         edge_hidden_second = self.feed_forward(edge_hidden_first)
+        
         node_hidden_first = node_hidden + self.dropout(self.norm(node_hidden_first))
+        
         node_hidden_second = self.feed_forward(node_hidden_first)
+        
         # the second residue block
-        node_hidden = node_hidden + node_hidden_first + self.dropout(self.norm(node_hidden_second))
-        edge_hidden_third = edge_hidden + edge_hidden_first + self.dropout(self.norm(edge_hidden_second))
-        return node_hidden, edge_hidden
+        
+        node_hidden_third = node_hidden_first + self.dropout(self.norm(node_hidden_second))
+        
+        edge_hidden_third = edge_hidden_first + self.dropout(self.norm(edge_hidden_second))
+        
+        return node_hidden_third, edge_hidden_third
 
 class PositionwiseFeedForward(nn.Module):
     """Implements FFN equation."""
@@ -459,26 +473,34 @@ class MoleculeEncoderDecoderLayer(nn.Module):
         ########## PROTEIN ENCODING LAYER #############
         
         prot_n_hidden = self.dropout(self.norm(prot_n))
-        prot_e_hidden_first, prot_n_hidden_first = self.self_attn(prot_n_hidden, prot_n_hidden, prot_e,adj_matrix)
+        prot_e_hidden = self.dropout(self.norm(prot_e))
+        #prot_e_hidden_first, prot_n_hidden_first = self.self_attn(prot_n_hidden, prot_n_hidden, prot_e,adj_matrix)
 
-        prot_e_hidden_first = prot_e + self.dropout(self.norm(prot_e_hidden_first))
-        prot_n_hidden_second = self.feed_forward(prot_n_hidden_first)
-        prot_n_hidden_second = prot_n_hidden + self.dropout(self.norm(prot_n_hidden_first))
-        prot_e_hidden_second = self.feed_forward(prot_e_hidden_first)
+        #prot_e_hidden_first = prot_e + self.dropout(self.norm(prot_e_hidden_first))
+        
+        #prot_n_hidden_second = self.feed_forward(prot_n_hidden_first)
+        
+        #prot_n_hidden_second = prot_n_hidden + self.dropout(self.norm(prot_n_hidden_first))
+        
+        #prot_e_hidden_second = self.feed_forward(prot_e_hidden_first)
      
-        prot_n_hidden = prot_n_hidden + prot_n_hidden_first + self.dropout(self.norm(prot_n_hidden_second))
-        prot_e_hidden_third = prot_e + prot_e_hidden_first + self.dropout(self.norm(prot_e_hidden_second))
+        #prot_n_hidden_third =  prot_n_hidden_first + self.dropout(self.norm(prot_n_hidden_second))
+        
+        #prot_e_hidden_third = prot_e_hidden_first + self.dropout(self.norm(prot_e_hidden_second))
         
         ########## MOLECULE DECODING LAYER #############
-        edge_hidden_first, node_hidden_first, attn = self.dec_attn(nodes_hidden,nodes_hidden, edges_hidden, adj_matrix,prot_n_hidden, prot_e)
+        
+        edge_hidden_first, node_hidden_first, attn = self.dec_attn(nodes_hidden,nodes_hidden, edges_hidden, adj_matrix,prot_n, prot_e)
         
         node_hidden_first = nodes_hidden + self.dropout(node_hidden_first)
+        
         edge_hidden_first = edges_hidden + self.dropout(edge_hidden_first)
         
-        node_hidden_second, edge_hidden_second = self.norm(node_hidden_first), self.norm(edge_hidden_first)
+        node_hidden_second  = self.feed_forward(self.norm(node_hidden_first))
         
-        node_hidden_second = self.feed_forward(node_hidden_first)
-        #edge_hidden_second = self.feed_forward(edge_hidden_first)
+        edge_hidden_second =  self.feed_forward(self.norm(edge_hidden_first))
+        
+        
       
 
         return edge_hidden_second, node_hidden_second, attn
@@ -562,8 +584,11 @@ def dec_attention(query_mol_annot, key_prot_annot, value_mol_annot, query_mol_ad
     # key_prot_adj.shape = (batch, h, max_length, max_length, d_e)  16,4,500,500,128
     # value_mol_adj.shape = (batch, h, max_length, max_length, d_e) 16,4,25,25,128
     
+    
+    
     # out_scores.shape = (batch, h, max_length, max_length) 16,4,25,25
     # in_scores.shape = (batch, h, max_length, max_length) 
+    
     d_e = query_mol_annot.size(-1)
     
     out_scores = torch.einsum('bhmd,bhnd->bhmn', query_mol_annot, key_prot_annot) / math.sqrt(d_e) # 16, 4, 25, 128 ------ 16, 4, 500, 128

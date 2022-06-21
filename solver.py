@@ -18,7 +18,6 @@ from new_dataloader_drugs import DruggenDataset_drugs
 import torch.utils.data
 from torch.nn.parallel import DataParallel as DP
 
-
 class Solver(object):
     
     """Solver for training and testing DrugGEN."""
@@ -30,15 +29,15 @@ class Solver(object):
         
         self.dataset_name = self.dataset_file.split(".")[0]
         self.z_dim = config.z_dim
-        
+        self.num_test_epoch = config.num_test_epoch
         # Data loader.
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
         self.batch_size = config.batch_size
  
         self.dataset = DruggenDataset(config.mol_data_dir,self.dataset_file)
-        self.loader = DataLoader(self.dataset, shuffle=True,batch_size=self.batch_size, drop_last=True)  
-
+        self.loader = DataLoader(self.dataset, shuffle=True,batch_size=self.batch_size, drop_last=True, pin_memory=True,num_workers=16)  
+        self.inference_sample_num = config.inference_sample_num
         atom_decoders = self.decoder_load("atom_decoders")
         bond_decoders = self.decoder_load("bond_decoders")  
      
@@ -48,7 +47,7 @@ class Solver(object):
      
              
         self.drugs = DruggenDataset_drugs(config.drug_data_dir)
-        self.drugs_loader = DataLoader(self.drugs, shuffle=True,batch_size=self.batch_size, drop_last=True)  
+        self.drugs_loader = DataLoader(self.drugs, shuffle=True,batch_size=self.batch_size, drop_last=True, pin_memory=True,num_workers=16)  
 
         drugs_atom_decoders = self.drug_decoder_load("drugs_atom_decoders")
         drugs_bond_decoders = self.drug_decoder_load("drugs_bond_decoders")
@@ -275,7 +274,7 @@ class Solver(object):
         self.D2_PNA.to(self.device)
         self.D2_TraConv.to(self.device)
         self.V2.to(self.device)      
-        '''
+     
         for p in self.G.parameters():
             if p.dim() > 1:
                 if self.init_type == 'uniform':
@@ -327,8 +326,8 @@ class Solver(object):
                     elif self.init_type == 'normal':
                         torch.nn.init.xavier_normal_(p)   
                     elif self.init_type == 'random_normal':
-                        torch.nn.init.normal_(p, 0.0, 0.02)   
-    '''   
+                        torch.nn.init.normal_(p, 0.0, 0.02)
+       
     def decoder_load(self, dictionary_name):
         
         ''' Loading the atom and bond decoders'''
@@ -439,10 +438,11 @@ class Solver(object):
         
         self.g_optimizer.zero_grad()
         self.g2_optimizer.zero_grad()
-        if self.dis_select == "conv":     
-            self.d_optimizer.zero_grad()
-            self.d2_optimizer.zero_grad()
-        elif self.dis_select == "PNA":
+            
+        self.d_optimizer.zero_grad()
+        self.d2_optimizer.zero_grad()
+        
+        if self.dis_select == "PNA":
             self.d_pna_optimizer.zero_grad()
             self.d2_pna_optimizer.zero_grad()      
         elif self.dis_select == "TraConv":
@@ -645,7 +645,7 @@ class Solver(object):
                 prot_e = akt1_human_adj[None,None,:].view(1,546,546,1).to(self.device).long()
                 real_edge_attr_for_traconv = self.attr_mlp(data.edge_attr.view(-1,1).float())
                 real_nodes_for_traconv = self.nodes_mlp(data.x.view(-1,1).float())
-             
+               
                 # =================================================================================== #
                 #                             2. Train the discriminator                              #
                 # =================================================================================== #
@@ -695,7 +695,7 @@ class Solver(object):
                 x_int1 = (eps.squeeze(-1) * x_tensor + (1. - eps.squeeze(-1)) * nodes_hat).requires_grad_(True)
 
            
-                grad0, grad1 = self.V(x_int0, None, x_int1)
+                grad0, grad1 = self.D(x_int0, None, x_int1)
                 d_loss_gp = self.gradient_penalty(grad0, x_int0) + self.gradient_penalty(grad1, x_int1) 
 
                 # Calculate total loss
@@ -723,7 +723,7 @@ class Solver(object):
 
                 #loss['D/loss_gp'] = d_loss_gp.item()
                 loss["D/d_loss"] = d_loss.item()
-                wandb.log({"d_loss_fake": d_loss_fake, "d_loss_real": d_loss_real, "d_loss": d_loss, "iteration/epoch":[i,idx]})        
+                wandb.log({"d_loss_fake": d_loss_fake, "d_loss_real": d_loss_real, "d_loss": d_loss, "iteration/epoch":[i,idx]})       
                 # =================================================================================== #
                 #                            3. Train the generator                                   #
                 # =================================================================================== #                
@@ -757,7 +757,7 @@ class Solver(object):
                         g_logits_fake = self.D_TraConv(g_nodes_for_traconv, g_fake_edge_index, g_attr_for_traconv, data.batch)   
                                              
                     g_loss_fake = -torch.mean(g_logits_fake) 
-
+                    
                     # Real Reward
                     
                     rewardR = torch.from_numpy(self.reward(mols)).to(self.device)
@@ -807,6 +807,9 @@ class Solver(object):
                     tra_edges_hat, tra_nodes_hat, edges_hard, nodes_hard, nodes_fake2, fake_edge_index2, fake_edge_attr2,g2_attr_for_traconv,g2_nodes_for_traconv = self.G2(g_edges_logits_forGAN2, g_nodes_logits_forGAN2,prot_n,prot_e)
                     drugs_node_for_transconv = self.nodes_mlp(drugs.x.view(-1,1).float())
                     drugs_attr_for_transconv = self.attr_mlp(drugs.edge_attr.view(-1,1).float())
+                    
+                    
+                    
                     if self.dis_select == "conv":
                         
                         logits_fake2, features_fake2 = self.D2(tra_edges_hat, None, tra_nodes_hat)
@@ -832,11 +835,25 @@ class Solver(object):
                     elif self.dis_select == "TraConv":
                         
                         logits_real2 = self.D2_TraConv(drugs_node_for_transconv, drugs.edge_index, drugs_attr_for_transconv, drugs.batch)   
+                    
+                    adj_pad_shape =(drugs_a_tensor.shape[1]-tra_edges_hat.shape[1])//2
+                    adj_pad = (0,0,adj_pad_shape,adj_pad_shape,adj_pad_shape,adj_pad_shape)
+                    annot_pad = (0,0,adj_pad_shape,adj_pad_shape)
+                    tra_edges_hat = F.pad(tra_edges_hat, adj_pad,"constant", 0 )
+                    tra_nodes_hat = F.pad(tra_nodes_hat, annot_pad,"constant", 0 )
+                    eps2 = torch.rand(logits_real2.size(0),1,1,1).to(self.device)
+                    x_int02 = (eps2 * drugs_a_tensor + (1. - eps2) * tra_edges_hat).requires_grad_(True)
+                    x_int12 = (eps2.squeeze(-1) * drugs_x_tensor + (1. - eps2.squeeze(-1)) * tra_nodes_hat).requires_grad_(True)
+
+            
+                    grad02, grad12 = self.D2(x_int02, None, x_int12)
+                    d_loss_gp2 = self.gradient_penalty(grad02, x_int02) + self.gradient_penalty(grad12, x_int12)                     
+                    
                         
                     d2_loss_real = - torch.mean(logits_real2)
 
          
-                    d2_loss = d2_loss_fake + d2_loss_real 
+                    d2_loss = d2_loss_fake + d2_loss_real + d_loss_gp2
                 
                     self.reset_grad()
                     d2_loss.backward(retain_graph=True)
@@ -864,6 +881,10 @@ class Solver(object):
                 
                     
                     g_tra_edges_hat, g_tra_nodes_hat, edges_hard, nodes_hard, nodes_fake2, g_fake_edge_index2, fake_edge_attr2 ,g2_attr_for_traconv,g2_nodes_for_traconv= self.G2(g_edges_logits_forGAN2, g_nodes_logits_forGAN2,prot_n,prot_e)
+                   
+                    
+                    
+                    
                     
                     if self.dis_select == "conv":
                             
@@ -896,7 +917,7 @@ class Solver(object):
                 
                     #g2_loss_value = torch.mean(torch.abs(value_logit_real2 - rewardR2)) + torch.mean(torch.abs(value_logit_fake2 - rewardF2))
                     g2_loss_value = 1 - torch.mean(rewardF2)
-                    g2_loss =  g2_loss_fake + g2_loss_value
+                    g2_loss =  self.la * g2_loss_fake + (1-self.la) * g2_loss_value
                 
                     self.reset_grad()
                 
@@ -926,7 +947,7 @@ class Solver(object):
                     m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
                     m0.update(m1)
                     loss.update(m0)
-                    wandb.log({"metrics": m1})
+                    wandb.log({"metrics,": m1})
                     for tag, value in loss.items():
                         
                         log += ", {}: {:.4f}".format(tag, value)
@@ -937,7 +958,7 @@ class Solver(object):
                         m2 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m2.items()}
                         m2.update(m3)
                         loss2.update(m2)
-                        wandb.log({"metrics_2": m3})
+                        wandb.log({"metrics_2,": m3})
                         for tag, value in loss2.items():
                             log2 += ", {}: {:.4f}".format(tag, value)
 
@@ -990,12 +1011,16 @@ class Solver(object):
                         os.makedirs(self.sample_path)
                     mols2grid_image(fake_mol,self.sample_path)
                     save_smiles_matrices(fake_mol,g_edges_hard.detach(), g_nodes_hard.detach(), self.sample_path)
+                    if len(os.listdir(self.sample_path)) == 0:
+                        os.rmdir(self.sample_path)
                     if idx+1 > self.warm_up_steps:
                         if not os.path.exists(self.sample_path_GAN2):
                             os.makedirs(self.sample_path_GAN2)   
                         mols2grid_image(fake_mol2,self.sample_path_GAN2)
                         save_smiles_matrices(fake_mol2,edges_hard.detach(), nodes_hard.detach(), self.sample_path_GAN2) 
                         attn_path = os.path.join("MolecularTransGAN-master/data/attn_tensors", '{}_{}-attn_GAN2.pt'.format(idx+1, i+1))
+                        if len(os.listdir(self.sample_path_GAN2)) == 0:
+                            os.rmdir(self.sample_path_GAN2)
                         #torch.save(attn, attn_path)                                                
                     print("Sample molecules are saved.")
                     print("Matrices and smiles are saved")
@@ -1014,35 +1039,159 @@ class Solver(object):
     def test(self):
         # Load the trained generator.
         self.restore_model(self.test_iters)
-
+        akt1_human_adj = torch.load("MolecularTransGAN-master/data/akt/AKT1_human_adj.pt")
+        akt1_human_annot = torch.load("MolecularTransGAN-master/data/akt/AKT1_human_annot.pt")  
+        prot_n = akt1_human_annot[None,:].to(self.device)          
+        prot_e = akt1_human_adj[None,None,:].view(1,546,546,1).to(self.device).long()
+        date = time.time()
         with torch.no_grad():
-            mols, _, _, a, x, _, _, _, _ = self.data.next_test_batch(self.batch_size)
-            z = self.sample_z(a.shape[0])
-            z = torch.from_numpy(z).to(self.device).float()
-            # Z-to-target
-            edges_logits, nodes_logits = self.G(z)
-            # Postprocess with Gumbel softmax
-            (edges_hat, nodes_hat) = self.postprocess((edges_logits, nodes_logits), self.post_method)
-            logits_fake, features_fake = self.D(edges_hat, None, nodes_hat)
-            g_loss_fake = - torch.mean(logits_fake)
+            for idx in range(self.num_test_epoch):
 
-            # Fake Reward
-            (edges_hard, nodes_hard) = self.postprocess((edges_logits, nodes_logits), self.post_method)
-            edges_hard, nodes_hard = torch.max(edges_hard, -1)[1], torch.max(nodes_hard, -1)[1]
-            mols = [self.data.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True)
-                    for e_, n_ in zip(edges_hard, nodes_hard)]
+            # =================================================================================== #
+            #                             1. Preprocess input data                                #
+            # =================================================================================== #
+          
+            # Load the data 
             
-            # Log update
-            m0, m1 = all_scores(mols, self.data, norm=True)     # 'mols' is output of Fake Reward
-            m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
-            m0.update(m1)
+                dataloader_iterator = iter(self.drugs_loader)
             
-            mols2grid_image(mols)
+                for i, data in enumerate(self.loader):   
+                    try:
+                        drugs = next(dataloader_iterator)
+                    except StopIteration:
+                        dataloader_iterator = iter(self.drugs_loader)
+                        drugs = next(dataloader_iterator)
                         
-            log = "Test started [{}]".format("now")
-            for tag, value in m0.items():
-                log += ", {}: {:.4f}".format(tag, value)
-            print(log)
+                    data = data.to(self.device)
+                            
+                    drugs = drugs.to(self.device)                                               
+                    z_e = self.sample_z_edge(self.batch_size)                                                   # (batch,max_len,max_len)    
+                    z_n = self.sample_z_node(self.batch_size)                                                   # (batch,max_len)          
+                    z_edge = torch.from_numpy(z_e).to(self.device).float()                                      # Edge noise.(batch,max_len,max_len)
+                    z_node = torch.from_numpy(z_n).to(self.device).float()                                      # Node noise.(batch,max_len)       
+                    a = geoutils.to_dense_adj(edge_index = data.edge_index,batch=data.batch,edge_attr=data.edge_attr, max_num_nodes=int(data.batch.shape[0]/self.batch_size))
+                    x = data.x.view(-1,int(data.batch.shape[0]/self.batch_size))
+                
+                    a_tensor = self.label2onehot(a, self.b_dim)
+                    x_tensor = self.label2onehot(x, self.m_dim)
+                    
+                    drugs_a = geoutils.to_dense_adj(edge_index = drugs.edge_index,batch=drugs.batch,edge_attr=drugs.edge_attr, max_num_nodes=int(drugs.batch.shape[0]/self.batch_size))
+                    drugs_x = drugs.x.view(-1,int(drugs.batch.shape[0]/self.batch_size))
+                    
+                    drugs_a = drugs_a.to(self.device).long() 
+                    drugs_x = drugs_x.to(self.device).long() 
+                    drugs_a_tensor = self.label2onehot(drugs_a, self.drugs_b_dim)
+                    drugs_x_tensor = self.label2onehot(drugs_x, self.drugs_m_dim)
+                    drugs_a_tensor = drugs_a_tensor + torch.randn([drugs_a_tensor.size(0), drugs_a_tensor.size(1), drugs_a_tensor.size(2),1], device=drugs_a_tensor.device) * self.noise_strength_2
+                    drugs_x_tensor = drugs_x_tensor + torch.randn([drugs_x_tensor.size(0), drugs_x_tensor.size(1),1], device=drugs_x_tensor.device) * self.noise_strength_3
+                    real_edge_attr_for_traconv = self.attr_mlp(data.edge_attr.view(-1,1).float())
+                    real_nodes_for_traconv = self.nodes_mlp(data.x.view(-1,1).float())        
+                    mols = [self.dataset.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=False) 
+                                for e_, n_ in zip(a, x)]                     
+            
+                    # =================================================================================== #
+                    #                             2. GAN1 Inference                                       #
+                    # =================================================================================== #            
+                    edges_hat, nodes_hat, edges_logits, nodes_logits, nodes_fake,fake_edge_index,fake_edge_attr, attr_for_traconv, nodes_for_traconv = self.G(z_edge,z_node,a,a_tensor,x_tensor)   
+                    edges_hat = edges_hat.view(-1, self.vertexes,self.vertexes,self.b_dim)
+                    if self.dis_select == "conv":
+                    
+                        logits_real, features_real = self.D(a_tensor, None, x_tensor)
+                        
+                    elif self.dis_select == "PNA":
+                        
+                        logits_real = self.D_PNA(data.x, data.edge_index, data.edge_attr, data.batch)
+                        
+                    elif self.dis_select == "TraConv":
+                        
+                        logits_real = self.D_TraConv(real_nodes_for_traconv, data.edge_index, real_edge_attr_for_traconv, data.batch)  
+                                    
+                    d_loss_real = - torch.mean(logits_real)                             
+
+                    if self.dis_select == "conv":
+                    
+                        logits_fake, features_fake = self.D(edges_hat, None, nodes_hat)
+                        
+                    elif self.dis_select == "PNA":
+                        
+                        logits_fake = self.D_PNA(nodes_fake, fake_edge_index, fake_edge_attr, data.batch)
+
+                    elif self.dis_select == "TraConv":
+                        
+                        logits_fake = self.D_TraConv(nodes_for_traconv, fake_edge_index, attr_for_traconv, data.batch)
+                    g_edges_hard, g_nodes_hard = torch.max(edges_hat, 1)[1], torch.max(nodes_hat, -1)[1] 
+                    fake_mol = [self.dataset.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True) 
+                                for e_, n_ in zip(g_edges_hard, g_nodes_hard)] 
+                                           
+                    d_loss_fake = torch.mean(logits_fake)
+                    g_loss = - torch.mean(logits_fake)
+                    # =================================================================================== #
+                    #                             3. GAN2 Inference                                       #
+                    # =================================================================================== #           
+                    edges_logits_forGAN2, nodes_logits_forGAN2 = edges_logits.detach().clone(), nodes_logits.detach().clone()
+                    tra_edges_hat, tra_nodes_hat, edges_hard, nodes_hard, nodes_fake2, fake_edge_index2, fake_edge_attr2,g2_attr_for_traconv,g2_nodes_for_traconv = self.G2(edges_logits_forGAN2, nodes_logits_forGAN2,prot_n,prot_e)
+                    drugs_node_for_transconv = self.nodes_mlp(drugs.x.view(-1,1).float())
+                    drugs_attr_for_transconv = self.attr_mlp(drugs.edge_attr.view(-1,1).float())
+                    
+                    if self.dis_select == "conv":
+                        
+                        logits_fake2, features_fake2 = self.D2(tra_edges_hat, None, tra_nodes_hat)
+
+                    elif self.dis_select == "PNA":
+                        
+                        logits_fake2 = self.D2_PNA(nodes_fake2, fake_edge_index2, fake_edge_attr2, data.batch)
+                    
+                    elif self.dis_select == "TraConv":
+                        
+                        logits_fake2 = self.D2_TraConv(g2_nodes_for_traconv, fake_edge_index2, g2_attr_for_traconv, data.batch)
+                        
+                    d2_loss_fake = torch.mean(logits_fake2)
+                    
+                    if self.dis_select == "conv":
+      
+                        logits_real2, features_real2 = self.D2(drugs_a_tensor, None,drugs_x_tensor)
+                    
+                    elif self.dis_select == "PNA":    
+                        
+                        logits_real2 = self.D2_PNA(drugs.x, drugs.edge_index, drugs.edge_attr, drugs.batch)
+                        
+                    elif self.dis_select == "TraConv":
+                        
+                        logits_real2 = self.D2_TraConv(drugs_node_for_transconv, drugs.edge_index, drugs_attr_for_transconv, drugs.batch)   
+                    
+                    d2_loss_real = - torch.mean(logits_real2)
+                    d2_loss = d2_loss_fake + d2_loss_real
+                    g2_loss = - torch.mean(logits_fake2)
+                    fake_mol2 = [self.dataset.matrices2mol_drugs(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True) 
+                                        for e_, n_ in zip(edges_hard, nodes_hard)]     
+                    
+                    drugs_mol = [self.dataset.matrices2mol_drugs(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True) 
+                                        for e_, n_ in zip(drugs_a, drugs_x)]        
+                                          
+                # Log update
+                m0, m1 = all_scores(fake_mol, mols, norm=True)     # 'mols' is output of Fake Reward
+                m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
+                m0.update(m1)
+                m2, m3 = all_scores(fake_mol, mols, norm=True)
+                m2 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m2.items()}
+                m2.update(m3)
+                
+                sample_path = os.path.join(self.sample_path,"inference",date)
+                sample_path_GAN2 = os.path.join(self.sample_path_GAN2,"inference",date)
+                if not os.path.exists(sample_path_GAN2):
+                            os.makedirs(sample_path_GAN2)  
+                if not os.path.exists(sample_path):
+                            os.makedirs(sample_path)                          
+                mols2grid_image(fake_mol,self.sample_path)
+                save_smiles_matrices(fake_mol,g_edges_hard.detach(), g_nodes_hard.detach(), sample_path)
+                mols2grid_image(fake_mol2,self.sample_path_GAN2)
+                save_smiles_matrices(fake_mol2,edges_hard.detach(), nodes_hard.detach(), sample_path_GAN2)                           
+                log = "Test started [{}]".format("now")
+                for tag, value in m0.items():
+                    log += ", {}: {:.4f}".format(tag, value)
+                print(log)
+                if ((i * self.batch_size) // self.inference_sample_num) >= 1 :
+                    break
 
 
 

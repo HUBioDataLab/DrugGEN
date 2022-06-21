@@ -93,7 +93,7 @@ class Generator(nn.Module):
       
         
     def forward(self, z_e,z_n,a,a_tensor,x_tensor):
-        '''
+        """
         nodes_logits = self.layers_node(z_n) 
         nodes_logits = nodes_logits.view(-1,self.vertexes,self.nodes)
 
@@ -101,14 +101,14 @@ class Generator(nn.Module):
         edges_logits = edges_logits.view(-1,self.edges,self.vertexes,self.vertexes)
         edges_logits = (edges_logits + edges_logits.permute(0,1,3,2))/2
         edges_logits = self.dropout(edges_logits)
-        '''
+        
 
    
  
-        #adj_matrix = torch.max(edges_logits,1)[1]
-        #edges_logits = edges_logits.view(-1,self.vertexes,self.vertexes,self.edges)
-        
-        nodes_logits , edges_logits = self.TransformerEncoder(x_tensor, a, a_tensor)
+        adj_matrix = torch.max(edges_logits,1)[1]
+        edges_logits = edges_logits.view(-1,self.vertexes,self.vertexes,self.edges)
+        """
+        nodes_logits , edges_logits = self.TransformerEncoder(x_tensor, a, a_tensor, a)
         
         edges_logits = self.dropout(edges_logits)
         nodes_logits = self.dropout(nodes_logits)
@@ -224,7 +224,7 @@ class Generator2(nn.Module):
 
         ##### EDGE LOGITS #####
         adj_matrix = torch.max(edges_logits,-1)[1]
-
+        
         
         edges_logits, nodes_logits, attn = self.TransformerDecoder(edges_logits, nodes_logits, prot_n, prot_e,adj_matrix)
    

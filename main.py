@@ -43,13 +43,13 @@ if __name__ == '__main__':
     parser.add_argument('--dim', type=int, default=64, help='Embedding dimension.')
     parser.add_argument('--depth', type=int, default=3, help='Encoder depth.')
     parser.add_argument('--heads', type=int, default=8, help='Number of head for Attention.')
-    parser.add_argument('--dec_depth', type=int, default=2, help='Decoder depth.')
-    parser.add_argument('--dec_heads', type=int, default=4, help='Number of head for Decoder-Attention.')    
+    parser.add_argument('--dec_depth', type=int, default=1, help='Decoder depth.')
+    parser.add_argument('--dec_heads', type=int, default=8, help='Number of head for Decoder-Attention.')    
     parser.add_argument('--mlp_ratio', type=int, default=2, help='.')
     parser.add_argument('--drop_rate', type=float, default=0.1 , help='.')
     parser.add_argument('--warm_up_steps', type=float, default=0, help='.')
-    parser.add_argument('--dis_select', type=str, default="TraConv", help="conv, PNA, TraConv")
-    parser.add_argument('--init_type', type=str, default="random_normal", help="u")
+    parser.add_argument('--dis_select', type=str, default="PNA", help="conv, PNA, TraConv")
+    parser.add_argument('--init_type', type=str, default="normal", help="u")
     parser.add_argument('--la', type=float, default=0.5, help="lambda value for RL and Generator loss balance")
     # PNA configurations
     parser.add_argument('--aggregators', type=str, default="max,mean,min,std", help='aggregator identifiers - "min","max","std","var","mean","sum"')
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     parser.add_argument('--graph_add', type=str, default="set2set", help='global_add,set2set,graph_multitrans')   
 
     # Training configuration.
-    parser.add_argument('--batch_size', type=int, default=128, help='mini-batch size')
+    parser.add_argument('--batch_size', type=int, default=8, help='mini-batch size')
     parser.add_argument('--num_iters', type=int, default=200, help='number of total iterations for training D')
     parser.add_argument('--num_iters_decay', type=int, default=100000, help='number of iterations for decaying lr')
     parser.add_argument('--g_lr', type=float, default=0.0001, help='learning rate for G')
@@ -80,7 +80,8 @@ if __name__ == '__main__':
     parser.add_argument('--feature_matching', type=str2bool, default=False, help='features for molecules')
     # Test configuration.
     parser.add_argument('--test_iters', type=int, default=10000, help='test model from this step')
-
+    parser.add_argument('--num_test_epoch', type=int, default=1, help='inference epoch')
+    parser.add_argument('--inference_sample_num', type=int, default=30000, help='inference samples')
     # Miscellaneous.
     parser.add_argument('--num_workers', type=int, default=1)
     parser.add_argument('--mode', type=str, default='train', choices=['train', 'test'])
@@ -95,7 +96,7 @@ if __name__ == '__main__':
     parser.add_argument('--sample_dir', type=str, default='MolecularTransGAN-master/molgan/samples')
     parser.add_argument('--result_dir', type=str, default='MolecularTransGAN-master/molgan/results')
     parser.add_argument('--degree_dir', type=str, default='MolecularTransGAN-master/data')
-    parser.add_argument('--dataset_file', type=str, default='chembl45.pt')    
+    parser.add_argument('--dataset_file', type=str, default='chembl25.pt')    
     # Step size.
     parser.add_argument('--log_step', type=int, default=100)
     parser.add_argument('--sample_step', type=int, default=100)

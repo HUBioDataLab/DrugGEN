@@ -53,11 +53,11 @@ class MolecularMetrics(object):
     @staticmethod
     def novel_scores(mols, data):
         return np.array(
-            list(map(lambda x: MolecularMetrics.valid_lambda(x) and Chem.MolToSmiles(x) not in data.smiles, mols)))
+            list(map(lambda x: MolecularMetrics.valid_lambda(x) and Chem.MolToSmiles(x) not in data, mols)))
 
     @staticmethod
     def novel_filter(mols, data):
-        return list(filter(lambda x: MolecularMetrics.valid_lambda(x) and Chem.MolToSmiles(x) not in data.smiles, mols))
+        return list(filter(lambda x: MolecularMetrics.valid_lambda(x) and Chem.MolToSmiles(x) not in data, mols))
 
     @staticmethod
     def novel_total_score(mols, data):
@@ -255,11 +255,14 @@ def mols2grid_image(mols,path):
 def all_scores(mols, data,  norm=False):
     m0 = {k: list(filter(lambda e: e is not None, v)) for k, v in {
         'QED score': MolecularMetrics.quantitative_estimation_druglikeness_scores(mols),
+        'NP score': MolecularMetrics.natural_product_scores(mols, norm=norm),
+        'drugcandidate score': MolecularMetrics.drugcandidate_scores(mols, data),
         'logP score': MolecularMetrics.water_octanol_partition_coefficient_scores(mols, norm=norm),
         'SA score': MolecularMetrics.synthetic_accessibility_score_scores(mols, norm=norm)}.items()}
 
     m1 = {'valid score': MolecularMetrics.valid_total_score(mols) * 100,
-          'unique score': MolecularMetrics.unique_total_score(mols) * 100}
+          'unique score': MolecularMetrics.unique_total_score(mols) * 100,
+          'novel score': MolecularMetrics.novel_total_score(mols, data) * 100}
         #             'NP score': MolecularMetrics.natural_product_scores(mols, norm=norm),    
         # 'novel score': MolecularMetrics.novel_total_score(mols, data) * 100
         # 'drugcandidate score': MolecularMetrics.drugcandidate_scores(mols, data)
