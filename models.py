@@ -3,14 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from layers import PNA, GraphConvolution, GraphAggregation
 import copy 
-from transformer import GraphTransformerEncoder, Encoder, EncoderLayer, Node_Embeddings, Edge_Embeddings, Position_Encoding, MultiHeadedAttention, PositionwiseFeedForward, GraphTransformerDecoder, MoleculeEncoderDecoderLayer, Decoder, MultiHeadedAttentionDecoder, PositionwiseFeedForwardDecoder, TransformerDecoderAttention
+from transformer import GraphTransformerEncoder, Encoder, EncoderLayer, Node_Embeddings, Edge_Embeddings, MultiHeadedAttention, PositionwiseFeedForward, GraphTransformerDecoder, MoleculeEncoderDecoderLayer, Decoder, MultiHeadedAttentionDecoder, PositionwiseFeedForwardDecoder, TransformerDecoderAttention, Node_Embeddings_dec, Edge_Embeddings_dec, Position_Encoding_dec
 from torch_geometric.nn import global_add_pool
 from torch_geometric.nn.conv import TransformerConv
 
     
 class Generator(nn.Module):
     """Generator network."""
-    def __init__(self, conv_dims, z_dim, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio, drop_rate):
+    def __init__(self, conv_dims, z_dim, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio, drop_rate, tra_conv):
         super(Generator, self).__init__()
 
         self.vertexes = vertexes
@@ -34,16 +34,18 @@ class Generator(nn.Module):
         d_atom = self.nodes
         d_edge = self.edges
         c = copy.deepcopy
+        self.tra_conv = tra_conv
         output_layer = vertexes * vertexes * dim + vertexes * dim
+        
         self.layers_edge = nn.Sequential(nn.Linear(self.vertexes, conv_dims[0]), nn.Tanh(), nn.Linear(conv_dims[0], self.vertexes*self.edges),
                                          nn.Sigmoid(), nn.Dropout(p=dropout))
         
         self.layers_node = nn.Sequential(nn.Linear(self.vertexes, conv_dims[0]), nn.Tanh(), nn.Linear(conv_dims[0], self.vertexes*self.nodes),
                                          nn.Sigmoid(), nn.Dropout(p=dropout))
 
-        self.layers = nn.Sequential(nn.Linear(256, conv_dims[0]), nn.Tanh(), nn.Linear(conv_dims[0], conv_dims[1]), nn.Tanh(), nn.Linear(conv_dims[1], conv_dims[2]),
-                                         nn.Tanh(), nn.Linear(conv_dims[2], output_layer),
-                                         nn.Sigmoid(), nn.Dropout(p=dropout))
+        #self.layers = nn.Sequential(nn.Linear(vertexes, conv_dims[0]), nn.Tanh(), nn.Linear(conv_dims[0], conv_dims[1]), nn.Tanh(), 
+         #                                nn.Tanh(), nn.Linear(conv_dims[1], vertexes * (vertexes+1)),
+          #                               nn.Sigmoid(), nn.Dropout(p=dropout))
         
         attn = MultiHeadedAttention(h, d_model, leaky_relu_slope, dropout, attenuation_lambda)
         ff = PositionwiseFeedForward(d_model, N_dense, dropout, leaky_relu_slope, dense_output_nonlinearity) 
@@ -55,16 +57,17 @@ class Generator(nn.Module):
         
         self.TransformerEncoder = GraphTransformerEncoder(Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout, scale_norm), N, scale_norm),
                                             Node_Embeddings(d_atom, d_model, dropout),
-                                            Edge_Embeddings(d_edge, d_model, dropout),
-                                            Position_Encoding(max_length, d_model, dropout),dim)
+                                            Edge_Embeddings(d_edge, d_model, dropout),dim)
 
 
         self.dropout = nn.Dropout(p=dropout)
         self.last_dropout= nn.Dropout(p=0.99)
         self.nodes_output_layer = nn.Sequential(nn.Linear(self.dim, self.nodes))
         self.edges_output_layer = nn.Sequential(nn.Linear(self.dim, self.edges))
-        self.attr_mlp = nn.Linear(1, self.dim)
-        self.nodes_mlp = nn.Linear(1, self.dim)
+        if self.tra_conv: 
+            self.attr_mlp = nn.Linear(1, self.dim)
+            self.nodes_mlp = nn.Linear(1, self.dim)
+        
     def postprocess(self, inputs, post_method, temperature=1.,dimension=-1):
         
         if post_method == 'soft_gumbel':
@@ -93,7 +96,7 @@ class Generator(nn.Module):
       
         
     def forward(self, z_e,z_n,a,a_tensor,x_tensor):
-        """
+        
         nodes_logits = self.layers_node(z_n) 
         nodes_logits = nodes_logits.view(-1,self.vertexes,self.nodes)
 
@@ -107,14 +110,18 @@ class Generator(nn.Module):
  
         adj_matrix = torch.max(edges_logits,1)[1]
         edges_logits = edges_logits.view(-1,self.vertexes,self.vertexes,self.edges)
-        """
-        nodes_logits , edges_logits = self.TransformerEncoder(x_tensor, a, a_tensor, a)
+        
+        nodes_logits , edges_logits = self.TransformerEncoder(nodes_logits, adj_matrix, edges_logits)
         
         edges_logits = self.dropout(edges_logits)
         nodes_logits = self.dropout(nodes_logits)
         
+        
         nodes_logits_sample = self.nodes_output_layer(nodes_logits)
+        # 128,25,13
+        
         edges_logits_sample = self.edges_output_layer(edges_logits)  
+        # 128,25,25,5
         
         edges_logits_sample = edges_logits_sample.view(-1,self.edges,self.vertexes,self.vertexes)
         edges_logits_sample = self.postprocess(edges_logits_sample, "soft_gumbel", dimension=1)
@@ -127,11 +134,14 @@ class Generator(nn.Module):
         
         fake_edge_index, fake_edge_attr = self.dense_to_sparse_with_attr(edges_hat)
         nodes_fake = nodes_hat.view(-1,1)
-        attr_for_traconv = self.attr_mlp(fake_edge_attr.view(-1,1).float())
-        nodes_for_traconv = self.nodes_mlp(nodes_fake.view(-1,1).float())
+        if self.tra_conv:
+            attr_for_traconv = self.attr_mlp(fake_edge_attr.view(-1,1).float())
+            nodes_for_traconv = self.nodes_mlp(nodes_fake.view(-1,1).float())
+        if self.tra_conv:
+            return edges_logits_sample, nodes_logits_sample, edges_logits, nodes_logits,nodes_fake,fake_edge_index,fake_edge_attr, attr_for_traconv, nodes_for_traconv
+        else:
+            return edges_logits_sample, nodes_logits_sample, edges_logits, nodes_logits,nodes_fake,fake_edge_index,fake_edge_attr
         
-        return edges_logits_sample, nodes_logits_sample, edges_logits, nodes_logits,nodes_fake,fake_edge_index,fake_edge_attr, attr_for_traconv, nodes_for_traconv
-
 class Generator2(nn.Module):
     def __init__(self, vertexes_mol, edges_mol, nodes_mol, vertexes_protein, 
                 edges_protein, nodes_protein, dropout, dim, depth, heads, mlp_ratio, 
@@ -185,8 +195,7 @@ class Generator2(nn.Module):
         dec_attn = TransformerDecoderAttention(heads, d_model, leaky_relu_slope=0.1, dropout=0.1, attenuation_lambda=0.1)
         self.TransformerDecoder = GraphTransformerDecoder(Decoder(MoleculeEncoderDecoderLayer(d_model, c(attn), c(ff), dropout, scale_norm, c(dec_attn)), N, scale_norm),
                                             Node_Embeddings(d_atom, d_model, dropout),
-                                            Edge_Embeddings(d_edge, d_model, dropout),
-                                            Position_Encoding(max_length, d_model, dropout))
+                                            Edge_Embeddings(d_edge, d_model, dropout))
 
 
         self.nodes_output_layer = nn.Linear(self.dim, self.drugs_m_dim)

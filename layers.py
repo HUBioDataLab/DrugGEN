@@ -197,8 +197,8 @@ class PNA(torch.nn.Module):
             self.convs.append(conv)
             self.batch_norms.append(nn.LayerNorm(pna_out_ch))
         
-        self.graph_multitrans = GraphMultisetTransformer(in_channels=pna_out_ch, hidden_channels= 200, 
-                                                         out_channels= pna_out_ch, layer_norm = True)
+        #self.graph_multitrans = GraphMultisetTransformer(in_channels=pna_out_ch, hidden_channels= 200, 
+                                                         #out_channels= pna_out_ch, layer_norm = True)
 
         self.s2s = Set2Set(in_channels=pna_out_ch, processing_steps=1, num_layers=1)
 
@@ -221,8 +221,8 @@ class PNA(torch.nn.Module):
         elif self.graph_add == "set2set":
 
             x = self.s2s(x, batch.squeeze())
-        elif self.graph_add == "graph_multitrans":
-            x = self.graph_multitrans(x,batch.squeeze(),edge_index)
+        #elif self.graph_add == "graph_multitrans":
+            #x = self.graph_multitrans(x,batch.squeeze(),edge_index)
         x = self.mlp(x)
 
         return  x
@@ -252,8 +252,7 @@ class GraphConvolution(Module):
         hidden = torch.einsum('bijk,bikl->bijl', (adj, hidden))
         hidden = torch.sum(hidden, 1) + self.linear1(input)
         hidden = activation(hidden) if activation is not None else hidden
-        #print("hidden:", hidden.shape)
-        #print("hidden", hidden)
+
         hidden = self.dropout(hidden)
 
         output = torch.stack([self.linear2(hidden) for _ in range(adj.size(1))], 1)

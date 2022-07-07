@@ -7,12 +7,12 @@ import torch.nn.functional as F
 
 
 class GraphTransformerEncoder(nn.Module):
-    def __init__(self, encoder, node_embed, edge_embed, pos_embed,dim):
+    def __init__(self, encoder, node_embed, edge_embed,dim):
         super(GraphTransformerEncoder, self).__init__()
         self.encoder = encoder
         self.node_embed = node_embed
         self.edge_embed = edge_embed
-        self.pos_embed = pos_embed
+        #self.pos_embed = pos_embed
         self.pos = nn.Linear(3,dim)
         self.dropout = nn.Dropout(0.1)
         
@@ -35,23 +35,23 @@ class GraphTransformerEncoder(nn.Module):
       
         return torch.from_numpy(pos_enc).to("cuda").float()
     
-    def forward(self, node_features,  adj_matrix, edge_features, a):
+    def forward(self, node_features,  adj_matrix, edge_features):
         """Take in and process src and target sequences."""
         # return self.predict(self.encode(src,  adj_matrix, edges_att))
-        return self.encode(node_features, edge_features, adj_matrix, a)
+        return self.encode(node_features, edge_features, adj_matrix)
 
-    def encode(self, node_features, edge_features, adj_matrix, a):  # (batch, max_length, d_atom+1)
+    def encode(self, node_features, edge_features, adj_matrix):  # (batch, max_length, d_atom+1)
         
         # xv.shape = (batch, max_length, d_model)
-        a = a.to("cpu")
+        adj_matrix_cpu = adj_matrix.to("cpu")
      
-        pos_enc = [self.laplacian_positional_encoding(a[i]) for i in range(a.shape[0])]
+        pos_enc = [self.laplacian_positional_encoding(adj_matrix_cpu[i]) for i in range(adj_matrix_cpu.shape[0])]
 
         pos_enc = torch.stack(pos_enc)
 
 
         pos_embeding = self.pos(self.dropout(pos_enc))
-        node_embeding = self.node_embed(node_features[:, :, :])
+        node_embeding = self.node_embed(node_features)
 
    
         node_initial = pos_embeding + node_embeding
@@ -72,7 +72,7 @@ class Node_Embeddings(nn.Module):
         self.lut = nn.Linear(d_atom, d_emb)
         self.dropout = nn.Dropout(dropout)
         self.d_emb = d_emb
-
+        self.d_atom = d_atom
     def forward(self, x):  # x.shape(batch, max_length, d_atom)
 
 
@@ -90,7 +90,7 @@ class Edge_Embeddings(nn.Module):
     
         return self.dropout(self.lut(x)) * math.sqrt(self.d_emb)
 
-
+"""
 class Position_Encoding(nn.Module):
     def __init__(self, max_length, d_emb, dropout):
         super(Position_Encoding, self).__init__()
@@ -104,7 +104,7 @@ class Position_Encoding(nn.Module):
         
         
         return self.pe(self.dropout(x))  # (batch, max_length) -> (batch, max_length, d_emb)
-
+"""
 
 # Generator
 class Swish(nn.Module):
@@ -268,7 +268,7 @@ def attention(query, key, value, adj_matrix, dropout=None):
     # value.shape = (batch, h, max_length, d_e)
     # out_scores.shape = (batch, h, max_length, max_length)
     # in_scores.shape = (batch, h, max_length, max_length)
-   
+    # normal einsum out = 'bhmd,bhmnd->bhmn' , normal einsum in = 'bhnd,bhmnd->bhnm', normal node = 'bhmn,bhnd->bhmd'
     d_e = query.size(-1)
     out_scores = torch.einsum('bhmd,bhmnd->bhmn', query, key) / math.sqrt(d_e)
     in_scores = torch.einsum('bhnd,bhmnd->bhnm', query, key) / math.sqrt(d_e)
@@ -280,17 +280,22 @@ def attention(query, key, value, adj_matrix, dropout=None):
     diag_attn = torch.diag_embed(torch.diagonal(out_attn, dim1=-2, dim2=-1), dim1=-2, dim2=-1)
 
     message = out_attn + in_attn - diag_attn
+    
 
     # add the diffusion caused by distance
-    message = message * adj_matrix.unsqueeze(1)
+    #message = message * adj_matrix.unsqueeze(1)
 
     if dropout is not None:
         message = dropout(message)
 
     # message.shape = (batch, h, max_length, max_length), value.shape = (batch, h, max_length, d_k)
     node_hidden = torch.einsum('bhmn,bhnd->bhmd', message, value)
+    
+    
+    
     edge_hidden = message.unsqueeze(-1) * key
-
+    
+    
     return node_hidden, edge_hidden, message
 
 
@@ -302,7 +307,7 @@ class MultiHeadedAttention(nn.Module):
         self.d_k = d_model // heads  # We assume d_v always equals d_k
         self.heads = heads
 
-        self.attenuation_lambda = torch.nn.Parameter(torch.tensor(attenuation_lambda, requires_grad=True))
+        #self.atten_lambda = torch.nn.Parameter(torch.tensor(attenuation_lambda), requires_grad=True)
 
         self.linears = clones(nn.Linear(d_model, d_model), 5)  # 5 for query, key, value, node update, edge update
 
@@ -320,35 +325,35 @@ class MultiHeadedAttention(nn.Module):
         n_batches, max_length, d_model = query_node.shape
 
         # 1) Prepare adjacency matrix with shape (batch, max_length, max_length)
-        torch.clamp(self.attenuation_lambda, min=0, max=1)
-        adj_matrix = self.attenuation_lambda * adj_matrix
+        #torch.clamp(self.atten_lambda, min=0, max=1)
+        #adj_matrix = self.atten_lambda * adj_matrix
         
-        adj_matrix = self.distance_matrix_kernel(adj_matrix)
+        adj_matrix = self.distance_matrix_kernel(adj_matrix.float())
 
         # 2) Do all the linear projections in batch from d_model => h x d_k
         query = self.linears[0](query_node).view(n_batches, max_length, self.heads, self.d_k).transpose(1, 2)
         key = self.linears[1](key_edge).view(n_batches, max_length, max_length, self.heads, self.d_k).permute(0, 3, 1, 2, 4)
         value = self.linears[2](value_node).view(n_batches, max_length, self.heads, self.d_k).transpose(1, 2)
-
+        
         # 3) Apply attention on all the projected vectors in batch.
         node_hidden, edge_hidden, self.message = attention(query, key, value, adj_matrix, dropout=self.dropout)
 
         # 4) "Concat" using a view and apply a final linear.
         node_hidden = node_hidden.transpose(1, 2).contiguous().view(n_batches, max_length, self.heads * self.d_k)
         edge_hidden = edge_hidden.permute(0, 2, 3, 1, 4).contiguous().view(n_batches, max_length, max_length, self.heads * self.d_k)
-
+        
         return mish_function(self.linears[3](node_hidden)), mish_function(self.linears[4](edge_hidden))
 
 
 
 
 class GraphTransformerDecoder(nn.Module):
-    def __init__(self, encoder_decoder, prot_n_embed, prot_e_embed, pos_embed):
+    def __init__(self, encoder_decoder, prot_n_embed, prot_e_embed):
         super(GraphTransformerDecoder, self).__init__()
         self.encoder_decoder = encoder_decoder
         self.prot_n_embed = prot_n_embed
         self.prot_e_embed = prot_e_embed
-        self.pos_embed = pos_embed
+        #self.pos_embed = pos_embed
         
 
     def forward(self,edges_logits, nodes_logits, prot_n_features,prot_e_features,adj_matrix):
@@ -359,7 +364,7 @@ class GraphTransformerDecoder(nn.Module):
     def decode(self,edges_logits, nodes_logits, prot_n_features, prot_e_features, adj_matrix):  # (batch, max_length, d_atom+1)
         # xv.shape = (batch, max_length, d_model)
  
-        prot_n_initial = self.prot_n_embed(prot_n_features[:, :, :]) + self.pos_embed(prot_n_features[:, :, -1].squeeze(-1))
+        prot_n_initial = self.prot_n_embed(prot_n_features[:, :, :]) #+ self.pos_embed(prot_n_features[:, :, -1].squeeze(-1))
         # node_initial = self.node_embed(node_features[:, :, :-1])
         # evw = xv + evw for directions; evw.shape = (batch, max_length, max_length, d_model)
         # edge_initial = node_initial.unsqueeze(-2) + self.edge_embed(edge_features)
@@ -373,9 +378,9 @@ class GraphTransformerDecoder(nn.Module):
 # Embeddings
 
 
-class Node_Embeddings(nn.Module):
+class Node_Embeddings_dec(nn.Module):
     def __init__(self, d_atom, d_emb, dropout):
-        super(Node_Embeddings, self).__init__()
+        super(Node_Embeddings_dec, self).__init__()
         self.lut = nn.Linear(d_atom, d_emb)
         self.dropout = nn.Dropout(dropout)
         self.d_emb = d_emb
@@ -385,9 +390,9 @@ class Node_Embeddings(nn.Module):
         return self.dropout(self.lut(x.float())) * math.sqrt(self.d_emb)
 
 
-class Edge_Embeddings(nn.Module):
+class Edge_Embeddings_dec(nn.Module):
     def __init__(self, d_edge, d_emb, dropout):
-        super(Edge_Embeddings, self).__init__()
+        super(Edge_Embeddings_dec, self).__init__()
         
         self.lut = nn.Linear(d_edge, d_emb)
         self.dropout = nn.Dropout(dropout)
@@ -398,9 +403,9 @@ class Edge_Embeddings(nn.Module):
         return self.dropout(self.lut(x.float())) * math.sqrt(self.d_emb)
 
 
-class Position_Encoding(nn.Module):
+class Position_Encoding_dec(nn.Module):
     def __init__(self, max_length, d_emb, dropout):
-        super(Position_Encoding, self).__init__()
+        super(Position_Encoding_dec, self).__init__()
         self.max_length = max_length
         self.d_emb = d_emb
         self.dropout = nn.Dropout(dropout)
