@@ -1,16 +1,18 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from layers import PNA, GraphConvolution, GraphAggregation
+from layers import PNA, GraphConvolution, GraphAggregation, TransformerEncoder, TransformerDecoder
 import copy 
-from transformer import GraphTransformerEncoder, Encoder, EncoderLayer, Node_Embeddings, Edge_Embeddings, MultiHeadedAttention, PositionwiseFeedForward, GraphTransformerDecoder, MoleculeEncoderDecoderLayer, Decoder, MultiHeadedAttentionDecoder, PositionwiseFeedForwardDecoder, TransformerDecoderAttention, Node_Embeddings_dec, Edge_Embeddings_dec, Position_Encoding_dec
 from torch_geometric.nn import global_add_pool
 from torch_geometric.nn.conv import TransformerConv
+from torch_geometric.nn.dense import DenseGCNConv
 
+    
+    
     
 class Generator(nn.Module):
     """Generator network."""
-    def __init__(self, conv_dims, z_dim, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio, drop_rate, tra_conv):
+    def __init__(self, conv_dims, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio, drop_rate):
         super(Generator, self).__init__()
 
         self.vertexes = vertexes
@@ -21,240 +23,96 @@ class Generator(nn.Module):
         self.heads = heads
         self.mlp_ratio = mlp_ratio
         self.dropout_rate = drop_rate
-        N=self.depth
-        d_model=self.dim
-        h=self.heads
         dropout= self.dropout_rate
-        attenuation_lambda=0.1
-        max_length=self.vertexes
-        N_dense=2
-        leaky_relu_slope=0.0 
-        dense_output_nonlinearity='tanh' 
-        scale_norm=False
-        d_atom = self.nodes
-        d_edge = self.edges
-        c = copy.deepcopy
-        self.tra_conv = tra_conv
-        output_layer = vertexes * vertexes * dim + vertexes * dim
-        
-        self.layers_edge = nn.Sequential(nn.Linear(self.vertexes, conv_dims[0]), nn.Tanh(), nn.Linear(conv_dims[0], self.vertexes*self.edges),
-                                         nn.Sigmoid(), nn.Dropout(p=dropout))
-        
-        self.layers_node = nn.Sequential(nn.Linear(self.vertexes, conv_dims[0]), nn.Tanh(), nn.Linear(conv_dims[0], self.vertexes*self.nodes),
-                                         nn.Sigmoid(), nn.Dropout(p=dropout))
+    
 
-        #self.layers = nn.Sequential(nn.Linear(vertexes, conv_dims[0]), nn.Tanh(), nn.Linear(conv_dims[0], conv_dims[1]), nn.Tanh(), 
-         #                                nn.Tanh(), nn.Linear(conv_dims[1], vertexes * (vertexes+1)),
-          #                               nn.Sigmoid(), nn.Dropout(p=dropout))
         
-        attn = MultiHeadedAttention(h, d_model, leaky_relu_slope, dropout, attenuation_lambda)
-        ff = PositionwiseFeedForward(d_model, N_dense, dropout, leaky_relu_slope, dense_output_nonlinearity) 
+        self.layers_edge = nn.Sequential(nn.Linear(self.edges, conv_dims[0]), nn.ReLU(), nn.Linear(conv_dims[0], self.dim))  #  128, 9, 9, 5 --> 128, 9, 9, 128
         
-        #self.Transformer_n = torch.nn.DataParallel(TransformerEncoder(dim=self.dim, depth=self.depth, heads=self.heads,
-         #                                                           mlp_ratio=self.mlp_ratio, drop_rate=self.dropout_rate), device_ids=[0,1])              
-        #self.Transformer_e = torch.nn.DataParallel(TransformerEncoder(dim=self.dim, depth=self.depth, heads=self.heads,
-         #                                                           mlp_ratio=self.mlp_ratio, drop_rate=self.dropout_rate), device_ids=[0,1])        
+        self.layers_node = nn.Sequential(nn.Linear(self.nodes, conv_dims[0]), nn.ReLU(), nn.Linear(conv_dims[0], self.dim))  #  128, 9, 5 --> 128, 9, 128
         
-        self.TransformerEncoder = GraphTransformerEncoder(Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout, scale_norm), N, scale_norm),
-                                            Node_Embeddings(d_atom, d_model, dropout),
-                                            Edge_Embeddings(d_edge, d_model, dropout),dim)
-
+    
+        
+        self.TransformerEncoder = TransformerEncoder(dim=self.dim, depth=self.depth, heads=self.heads,
+                                                                    mlp_ratio=self.mlp_ratio, drop_rate=self.dropout_rate)              
+     
 
         self.dropout = nn.Dropout(p=dropout)
-        self.last_dropout= nn.Dropout(p=0.99)
-        self.nodes_output_layer = nn.Sequential(nn.Linear(self.dim, self.nodes))
-        self.edges_output_layer = nn.Sequential(nn.Linear(self.dim, self.edges))
-        if self.tra_conv: 
-            self.attr_mlp = nn.Linear(1, self.dim)
-            self.nodes_mlp = nn.Linear(1, self.dim)
         
-    def postprocess(self, inputs, post_method, temperature=1.,dimension=-1):
-        
-        if post_method == 'soft_gumbel':
-            softmax = F.gumbel_softmax(inputs
-                        / temperature, hard=False, dim = dimension)
-        elif post_method == 'hard_gumbel':
-            softmax = F.gumbel_softmax(inputs
-                        / temperature, hard=True, dim = dimension)
-        elif post_method == 'softmax':
-            softmax = F.softmax(inputs / temperature, dim = dimension)
-            
-        return softmax
-    
-    def dense_to_sparse_with_attr(self, adj):
-        assert adj.dim() >= 2 and adj.dim() <= 3
-        assert adj.size(-1) == adj.size(-2)
-
-        index = adj.nonzero(as_tuple=True)
-        edge_attr = adj[index]
-
-        if len(index) == 3:
-            batch = index[0] * adj.size(-1)
-            index = (batch + index[1], batch + index[2])
-            index = torch.stack(index, dim=0)
-        return index, edge_attr.long()
+        self.nodes_output_layer = nn.Linear(self.dim, self.nodes)  # 128 -- > 5
+        self.edges_output_layer = nn.Linear(self.dim, self.edges)  # 128 -- > 5
       
-        
+
     def forward(self, z_e,z_n,a,a_tensor,x_tensor):
         
         nodes_logits = self.layers_node(z_n) 
-        nodes_logits = nodes_logits.view(-1,self.vertexes,self.nodes)
-
+        
+        nodes_logits = self.dropout(nodes_logits)
+        
         edges_logits = self.layers_edge(z_e)
-        edges_logits = edges_logits.view(-1,self.edges,self.vertexes,self.vertexes)
+        
+        edges_logits = edges_logits.view(-1,self.dim,self.vertexes,self.vertexes)
         edges_logits = (edges_logits + edges_logits.permute(0,1,3,2))/2
         edges_logits = self.dropout(edges_logits)
-        
+        edges_logits = edges_logits.view(-1,self.vertexes,self.vertexes,self.dim)
 
-   
- 
-        adj_matrix = torch.max(edges_logits,1)[1]
-        edges_logits = edges_logits.view(-1,self.vertexes,self.vertexes,self.edges)
-        
-        nodes_logits , edges_logits = self.TransformerEncoder(nodes_logits, adj_matrix, edges_logits)
+
+        nodes_logits , edges_logits, attn = self.TransformerEncoder(nodes_logits, edges_logits)
         
         edges_logits = self.dropout(edges_logits)
         nodes_logits = self.dropout(nodes_logits)
         
         
-        nodes_logits_sample = self.nodes_output_layer(nodes_logits)
-        # 128,25,13
-        
-        edges_logits_sample = self.edges_output_layer(edges_logits)  
-        # 128,25,25,5
-        
-        edges_logits_sample = edges_logits_sample.view(-1,self.edges,self.vertexes,self.vertexes)
-        edges_logits_sample = self.postprocess(edges_logits_sample, "soft_gumbel", dimension=1)
-        nodes_logits_sample = self.postprocess(nodes_logits_sample, "soft_gumbel")
-        
-        
-        
-        edges_hat, nodes_hat = torch.max(edges_logits_sample, 1)[1], torch.max(nodes_logits_sample, -1)[1] 
-        
-        
-        fake_edge_index, fake_edge_attr = self.dense_to_sparse_with_attr(edges_hat)
-        nodes_fake = nodes_hat.view(-1,1)
-        if self.tra_conv:
-            attr_for_traconv = self.attr_mlp(fake_edge_attr.view(-1,1).float())
-            nodes_for_traconv = self.nodes_mlp(nodes_fake.view(-1,1).float())
-        if self.tra_conv:
-            return edges_logits_sample, nodes_logits_sample, edges_logits, nodes_logits,nodes_fake,fake_edge_index,fake_edge_attr, attr_for_traconv, nodes_for_traconv
-        else:
-            return edges_logits_sample, nodes_logits_sample, edges_logits, nodes_logits,nodes_fake,fake_edge_index,fake_edge_attr
+        nodes_logits = self.nodes_output_layer(nodes_logits)
+        edges_logits = self.edges_output_layer(edges_logits)
+
+        return edges_logits, nodes_logits, attn
         
 class Generator2(nn.Module):
-    def __init__(self, vertexes_mol, edges_mol, nodes_mol, vertexes_protein, 
-                edges_protein, nodes_protein, dropout, dim, depth, heads, mlp_ratio, 
-                drop_rate,drugs_m_dim,drugs_b_dim):
+    def __init__(self, dim, depth, heads, mlp_ratio, drop_rate,drugs_m_dim,drugs_b_dim,b_dim,m_dim):
         super().__init__()
 
-        ## edge_logits = 16,9,9,4 (bs, mol_length, mol_length, bond_type)
-
-        #self.conv_dims = conv_dims
-        self.vertexes_prot = vertexes_protein # protein_length = 
-        self.edges_prot = 1 # bond_type_number =
-        self.nodes_prot = 7 # atom_type_num =
-        self.vertexes_mol = vertexes_mol
-        self.edges_mol = edges_mol 
-        self.nodes_mol = nodes_mol
         self.depth = depth
         self.dim = dim
-        self.heads = heads
         self.mlp_ratio = mlp_ratio
-        self.droprate_rate =drop_rate
-        self.depth = depth
-        self.dim = dim
         self.heads = heads
-        self.mlp_ratio = mlp_ratio
         self.dropout_rate = drop_rate
-        N=self.depth
-        d_model=self.dim
-        h=self.heads
-        dropout= self.dropout_rate
-        attenuation_lambda=0.1
-        max_length= 546
-        N_dense=2
-        leaky_relu_slope=0.0 
-        dense_output_nonlinearity='tanh' 
-        scale_norm=False
-        d_atom = self.nodes_prot
-        d_edge = self.edges_prot
-        c = copy.deepcopy
         self.drugs_m_dim = drugs_m_dim
         self.drugs_b_dim = drugs_b_dim
-        #self.prot_e_layer = nn.Sequential(nn.Linear(self.edges_prot, conv_dims[0]), nn.Tanh(), nn.Linear(conv_dims[0], conv_dims[1]), nn.Tanh(), nn.Linear(conv_dims[1], conv_dims[2]),
-         #                                nn.Tanh(), nn.Linear(conv_dims[2], self.dim),
-          #                               nn.Tanh(), nn.Dropout(p=dropout))
-        #self.prot_n_layer = nn.Sequential(nn.Linear(self.nodes_prot, conv_dims[0]), nn.Tanh(), nn.Linear(conv_dims[0], conv_dims[1]), nn.Tanh(), nn.Linear(conv_dims[1], conv_dims[2]),
-         #                                nn.Tanh(), nn.Linear(conv_dims[2], self.dim),
-          #                               nn.Tanh(), nn.Dropout(p=dropout))        
-        self.dropoout = nn.Dropout(p=dropout)
-
-        attn = MultiHeadedAttentionDecoder(h, d_model, leaky_relu_slope, dropout, attenuation_lambda)
-        ff = PositionwiseFeedForwardDecoder(d_model, N_dense, dropout, leaky_relu_slope, dense_output_nonlinearity) 
-        dec_attn = TransformerDecoderAttention(heads, d_model, leaky_relu_slope=0.1, dropout=0.1, attenuation_lambda=0.1)
-        self.TransformerDecoder = GraphTransformerDecoder(Decoder(MoleculeEncoderDecoderLayer(d_model, c(attn), c(ff), dropout, scale_norm, c(dec_attn)), N, scale_norm),
-                                            Node_Embeddings(d_atom, d_model, dropout),
-                                            Edge_Embeddings(d_edge, d_model, dropout))
-
+        self.prot_n = 7
+        self.prot_e = 1 
+    
+        self.dropoout = nn.Dropout(p=drop_rate)
+        
+        self.mol_nodes = nn.Linear(m_dim, dim)
+        self.mol_edges = nn.Linear(b_dim, dim)
+        
+        self.prot_nodes =  nn.Linear(self.prot_n, dim)
+        self.prot_edges =  nn.Linear(self.prot_e, dim)
+        
+        self.TransformerDecoder = TransformerDecoder(dim, depth, heads, mlp_ratio=4, drop_rate=0.)
 
         self.nodes_output_layer = nn.Linear(self.dim, self.drugs_m_dim)
         self.edges_output_layer = nn.Linear(self.dim, self.drugs_b_dim)
-        self.attr_mlp = nn.Linear(1, self.dim)
-        self.nodes_mlp = nn.Linear(1, self.dim)
-    def postprocess(self, inputs, post_method, temperature=1.,dimension=-1):
-        
-        if post_method == 'soft_gumbel':
-            softmax = F.gumbel_softmax(inputs
-                        / temperature, hard=False, dim = dimension)
-        elif post_method == 'hard_gumbel':
-            softmax = F.gumbel_softmax(inputs
-                        / temperature, hard=True, dim = dimension)
-        elif post_method == 'softmax':
-            softmax = F.softmax(inputs / temperature, dim = dimension)
-            
-        return softmax
-    
-    
-    def dense_to_sparse_with_attr(self, adj):
-        assert adj.dim() >= 2 and adj.dim() <= 3
-        assert adj.size(-1) == adj.size(-2)
 
-        index = adj.nonzero(as_tuple=True)
-        edge_attr = adj[index]
 
-        if len(index) == 3:
-            batch = index[0] * adj.size(-1)
-            index = (batch + index[1], batch + index[2])
-            index = torch.stack(index, dim=0)
-        return index, edge_attr.long()
-    
     def forward(self, edges_logits, nodes_logits, prot_n, prot_e):
-
-        ##### EDGE LOGITS #####
-        adj_matrix = torch.max(edges_logits,-1)[1]
         
+        edges_logits = self.mol_edges(edges_logits)
+        nodes_logits = self.mol_nodes(nodes_logits)
         
-        edges_logits, nodes_logits, attn = self.TransformerDecoder(edges_logits, nodes_logits, prot_n, prot_e,adj_matrix)
-   
+        prot_n = self.prot_nodes(prot_n)
+        prot_e = self.prot_edges(prot_e)
         
-        ##### NODE LOGITS #####
+        edges_logits, nodes_logits, dec_attn = self.TransformerDecoder(nodes_logits,prot_n,edges_logits,prot_e)
+     
+        edges_logits = self.edges_output_layer(edges_logits)
+        nodes_logits = self.nodes_output_layer(nodes_logits)
         
-        edges_hat = self.edges_output_layer(edges_logits)
-        nodes_hat = self.nodes_output_layer(nodes_logits)
-        edges_hat = edges_hat.view(-1,self.edges_mol, self.vertexes_mol,self.vertexes_mol)
-        edges_hat = self.postprocess(edges_hat, "soft_gumbel", dimension=1)
-        nodes_hat = self.postprocess(nodes_hat, "soft_gumbel")        
+        edges_logits = self.dropoout(edges_logits)
+        nodes_logits = self.dropoout(nodes_logits)
         
-        edges_hard, nodes_hard = torch.max(edges_hat, 1)[1], torch.max(nodes_hat, -1)[1] 
-        
-        edges_hat = edges_hat.view(-1, self.vertexes_mol,self.vertexes_mol,self.edges_mol)
-        fake_edge_index2, fake_edge_attr2 = self.dense_to_sparse_with_attr(edges_hard)
-        
-        nodes_fake2 = nodes_hard.view(-1,1)
-        g_attr_for_traconv = self.attr_mlp(fake_edge_attr2.view(-1,1).float())
-        g_nodes_for_traconv = self.nodes_mlp(nodes_fake2.view(-1,1).float())        
-        return edges_hat, nodes_hat, edges_hard, nodes_hard, nodes_fake2, fake_edge_index2, fake_edge_attr2,g_attr_for_traconv,g_nodes_for_traconv
+        return edges_logits, nodes_logits, dec_attn
 
 class Discriminator(nn.Module):
     """Discriminator network with PatchGAN."""
@@ -315,13 +173,13 @@ class Discriminator2(nn.Module):
 
 class Discriminator_old(nn.Module):
 
-    def __init__(self, conv_dim, m_dim, b_dim, dropout):
+    def __init__(self, conv_dim, m_dim, b_dim, dropout, gcn_depth):
         super(Discriminator_old, self).__init__()
 
         graph_conv_dim, aux_dim, linear_dim = conv_dim
         
         # discriminator
-        self.gcn_layer = GraphConvolution(m_dim, graph_conv_dim, b_dim, dropout)
+        self.gcn_layer = GraphConvolution(m_dim, graph_conv_dim, b_dim, dropout,gcn_depth)
         self.agg_layer = GraphAggregation(graph_conv_dim[-1], aux_dim, m_dim, dropout)
 
         # multi dense layer
@@ -356,13 +214,13 @@ class Discriminator_old(nn.Module):
     
 class Discriminator_old2(nn.Module):
 
-    def __init__(self, conv_dim, m_dim, b_dim, dropout):
+    def __init__(self, conv_dim, m_dim, b_dim, dropout, gcn_depth):
         super(Discriminator_old2, self).__init__()
 
         graph_conv_dim, aux_dim, linear_dim = conv_dim
         
         # discriminator
-        self.gcn_layer = GraphConvolution(m_dim, graph_conv_dim, b_dim, dropout)
+        self.gcn_layer = GraphConvolution(m_dim, graph_conv_dim, b_dim, dropout, gcn_depth)
         self.agg_layer = GraphAggregation(graph_conv_dim[-1], aux_dim, m_dim, dropout)
 
         # multi dense layer
@@ -412,3 +270,31 @@ class Discriminator3(nn.Module):
         h = activation(h) if activation is not None else h
         
         return h
+    
+    
+class PNA_Net(nn.Module):
+    def __init__(self,deg):
+        super().__init__()
+
+      
+
+        self.convs = nn.ModuleList()
+        
+        self.lin = nn.Linear(5, 128)
+        for _ in range(1):
+            conv = DenseGCNConv(128, 128, improved=False, bias=True)
+            self.convs.append(conv)
+            
+        self.agg_layer = GraphAggregation(128, 128, 0, dropout=0.1)
+        self.mlp = nn.Sequential(nn.Linear(128, 64), nn.Tanh(), nn.Linear(64, 32), nn.Tanh(),
+                              nn.Linear(32, 1))
+
+    def forward(self, x, adj,mask=None):
+        x = self.lin(x)
+        
+        for conv in self.convs:
+            x = F.relu(conv(x, adj,mask=None))
+
+        x = self.agg_layer(x,torch.tanh)
+       
+        return self.mlp(x)     

@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 from utils import *
-from models import Generator, Discriminator, Generator2, Discriminator2, Discriminator_old, Discriminator_old2, Discriminator3
+from models import Generator, Discriminator, Generator2, Discriminator2, Discriminator_old, Discriminator_old2, Discriminator3, PNA_Net
 import torch_geometric.utils as geoutils
 import wandb
 from torch_geometric.loader import DataLoader
@@ -19,6 +19,8 @@ import torch.utils.data
 from torch.nn.parallel import DataParallel as DP
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+import seaborn as sns
+
 
 class Solver(object):
     
@@ -76,6 +78,8 @@ class Solver(object):
         self.dec_heads = config.dec_heads
         self.dis_select = config.dis_select
         self.la = config.la
+        self.la2 = config.la2
+        self.gcn_depth = config.gcn_depth
         # PNA config
         
         self.agg = config.aggregators
@@ -122,7 +126,7 @@ class Solver(object):
         self.sample_step = config.sample_step
         self.model_save_step = config.model_save_step
         self.lr_update_step = config.lr_update_step
-        
+        self.clipping_value = config.clipping_value
         # Miscellaneous.
         
         self.mode = config.mode
@@ -131,6 +135,8 @@ class Solver(object):
         self.nodes_mlp = torch.nn.Linear(1,self.dim, device = self.device)
         self.m_dim_drugs = torch.nn.Linear(self.drugs_m_dim,self.dim, device = self.device)
         self.b_dim_drugs = torch.nn.Linear(self.drugs_b_dim,self.dim, device = self.device)
+        self.noise_strength_0 = torch.nn.Parameter(torch.zeros([]))
+        self.noise_strength_1 = torch.nn.Parameter(torch.zeros([]))        
         self.noise_strength_2 = torch.nn.Parameter(torch.zeros([]))
         self.noise_strength_3 = torch.nn.Parameter(torch.zeros([]))
         self.deg = self._genDegree()
@@ -161,7 +167,7 @@ class Solver(object):
             @ tra_conv: Whether module creates output for TransformerConv discriminator
             '''
             
-        self.G = Generator(self.g_conv_dim, self.z_dim,
+        self.G = Generator(self.g_conv_dim,
                            self.vertexes,
                            self.b_dim,
                            self.m_dim,
@@ -170,22 +176,17 @@ class Solver(object):
                            depth=self.depth, 
                            heads=self.heads, 
                            mlp_ratio=self.mlp_ratio, 
-                           drop_rate=self.drop_rate, tra_conv=self.tra_conv)
+                           drop_rate=self.drop_rate)
         
-        self.G2 = Generator2(self.vertexes,
-                           self.b_dim,
-                           self.m_dim,
-                           self.vertexes_protein, 
-                           self.edges_protein,
-                           self.nodes_protein,
-                           self.dropout,
-                           dim=self.dim, 
-                           depth=self.dec_depth, 
-                           heads=self.dec_heads, 
-                           mlp_ratio=self.mlp_ratio, 
-                           drop_rate=self.drop_rate,
-                           drugs_m_dim=self.drugs_m_dim,
-                           drugs_b_dim=self.drugs_b_dim)
+        self.G2 = Generator2(dim=self.dim, 
+                             depth=self.dec_depth, 
+                             heads=self.dec_heads, 
+                             mlp_ratio=self.mlp_ratio, 
+                             drop_rate=self.drop_rate,
+                             drugs_m_dim=self.drugs_m_dim,
+                             drugs_b_dim=self.drugs_b_dim,
+                             b_dim = self.b_dim,
+                             m_dim = self.m_dim)
         
         ''' Discriminator implementation with PNA:
         
@@ -206,7 +207,7 @@ class Solver(object):
                                    self.pre_lay, self.post_lay, self.pna_layer_num, self.graph_add)
         self.D2_PNA = Discriminator2(self.deg, self.agg,self.sca,self.pna_in_ch,self.pna_out_ch,self.edge_dim,self.towers,
                                    self.pre_lay, self.post_lay, self.pna_layer_num, self.graph_add)
-        
+        self.PNA = PNA_Net(self.deg)
         self.D2_TraConv = Discriminator3(self.dim)   
         self.V_PNA = Discriminator(self.deg, self.agg,self.sca,self.pna_in_ch,self.pna_out_ch,self.edge_dim,self.towers,
                                    self.pre_lay, self.post_lay, self.pna_layer_num, self.graph_add)
@@ -221,39 +222,41 @@ class Solver(object):
             @ dropout: dropout possibility 
             '''
         
-        self.D = Discriminator_old(self.d_conv_dim, self.m_dim , self.b_dim, self.dropout) 
-        self.D2 = Discriminator_old2(self.d_conv_dim, self.drugs_m_dim , self.drugs_b_dim, self.dropout)
+        self.D = Discriminator_old(self.d_conv_dim, self.m_dim , self.b_dim, self.dropout, self.gcn_depth) 
+        self.D2 = Discriminator_old2(self.d_conv_dim, self.drugs_m_dim , self.drugs_b_dim, self.dropout, self.gcn_depth)
         
-        self.V = Discriminator_old(self.d_conv_dim, self.m_dim , self.b_dim, self.dropout)
-        self.V2 = Discriminator_old2(self.d_conv_dim, self.drugs_m_dim , self.drugs_b_dim, self.dropout)
+        self.V = Discriminator_old(self.d_conv_dim, self.m_dim , self.b_dim, self.dropout, self.gcn_depth)
+        self.V2 = Discriminator_old2(self.d_conv_dim, self.drugs_m_dim , self.drugs_b_dim, self.dropout, self.gcn_depth)
         
         ''' Optimizers for G1, G2, D1, and D2:
             
             Adam Optimizer is used and different beta1 and beta2s are used for GAN1 and GAN2
             '''
         
-        self.g_optimizer = torch.optim.Adam(list(self.G.parameters())+list(self.V.parameters()),
+        self.g_optimizer = torch.optim.AdamW(self.G.parameters(),
                                             self.g_lr, [self.beta1, self.beta2])
-        self.g2_optimizer = torch.optim.Adam(list(self.G2.parameters())+list(self.V2.parameters()),
+        self.g2_optimizer = torch.optim.AdamW(self.G2.parameters(),
                                             self.g2_lr, [self.beta1, self.beta2])
         
-        self.d_optimizer = torch.optim.Adam(self.D.parameters(), self.d_lr, [self.beta1, self.beta2])
-        self.d2_optimizer = torch.optim.Adam(self.D2.parameters(), self.d2_lr, [self.beta1, self.beta2])
+        self.d_optimizer = torch.optim.AdamW(self.D.parameters(), self.d_lr, [self.beta1, self.beta2])
+        self.d2_optimizer = torch.optim.AdamW(self.D2.parameters(), self.d2_lr, [self.beta1, self.beta2])
         
-        self.d_pna_optimizer = torch.optim.Adam(self.D_PNA.parameters(), self.d_lr, [self.beta1, self.beta2])
-        self.d2_pna_optimizer = torch.optim.Adam(self.D2_PNA.parameters(), self.d2_lr, [self.beta1, self.beta2])  
+        self.d_pna_optimizer = torch.optim.AdamW(self.PNA.parameters(), self.d_lr, [self.beta1, self.beta2])
+        self.d2_pna_optimizer = torch.optim.AdamW(self.D2_PNA.parameters(), self.d2_lr, [self.beta1, self.beta2])  
         
-        self.d_traconv_optimizer = torch.optim.Adam(self.D_TraConv.parameters(), self.d_lr, [self.beta1, self.beta2])
-        self.d2_traconv_optimizer = torch.optim.Adam(self.D2_TraConv.parameters(), self.d2_lr, [self.beta1, self.beta2])         
+        self.d_traconv_optimizer = torch.optim.AdamW(self.D_TraConv.parameters(), self.d_lr, [self.beta1, self.beta2])
+        self.d2_traconv_optimizer = torch.optim.AdamW(self.D2_TraConv.parameters(), self.d2_lr, [self.beta1, self.beta2])         
         
-        self.v_optimizer = torch.optim.Adam(self.V.parameters(), self.d_lr, [self.beta1, self.beta2])       
-        self.v2_optimizer = torch.optim.Adam(self.V2.parameters(), self.d2_lr, [self.beta1, self.beta2]) 
+        self.v_optimizer = torch.optim.AdamW(self.V.parameters(), self.d_lr, [self.beta1, self.beta2])       
+        self.v2_optimizer = torch.optim.AdamW(self.V2.parameters(), self.d2_lr, [self.beta1, self.beta2]) 
         ''' Learning rate scheduler:
             
             Changes learning rate based on loss.
             '''
         
         self.scheduler_g = ReduceLROnPlateau(self.g_optimizer, mode='min', factor=0.5, patience=10, min_lr=0.00001)
+        
+        
         self.scheduler_d = ReduceLROnPlateau(self.d_optimizer, mode='min', factor=0.5, patience=10, min_lr=0.00001)
         self.scheduler_d_pna = ReduceLROnPlateau(self.d_pna_optimizer, mode='min', factor=0.5, patience=10, min_lr=0.00001)
         self.scheduler_d_traconv = ReduceLROnPlateau(self.d_traconv_optimizer, mode='min', factor=0.5, patience=10, min_lr=0.00001)        
@@ -271,7 +274,7 @@ class Solver(object):
         
         self.G.to(self.device)
         self.D.to(self.device)
-        self.D_PNA.to(self.device)
+        self.PNA.to(self.device)
         self.D_TraConv.to(self.device)
         self.V.to(self.device)
         
@@ -280,7 +283,7 @@ class Solver(object):
         self.D2_PNA.to(self.device)
         self.D2_TraConv.to(self.device)
         self.V2.to(self.device)      
-     
+        
         for p in self.G.parameters():
             if p.dim() > 1:
                 if self.init_type == 'uniform':
@@ -333,12 +336,12 @@ class Solver(object):
                         torch.nn.init.xavier_normal_(p)   
                     elif self.init_type == 'random_normal':
                         torch.nn.init.normal_(p, 0.0, 0.02)
-       
+        
     def decoder_load(self, dictionary_name):
         
         ''' Loading the atom and bond decoders'''
         
-        with open("MolecularTransGAN-master/data/" + dictionary_name + self.dataset_name + '.pkl', 'rb') as f:
+        with open("DrugGEN/data/" + dictionary_name + self.dataset_name + '.pkl', 'rb') as f:
             
             return pickle.load(f)    
 
@@ -346,7 +349,7 @@ class Solver(object):
         
         ''' Loading the atom and bond decoders'''
         
-        with open("MolecularTransGAN-master/data/" + dictionary_name +'.pkl', 'rb') as f:
+        with open("DrugGEN/data/" + dictionary_name +'.pkl', 'rb') as f:
             
             return pickle.load(f)    
                
@@ -372,7 +375,7 @@ class Solver(object):
             for data in self.dataset:
                 d = geoutils.degree(data.edge_index[1], num_nodes=data.num_nodes, dtype=torch.long)
                 deg += torch.bincount(d, minlength=deg.numel())
-            torch.save(deg, 'MolecularTransGAN-master/data/' + self.dataset_name + '-degree.pt')            
+            torch.save(deg, 'DrugGEN/data/' + self.dataset_name + '-degree.pt')            
         else:    
             deg = torch.load(degree_path, map_location=lambda storage, loc: storage)
             
@@ -487,46 +490,35 @@ class Solver(object):
         out = torch.zeros(list(labels.size())+[dim]).to(self.device)
         out.scatter_(len(out.size())-1,labels.unsqueeze(-1),1.)
         
-        return out
+        return out.float()
 
 
     def sample_z_node(self, batch_size):
         
         ''' Random noise for nodes logits. '''
         
-        return np.random.normal(0,1, size=(batch_size,self.vertexes))
+        return np.random.normal(0,1, size=(batch_size,self.vertexes, self.m_dim))  #  128, 9, 5
     
     
     def sample_z_edge(self, batch_size):
         
         ''' Random noise for edges logits. '''
         
-        return np.random.normal(0,1, size=(batch_size,self.vertexes,self.vertexes))
+        return np.random.normal(0,1, size=(batch_size,self.vertexes,self.vertexes,self.b_dim)) # 128, 9, 9, 5
     
     
-    def postprocess(self, inputs, post_method, temperature=1.):
-        
-        ''' Post-processing the edges and nodes logits with 
-            Softmax-Gumbel for categorical distribution. '''
-        
-        def listify(x):
-            return x if type(x) == list or type(x) == tuple else [x]
-
-        def delistify(x):
-            return x if len(x) > 1 else x[0]
+    def postprocess(self, inputs, post_method, temperature=1.,dimension=-1):
         
         if post_method == 'soft_gumbel':
-            softmax = [F.gumbel_softmax(e_logits.contiguous().view(-1,e_logits.size(-1))
-                       / temperature, hard=False).view(e_logits.size())
-                       for e_logits in listify(inputs)]
+            softmax = F.gumbel_softmax(inputs
+                        / temperature, hard=False, dim = dimension)
         elif post_method == 'hard_gumbel':
-            softmax = [F.gumbel_softmax(e_logits.contiguous().view(-1,e_logits.size(-1))
-                       / temperature, hard=True).view(e_logits.size())
-                       for e_logits in listify(inputs)]
+            softmax = F.gumbel_softmax(inputs
+                        / temperature, hard=True, dim = dimension)
         elif post_method == 'softmax':
-            softmax = [F.softmax(e_logits / temperature, -1)
-                       for e_logits in listify(inputs)]  
-        return [delistify(e) for e in (softmax)]          
+            softmax = F.softmax(inputs / temperature, dim = dimension)
+            
+        return softmax       
       
         
     def reward(self, mols):
@@ -560,6 +552,7 @@ class Solver(object):
         return rr.reshape(-1, 1)
     
     def dense_to_sparse_with_attr(self, adj):
+        ### 
         assert adj.dim() >= 2 and adj.dim() <= 3
         assert adj.size(-1) == adj.size(-2)
 
@@ -570,10 +563,10 @@ class Solver(object):
             batch = index[0] * adj.size(-1)
             index = (batch + index[1], batch + index[2])
             index = torch.stack(index, dim=0)
-        return index, edge_attr.long()   
+        return index, edge_attr
     
 
-    def plot_grad_flow(self, named_parameters, model):
+    def plot_grad_flow(self, named_parameters, model, iter, epoch):
         
         # Based on https://discuss.pytorch.org/t/check-gradient-flow-in-network/15063/10
         '''Plots the gradients flowing through different layers in the net during training.
@@ -595,7 +588,7 @@ class Solver(object):
         plt.hlines(0, 0, len(ave_grads)+1, lw=2, color="k" )
         plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
         plt.xlim(left=0, right=len(ave_grads))
-        plt.ylim(bottom = -0.001, top=0.5) # zoom in on the lower gradient regions
+        plt.ylim(bottom = -0.001, top=1) # zoom in on the lower gradient regions
         plt.xlabel("Layers")
         plt.ylabel("average gradient")
         plt.title("Gradient flow")
@@ -603,7 +596,29 @@ class Solver(object):
         plt.legend([Line2D([0], [0], color="c", lw=4),
                     Line2D([0], [0], color="b", lw=4),
                     Line2D([0], [0], color="k", lw=4)], ['max-gradient', 'mean-gradient', 'zero-gradient'])
-        plt.savefig("weights" + model + ".png", dpi= 500,bbox_inches='tight')
+        pltsavedir = "/home/atabey/gradients/tryout"
+        plt.savefig(os.path.join(pltsavedir, "weights_" + model + "_" + self.dataset_name + "_"  + str(iter) + "_" + str(epoch) +  ".png"), dpi= 500,bbox_inches='tight')
+
+
+    def plot_attn(self, attn_w, model, iter, epoch):
+        
+        cols = 4
+        rows = int(self.heads/cols)
+
+        fig, axes = plt.subplots( rows,cols, figsize = (30, 14))
+        axes = axes.flat
+        attentions_pos = attn_w[0]
+        attentions_pos = attentions_pos.cpu().detach().numpy()
+        for i,att in enumerate(attentions_pos):
+
+            #im = axes[i].imshow(att, cmap='gray')
+            sns.heatmap(att,vmin = 0, vmax = 1,ax = axes[i])
+            axes[i].set_title(f'head - {i} ')
+            axes[i].set_ylabel('layers')
+        pltsavedir = "/home/atabey/attn/second"
+        plt.savefig(os.path.join(pltsavedir, "attn" + model + "_" + self.dataset_name + "_"  + str(iter) + "_" + str(epoch) +  ".png"), dpi= 500,bbox_inches='tight')
+        
+
         
     def train(self):
         
@@ -633,8 +648,8 @@ class Solver(object):
 
         # protein data
 
-        akt1_human_adj = torch.load("MolecularTransGAN-master/data/akt/AKT1_human_adj.pt")
-        akt1_human_annot = torch.load("MolecularTransGAN-master/data/akt/AKT1_human_annot.pt")  
+        akt1_human_adj = torch.load("DrugGEN/data/akt/AKT1_human_adj.pt")
+        akt1_human_annot = torch.load("DrugGEN/data/akt/AKT1_human_annot.pt")  
         
         # Start training.
 
@@ -665,11 +680,13 @@ class Solver(object):
                 z_n = self.sample_z_node(self.batch_size)                                                   # (batch,max_len)          
                 z_edge = torch.from_numpy(z_e).to(self.device).float().requires_grad_(True)                                      # Edge noise.(batch,max_len,max_len)
                 z_node = torch.from_numpy(z_n).to(self.device).float().requires_grad_(True)                                      # Node noise.(batch,max_len)       
-                a = geoutils.to_dense_adj(edge_index = data.edge_index,batch=data.batch,edge_attr=data.edge_attr, max_num_nodes=int(data.batch.shape[0]/self.batch_size))
+                a = geoutils.to_dense_adj(edge_index = data.edge_index,batch=data.batch,edge_attr=data.edge_attr, max_num_nodes=int(data.batch.shape[0]/self.batch_size)) 
                 x = data.x.view(-1,int(data.batch.shape[0]/self.batch_size))
               
                 a_tensor = self.label2onehot(a, self.b_dim)
                 x_tensor = self.label2onehot(x, self.m_dim)
+                a_tensor = a_tensor + torch.randn([a_tensor.size(0), a_tensor.size(1), a_tensor.size(2),1], device=a_tensor.device) * self.noise_strength_0
+                x_tensor = x_tensor + torch.randn([x_tensor.size(0), x_tensor.size(1),1], device=x_tensor.device) * self.noise_strength_1
                 
                 drugs_a = geoutils.to_dense_adj(edge_index = drugs.edge_index,batch=drugs.batch,edge_attr=drugs.edge_attr, max_num_nodes=int(drugs.batch.shape[0]/self.batch_size))
                 drugs_x = drugs.x.view(-1,int(drugs.batch.shape[0]/self.batch_size))
@@ -680,14 +697,16 @@ class Solver(object):
                 drugs_x_tensor = self.label2onehot(drugs_x, self.drugs_m_dim)
                 drugs_a_tensor = drugs_a_tensor + torch.randn([drugs_a_tensor.size(0), drugs_a_tensor.size(1), drugs_a_tensor.size(2),1], device=drugs_a_tensor.device) * self.noise_strength_2
                 drugs_x_tensor = drugs_x_tensor + torch.randn([drugs_x_tensor.size(0), drugs_x_tensor.size(1),1], device=drugs_x_tensor.device) * self.noise_strength_3
-                prot_n = akt1_human_annot[None,:].to(self.device)          
-                prot_e = akt1_human_adj[None,None,:].view(1,546,546,1).to(self.device).long()
+                prot_n = akt1_human_annot[None,:].to(self.device).float()        
+                prot_e = akt1_human_adj[None,None,:].view(1,546,546,1).to(self.device).float()
                 real_edge_attr_for_traconv = self.attr_mlp(data.edge_attr.view(-1,1).float())
                 real_nodes_for_traconv = self.nodes_mlp(data.x.view(-1,1).float())
         
                 y_real = torch.autograd.Variable(torch.ones(self.batch_size, 1)).to(self.device)
                 y_fake = torch.autograd.Variable(torch.zeros(self.batch_size, 1)).to(self.device)
                 y_fake_value = torch.autograd.Variable(torch.zeros(self.batch_size, 1)).to(self.device)
+                
+               
                 # =================================================================================== #
                 #                             2. Train the discriminator                              #
                 # =================================================================================== #
@@ -700,44 +719,49 @@ class Solver(object):
                     
                 elif self.dis_select == "PNA":
                     
-                    logits_real = self.D_PNA(data.x, data.edge_index, data.edge_attr, data.batch)
-                    
+                    #logits_real = self.PNA(data.x, data.edge_index.float(), data.edge_attr, data.batch)
+                    logits_real = self.PNA(x_tensor.to(self.device).float() , a.to(self.device).float() ,mask=None)
                 elif self.dis_select == "TraConv":
                     
                     logits_real = self.D_TraConv(real_nodes_for_traconv, data.edge_index, real_edge_attr_for_traconv, data.batch)  
                                   
-                #prediction_real =  torch.mean(logits_real)
+                prediction_real =  - torch.mean(logits_real)
 
-                d_loss_real = bce_loss(torch.sigmoid(logits_real), y_real)
+                #d_loss_real = bce_loss(torch.sigmoid(logits_real), y_real)
                 
                 
 
                 # Compute loss with fake molecules.
-                if self.tra_conv:
-                    edges_hat, nodes_hat, edges_logits, nodes_logits, nodes_fake,fake_edge_index,fake_edge_attr, attr_for_traconv, nodes_for_traconv = self.G(z_edge,z_node,a,a_tensor,x_tensor)
-                else: 
-                    edges_hat, nodes_hat, edges_logits, nodes_logits, nodes_fake,fake_edge_index,fake_edge_attr = self.G(z_edge,z_node,a,a_tensor,x_tensor)
+
+                edges_logits, nodes_logits, attn= self.G(z_edge,z_node,a,a_tensor,x_tensor)
                 
-                edges_hat = edges_hat.view(-1, self.vertexes,self.vertexes,self.b_dim)
+                #edges_hat = edges_logits.view(-1,self.b_dim,self.vertexes,self.vertexes)
+                edges_hat = self.postprocess(edges_logits, "soft_gumbel")
+                nodes_hat = self.postprocess(nodes_logits, "soft_gumbel")
+                
+                
+                edges_hat_sample, nodes_hat_sample = torch.max(edges_hat, -1)[1], torch.max(nodes_hat, -1)[1]
+                
                 features_hat = None
-                
+                #fake_edge_index, fake_edge_attr = self.dense_to_sparse_with_attr(edges_hat_sample)
+                #nodes_fake = nodes_hat_sample.view(-1,1)
+                #edges_hat = edges_hat.view(-1, self.vertexes,self.vertexes,self.b_dim)
                 if self.dis_select == "conv":
                 
                     logits_fake, features_fake = self.D(edges_hat, None, nodes_hat)
                     
                 elif self.dis_select == "PNA":
                     
-                    logits_fake = self.D_PNA(nodes_fake, fake_edge_index, fake_edge_attr, data.batch)
+                    #logits_fake = self.PNA(nodes_fake, fake_edge_index, fake_edge_attr, data.batch)
+                    logits_fake = self.PNA(nodes_hat, edges_hat_sample.float(),mask=None)
 
-                elif self.dis_select == "TraConv":
                     
-                    logits_fake = self.D_TraConv(nodes_for_traconv, fake_edge_index, attr_for_traconv, data.batch)
-                    
-                #prediction_fake = torch.mean(logits_fake)
-                d_loss_fake = bce_loss(torch.sigmoid(logits_fake),y_fake)
+                prediction_fake = torch.mean(logits_fake)
+                
+                #d_loss_fake = bce_loss(torch.sigmoid(logits_fake),y_fake)
                 
                 # Compute gradient loss.
-                
+                """
                 eps = torch.rand(logits_real.size(0),1,1,1).to(self.device)
                 x_int0 = (eps * a_tensor + (1. - eps) * edges_hat).requires_grad_(True)
                 x_int1 = (eps.squeeze(-1) * x_tensor + (1. - eps.squeeze(-1)) * nodes_hat).requires_grad_(True)
@@ -745,31 +769,47 @@ class Solver(object):
            
                 grad0, grad1 = self.D(x_int0, None, x_int1,torch.sigmoid)
                 d_loss_gp = self.gradient_penalty(grad0, x_int0) + self.gradient_penalty(grad1, x_int1) 
-                
+                """
                 # Calculate total loss
                
-                d_loss = d_loss_fake + d_loss_real +  d_loss_gp #* self.lambda_gp
+                d_loss = prediction_fake + prediction_real #+  d_loss_gp #* self.lambda_gp
                 
                 # Feed the loss
                 d_loss.backward()
-
-                #d_loss.backward(retain_graph=True)
                 if self.dis_select == "conv":
+                    torch.nn.utils.clip_grad_norm_(self.D.parameters(), self.clipping_value)        
+                elif self.dis_select == "PNA":
+                    torch.nn.utils.clip_grad_norm_(self.D_PNA.parameters(), self.clipping_value)
+                elif self.dis_select == "TraConv":
+                    torch.nn.utils.clip_grad_norm_(self.D_TraConv.parameters(), self.clipping_value)                            
+                if (i+1) % 100 == 0:
+                    if self.dis_select == "conv":
+                        self.plot_grad_flow(self.D.named_parameters(),"D",i+1,idx)
+                    elif self.dis_select == "PNA":
+                        self.plot_grad_flow(self.PNA.named_parameters(),"D",i+1,idx)
+                    #elif self.dis_select == "TraConv":
+                        #self.plot_grad_flow(self.D_TraConv.named_parameters(),"D",i+1,idx)    
+                #d_loss.backward(retain_graph=True)
+                
+                if self.dis_select == "conv":
+                    
                     self.d_optimizer.step()
                     self.scheduler_d.step(d_loss)
                 elif self.dis_select == "PNA":
+                    
                     self.d_pna_optimizer.step()
                     self.scheduler_d_pna.step(d_loss)
                 elif self.dis_select == "TraConv":
+                    
                     self.d_traconv_optimizer.step()
                     self.scheduler_d_traconv.step(d_loss)                    
                 # Logging.
                 
                 loss = {}
-                loss['D/d_loss_real'] = - d_loss_real.item()
-                loss['D/d_loss_fake'] = d_loss_fake.item()
+                loss['D/d_loss_real'] = prediction_real.item()
+                loss['D/d_loss_fake'] = prediction_fake.item()
 
-                loss['D/loss_gp'] = d_loss_gp.item()
+                #loss['D/loss_gp'] = d_loss_gp.item()
                 loss["D/d_loss"] = d_loss.item()
                 #wandb.log({"d_loss_fake": d_loss_fake, "d_loss_real": d_loss_real, "d_loss": d_loss, "iteration/epoch":[i,idx]})       
                 # =================================================================================== #
@@ -778,20 +818,28 @@ class Solver(object):
                 if (i+1) % self.n_critic == 0:
                     self.reset_grad()
                     # Generate fake molecules.
-                    if self.tra_conv: 
-                        g_edges_hat, g_nodes_hat, g_edges_logits, g_nodes_logits, g_nodes_fake, g_fake_edge_index, g_fake_edge_attr, g_attr_for_traconv , g_nodes_for_traconv  = self.G(z_edge,z_node,a,a_tensor,x_tensor)
-                    else:
-                        g_edges_hat, g_nodes_hat, g_edges_logits, g_nodes_logits, g_nodes_fake, g_fake_edge_index, g_fake_edge_attr = self.G(z_edge,z_node,a,a_tensor,x_tensor)
+
+                    g_edges_logits, g_nodes_logits, g_attn = self.G(z_edge,z_node,a,a_tensor,x_tensor)
+                    
                     # Postprocess with Gumbel softmax
                 
-                    g_edges_hard, g_nodes_hard = torch.max(g_edges_hat, 1)[1], torch.max(g_nodes_hat, -1)[1] 
-              
+                    #g_edges_hat = g_edges_logits.view(-1,self.b_dim,self.vertexes,self.vertexes)
+                    g_edges_hat = self.postprocess(g_edges_logits, "soft_gumbel")
+                    g_nodes_hat = self.postprocess(g_nodes_logits, "soft_gumbel")
+                    
+                    
+                    g_edges_hat_sample, g_nodes_hat_sample = torch.max(g_edges_hat, -1)[1], torch.max(g_nodes_hat, -1)[1]
+                    
+                    features_hat = None
+                    #g_fake_edge_index, g_fake_edge_attr = self.dense_to_sparse_with_attr(g_edges_hat)
+                    g_nodes_fake = g_nodes_hat_sample.view(-1,1)
+                    
                     fake_mol = [self.dataset.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True) 
-                                for e_, n_ in zip(g_edges_hard, g_nodes_hard)]    
+                                for e_, n_ in zip(g_edges_hat_sample, g_nodes_hat_sample)]    
                     
                     mols = [self.dataset.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=False) 
                                 for e_, n_ in zip(a, x)]   
-                    g_edges_hat = g_edges_hat.view(-1, self.vertexes,self.vertexes,self.b_dim)
+                    #g_edges_hat = g_edges_hat.view(-1, self.vertexes,self.vertexes,self.b_dim)
                     # Compute loss with fake molecules.
                     if self.dis_select == "conv":
                          
@@ -799,14 +847,14 @@ class Solver(object):
                         
                     elif self.dis_select == "PNA":
                         
-                        g_logits_fake = self.D_PNA(g_nodes_fake, g_fake_edge_index, g_fake_edge_attr, data.batch)
-
-                    elif self.dis_select == "TraConv":
+                        #g_logits_fake = self.PNA(g_nodes_fake, g_fake_edge_index, g_fake_edge_attr, data.batch)
+                        g_logits_fake = self.PNA(g_nodes_hat, edges_hat_sample.float(),mask=None)
+                    #elif self.dis_select == "TraConv":
                         
-                        g_logits_fake = self.D_TraConv(g_nodes_for_traconv, g_fake_edge_index, g_attr_for_traconv, data.batch)   
-                                             
-                    #g_prediction_fake = torch.mean(g_logits_fake) 
-                    g_loss_fake = bce_loss(torch.sigmoid(g_logits_fake),y_real)
+                        #g_logits_fake = self.D_TraConv(g_nodes_for_traconv, g_fake_edge_index, g_attr_for_traconv, data.batch)   
+                                            
+                    g_prediction_fake = - torch.mean(g_logits_fake) 
+                    #g_loss_fake = bce_loss(torch.sigmoid(g_logits_fake),y_real)
                     
               
                    
@@ -822,11 +870,11 @@ class Solver(object):
                 
                     # Reinforcement Loss
                     
-                    value_logit_real,_ = self.V(a_tensor, None, x_tensor,torch.sigmoid)
-                    value_logit_fake,_ = self.V(g_edges_hat, None, g_nodes_hat, torch.sigmoid)
-                    #g_loss_value_dep =  torch.mean((value_logit_real - rewardR) ** 2 + (value_logit_fake - rewardF) ** 2)
-                    g_loss_value_pred =  (1 - rewardF) ** 2
-                    g_loss_value = bce_loss(torch.sigmoid(g_loss_value_pred),y_fake_value)
+                    #value_logit_real,_ = self.V(a_tensor, None, x_tensor,torch.sigmoid)
+                    #value_logit_fake,_ = self.V(g_edges_hat, None, g_nodes_hat, torch.sigmoid)
+                    #g_loss_value_pred =  torch.mean((value_logit_real - rewardR) ** 2 + (value_logit_fake - rewardF) ** 2)
+                    #g_loss_value_pred =  (1 - rewardF) ** 2
+                    #g_loss_value = bce_loss(torch.sigmoid(g_loss_value_pred),y_fake_value)
                  
 
                     # Clone edge and node logits for GAN2
@@ -835,27 +883,29 @@ class Solver(object):
          
                     # Backward and optimize. 
                     
-                    g_loss =  self.la * g_loss_fake  + (1. - self.la) * g_loss_value 
+                    g_loss =  self.la * g_prediction_fake # + (1. - self.la) * g_loss_value_pred 
+                    
                     g_loss.backward()
-                    if self.dis_select == "conv":
-                        self.plot_grad_flow(self.D.named_parameters(),"D")
-                    elif self.dis_select == "PNA":
-                        self.plot_grad_flow(self.D_PNA.named_parameters(),"D")
-                    elif self.dis_select == "TraConv":
-                        self.plot_grad_flow(self.D_TraConv.named_parameters(),"D")                    
-                    self.plot_grad_flow(self.G.named_parameters(),"G")
+                    torch.nn.utils.clip_grad_norm_(self.G.parameters(), self.clipping_value)
+                    torch.nn.utils.clip_grad_norm_(self.V.parameters(), self.clipping_value)
+                    
+                    if (i+1) % 100 == 0:
+                        self.plot_grad_flow(self.G.named_parameters(),"G",i+1,idx)
+                        print(g_edges_hat_sample[0], g_nodes_hat_sample[0])     
+                        #self.plot_attn(g_attn,"G",i+1,idx)
+                        #self.plot_grad_flow(self.V.named_parameters(),"V",i+1,idx)
                     #self.plot_grad_flow(self.V.named_parameters())
                     #g_loss.backward(retain_graph=True)
                     self.g_optimizer.step()
-                    self.v_optimizer.step()
+                    #self.v_optimizer.step()
                     self.scheduler_g.step(g_loss)
-                    self.scheduler_v.step(g_loss)
+                    #self.scheduler_v.step(g_loss)
                     
                     
                     # Logging.
                     
-                    loss['G/g_loss_fake'] = - g_loss_fake.item()
-                    loss['G/g_loss_value'] = g_loss_value.item() 
+                    loss['G/g_loss_fake'] =  g_prediction_fake.item()
+                    #loss['G/g_loss_value'] = g_loss_value_pred.item() 
                     
                     loss["G/g_loss"] = g_loss.item() 
                     #wandb.log({"g_loss_fake": g_loss_fake, "g_loss_value": g_loss_value, "g_loss": g_loss, "iteration/epoch":[i,idx]})
@@ -869,23 +919,20 @@ class Solver(object):
                     #                             4. Train the discriminator - 2                          #
                     # =================================================================================== #
   
-                    tra_edges_hat, tra_nodes_hat, edges_hard, nodes_hard, nodes_fake2, fake_edge_index2, fake_edge_attr2,g2_attr_for_traconv,g2_nodes_for_traconv = self.G2(g_edges_logits_forGAN2, g_nodes_logits_forGAN2,prot_n,prot_e)
-                    drugs_node_for_transconv = self.nodes_mlp(drugs.x.view(-1,1).float())
-                    drugs_attr_for_transconv = self.attr_mlp(drugs.edge_attr.view(-1,1).float())
+                    tra_edges_logits, tra_nodes_logits, dec_attn = self.G2(g_edges_logits_forGAN2, g_nodes_logits_forGAN2,prot_n,prot_e)
                     
+     
                     
+                    tra_edges_hat = self.postprocess(tra_edges_logits, "soft_gumbel")
+                    tra_nodes_hat = self.postprocess(tra_nodes_logits, "soft_gumbel")
                     
                     if self.dis_select == "conv":
                         
                         logits_fake2, features_fake2 = self.D2(tra_edges_hat, None, tra_nodes_hat)
 
-                    elif self.dis_select == "PNA":
-                        
-                        logits_fake2 = self.D2_PNA(nodes_fake2, fake_edge_index2, fake_edge_attr2, data.batch)
+          
                     
-                    elif self.dis_select == "TraConv":
-                        
-                        logits_fake2 = self.D2_TraConv(g2_nodes_for_traconv, fake_edge_index2, g2_attr_for_traconv, data.batch)
+               
                         
                     d2_loss_fake = torch.mean(logits_fake2)
                     
@@ -897,31 +944,26 @@ class Solver(object):
                         
                         logits_real2 = self.D2_PNA(drugs.x, drugs.edge_index, drugs.edge_attr, drugs.batch)
                         
-                    elif self.dis_select == "TraConv":
-                        
-                        logits_real2 = self.D2_TraConv(drugs_node_for_transconv, drugs.edge_index, drugs_attr_for_transconv, drugs.batch)   
+                
+        
                     
-                    adj_pad_shape =(drugs_a_tensor.shape[1]-tra_edges_hat.shape[1])//2
-                    adj_pad = (0,0,adj_pad_shape,adj_pad_shape,adj_pad_shape,adj_pad_shape)
-                    annot_pad = (0,0,adj_pad_shape,adj_pad_shape)
-                    tra_edges_hat = F.pad(tra_edges_hat, adj_pad,"constant", 0 )
-                    tra_nodes_hat = F.pad(tra_nodes_hat, annot_pad,"constant", 0 )
-                    eps2 = torch.rand(logits_real2.size(0),1,1,1).to(self.device)
-                    x_int02 = (eps2 * drugs_a_tensor + (1. - eps2) * tra_edges_hat).requires_grad_(True)
-                    x_int12 = (eps2.squeeze(-1) * drugs_x_tensor + (1. - eps2.squeeze(-1)) * tra_nodes_hat).requires_grad_(True)
+                    #eps2 = torch.rand(logits_real2.size(0),1,1,1).to(self.device)
+                    #x_int02 = (eps2 * drugs_a_tensor + (1. - eps2) * tra_edges_hat).requires_grad_(True)
+                    #x_int12 = (eps2.squeeze(-1) * drugs_x_tensor + (1. - eps2.squeeze(-1)) * tra_nodes_hat).requires_grad_(True)
 
             
-                    grad02, grad12 = self.D2(x_int02, None, x_int12)
-                    d_loss_gp2 = self.gradient_penalty(grad02, x_int02) + self.gradient_penalty(grad12, x_int12)                     
+                    #grad02, grad12 = self.D2(x_int02, None, x_int12)
+                    #d_loss_gp2 = self.gradient_penalty(grad02, x_int02) + self.gradient_penalty(grad12, x_int12)                     
                     
                         
                     d2_loss_real = - torch.mean(logits_real2)
 
          
-                    d2_loss = d2_loss_fake + d2_loss_real + d_loss_gp2
+                    d2_loss = d2_loss_fake + d2_loss_real #+ d_loss_gp2
                 
                     self.reset_grad()
                     d2_loss.backward(retain_graph=True)
+                    torch.nn.utils.clip_grad_norm_(self.D2.parameters(), self.clipping_value)      
                     if self.dis_select == "conv":
                         self.d2_optimizer.step()
                         self.scheduler_d2.step(d2_loss)
@@ -945,33 +987,26 @@ class Solver(object):
                 if ((idx+1 > self.warm_up_steps) & ((i+1) % self.n_critic == 0)):
                 
                     
-                    g_tra_edges_hat, g_tra_nodes_hat, edges_hard, nodes_hard, nodes_fake2, g_fake_edge_index2, fake_edge_attr2 ,g2_attr_for_traconv,g2_nodes_for_traconv= self.G2(g_edges_logits_forGAN2, g_nodes_logits_forGAN2,prot_n,prot_e)
+                    g_tra_edges_logits, g_tra_nodes_logits, g_dec_attn= self.G2(g_edges_logits_forGAN2, g_nodes_logits_forGAN2,prot_n,prot_e)
                    
+                    g_tra_edges_hat  = self.postprocess(g_tra_edges_logits, "soft_gumbel")
+                    g_tra_nodes_hat  = self.postprocess(g_tra_nodes_logits, "soft_gumbel")
                     
-                    
-                    
-                    
+                    g_tra_edges_hard, g_tra_nodes_hard = torch.max(g_tra_edges_hat, -1)[1], torch.max(g_tra_nodes_hat, -1)[1]
+              
                     if self.dis_select == "conv":
                             
                         g_tra_logits_fake2, g_tra_features_fake2 = self.D2(g_tra_edges_hat, None, g_tra_nodes_hat)
                         
-                    elif self.dis_select == "PNA":    
-                        
-                        g_tra_logits_fake2 = self.D2_PNA(nodes_fake2, g_fake_edge_index2, fake_edge_attr2, data.batch)
 
-                
-                    elif self.dis_select == "TraConv":
-                        
-                        g_tra_logits_fake2 = self.D_TraConv(g2_nodes_for_traconv, g_fake_edge_index2, g2_attr_for_traconv, data.batch)   
-                        
-                        
                     g2_loss_fake = - torch.mean(g_tra_logits_fake2)                                           
                     
                     fake_mol2 = [self.dataset.matrices2mol_drugs(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True) 
-                                        for e_, n_ in zip(edges_hard, nodes_hard)]     
+                                        for e_, n_ in zip(g_tra_edges_hard, g_tra_nodes_hard)]     
                     
                     drugs_mol = [self.dataset.matrices2mol_drugs(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True) 
-                                        for e_, n_ in zip(drugs_a, drugs_x)]                   
+                                        for e_, n_ in zip(drugs_a, drugs_x)]         
+                              
                     rewardR2 = torch.from_numpy(self.reward(drugs_mol)).to(self.device)
                     
                     rewardF2 = torch.from_numpy(self.reward(fake_mol2)).to(self.device)                
@@ -981,18 +1016,18 @@ class Solver(object):
                     #value_logit_fake2,value_f_fake2 = self.V2(g_tra_edges_hat, None, g_tra_nodes_hat, torch.sigmoid)
                 
                     #g2_loss_value = torch.mean(torch.abs(value_logit_real2 - rewardR2)) + torch.mean(torch.abs(value_logit_fake2 - rewardF2))
-                    g2_loss_value = 1 - torch.mean(rewardF2)
-                    g2_loss =  self.la * g2_loss_fake + (1-self.la) * g2_loss_value
+        
+                    g2_loss =  g2_loss_fake 
                 
                     self.reset_grad()
                 
                     g2_loss.backward()
-                
+                    torch.nn.utils.clip_grad_norm_(self.G2.parameters(), self.clipping_value)      
                     self.g2_optimizer.step()
                     self.v2_optimizer.step()
                     self.scheduler_g2.step(g2_loss)
                     
-                    loss2['G2/g2_loss_value'] = g2_loss_value.item()
+
                     loss2["G2/g2_loss_fake"] = g2_loss_fake.item()
                     loss2["G2/g2_loss"] = g2_loss.item()        
                     #wandb.log({"g2_loss_fake": g2_loss_fake, "g2_loss_value": g2_loss_value, "g2_loss": g2_loss, "iteration/epoch":[i,idx]})
@@ -1075,15 +1110,15 @@ class Solver(object):
                     if not os.path.exists(self.sample_path):
                         os.makedirs(self.sample_path)
                     mols2grid_image(fake_mol,self.sample_path)
-                    save_smiles_matrices(fake_mol,g_edges_hard.detach(), g_nodes_hard.detach(), self.sample_path)
+                    save_smiles_matrices(fake_mol,g_edges_hat_sample.detach(), g_nodes_hat_sample.detach(), self.sample_path)
                     if len(os.listdir(self.sample_path)) == 0:
                         os.rmdir(self.sample_path)
                     if idx+1 > self.warm_up_steps:
                         if not os.path.exists(self.sample_path_GAN2):
                             os.makedirs(self.sample_path_GAN2)   
                         mols2grid_image(fake_mol2,self.sample_path_GAN2)
-                        save_smiles_matrices(fake_mol2,edges_hard.detach(), nodes_hard.detach(), self.sample_path_GAN2) 
-                        attn_path = os.path.join("MolecularTransGAN-master/data/attn_tensors", '{}_{}-attn_GAN2.pt'.format(idx+1, i+1))
+                        save_smiles_matrices(fake_mol2,g_tra_edges_hard.detach(), g_tra_nodes_hard.detach(), self.sample_path_GAN2) 
+                        attn_path = os.path.join("DrugGEN/data/attn_tensors", '{}_{}-attn_GAN2.pt'.format(idx+1, i+1))
                         if len(os.listdir(self.sample_path_GAN2)) == 0:
                             os.rmdir(self.sample_path_GAN2)
                         #torch.save(attn, attn_path)                                                
@@ -1092,20 +1127,22 @@ class Solver(object):
 
                 if (i+1) % self.n_critic == 0:
                     
-                    writer.add_scalar("D/loss_real", d_loss_real.item(), i)
-                    writer.add_scalar("D/loss_fake", d_loss_fake.item(), i)
+                    writer.add_scalar("D/loss_real", prediction_real.item(), i)
+                    writer.add_scalar("D/loss_fake", prediction_fake.item(), i)
                     writer.add_scalar("D/loss", d_loss.item(), i)
-                    writer.add_scalar("G/g_loss_fake", g_loss_fake.item(), i)
+                    writer.add_scalar("G/g_loss_fake", g_prediction_fake.item(), i)
                     #writer.add_scalar("G/g_loss_value", g_loss_value.item(), i) 
                     writer.add_scalar("G/g_loss", g_loss.item(), i) 
 
             writer.close()
+
+
           
     def test(self):
         # Load the trained generator.
         self.restore_model(self.test_iters)
-        akt1_human_adj = torch.load("MolecularTransGAN-master/data/akt/AKT1_human_adj.pt")
-        akt1_human_annot = torch.load("MolecularTransGAN-master/data/akt/AKT1_human_annot.pt")  
+        akt1_human_adj = torch.load("DrugGEN/data/akt/AKT1_human_adj.pt")
+        akt1_human_annot = torch.load("DrugGEN/data/akt/AKT1_human_annot.pt")  
         prot_n = akt1_human_annot[None,:].to(self.device)          
         prot_e = akt1_human_adj[None,None,:].view(1,546,546,1).to(self.device).long()
         date = time.time()
