@@ -12,10 +12,10 @@ import os
 import math
 import numpy as np
 
-NP_model = pickle.load(gzip.open('MolecularTransGAN-master/data/NP_score.pkl.gz'))
-SA_model = {i[j]: float(i[0]) for i in pickle.load(gzip.open('MolecularTransGAN-master/data/SA_score.pkl.gz')) for j in range(1, len(i))}
-
-
+NP_model = pickle.load(gzip.open('DrugGEN/data/NP_score.pkl.gz'))
+SA_model = {i[j]: float(i[0]) for i in pickle.load(gzip.open('DrugGEN/data/SA_score.pkl.gz')) for j in range(1, len(i))}
+from rdkit import RDLogger  
+RDLogger.DisableLog('rdApp.*')     
 class MolecularMetrics(object):
 
     @staticmethod
@@ -238,6 +238,15 @@ class MolecularMetrics(object):
                                      np.exp(- (x - x_high) ** 2 / decay)],
                          default=np.ones_like(x))
 
+    @staticmethod
+    def tanimoto_sim_1v2(data1, data2):
+        min_len = data1.size if data1.size > data2.size else data2
+        mean_sim = []
+        for i in range(min_len):
+            sim = DataStructs.FingerprintSimilarity(data1[i], data2[i])
+            mean_sim.append(sim)
+        
+        return mean_sim
 
 
 def mols2grid_image(mols,path):
@@ -263,9 +272,7 @@ def all_scores(mols, data,  norm=False):
     m1 = {'valid score': MolecularMetrics.valid_total_score(mols) * 100,
           'unique score': MolecularMetrics.unique_total_score(mols) * 100,
           'novel score': MolecularMetrics.novel_total_score(mols, data) * 100}
-        #             'NP score': MolecularMetrics.natural_product_scores(mols, norm=norm),    
-        # 'novel score': MolecularMetrics.novel_total_score(mols, data) * 100
-        # 'drugcandidate score': MolecularMetrics.drugcandidate_scores(mols, data)
+     
     return m0, m1
 def all_scores_for_print(mols, data,  norm=False):
     m0 = {'QED score': MolecularMetrics.quantitative_estimation_druglikeness_scores_forsave(mols),
