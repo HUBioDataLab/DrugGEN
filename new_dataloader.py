@@ -52,19 +52,19 @@ class DruggenDataset(InMemoryDataset):
         print('Created bonds encoder and decoder with {} bond types and 1 PAD symbol!'.format(
             self.bond_num_types - 1))        
         #dataset_names = str(self.dataset_name)
-        atom_encoders = open("MolecularTransGAN-master/data/atom_encoders" + "zinc_250k" + ".pkl","wb")
+        atom_encoders = open("DrugGEN/data/atom_encoders" + "zinc_250k" + ".pkl","wb")
         pickle.dump(self.atom_encoder_m,atom_encoders)
         atom_encoders.close()
         
-        atom_decoders = open("MolecularTransGAN-master/data/atom_decoders" + "zinc_250k" + ".pkl","wb")
+        atom_decoders = open("DrugGEN/data/atom_decoders" + "zinc_250k" + ".pkl","wb")
         pickle.dump(self.atom_decoder_m,atom_decoders)
         atom_decoders.close() 
                
-        bond_encoders = open("MolecularTransGAN-master/data/bond_encoders" + "zinc_250k" + ".pkl","wb")
+        bond_encoders = open("DrugGEN/data/bond_encoders" + "zinc_250k" + ".pkl","wb")
         pickle.dump(self.bond_encoder_m,bond_encoders)
         bond_encoders.close()  
               
-        bond_decoders = open("MolecularTransGAN-master/data/bond_decoders" + "zinc_250k" + ".pkl","wb")
+        bond_decoders = open("DrugGEN/data/bond_decoders" + "zinc_250k" + ".pkl","wb")
         pickle.dump(self.bond_decoder_m,bond_decoders)
         bond_decoders.close()        
         
@@ -93,10 +93,10 @@ class DruggenDataset(InMemoryDataset):
                     max_length - mol.GetNumAtoms()))
 
     def decoder_load(self, dictionary_name):
-        with open("MolecularTransGAN-master/data/" + dictionary_name + self.dataset_name + '.pkl', 'rb') as f:
+        with open("DrugGEN/data/" + dictionary_name + self.dataset_name + '.pkl', 'rb') as f:
             return pickle.load(f)    
     def drugs_decoder_load(self, dictionary_name):
-        with open("MolecularTransGAN-master/data/" + "drugs_" + dictionary_name + '.pkl', 'rb') as f:
+        with open("DrugGEN/data/" + "drugs_" + dictionary_name + '.pkl', 'rb') as f:
             return pickle.load(f)      
     def matrices2mol(self, node_labels, edge_labels, strict=False):
         mol = Chem.RWMol()
@@ -129,7 +129,7 @@ class DruggenDataset(InMemoryDataset):
         for start, end in zip(*np.nonzero(edge_labels)):
             if start > end:
                 mol.AddBond(int(start), int(end), bond_decoders[edge_labels[start, end]])
-        mol = self.correct_mol(mol)
+        #mol = self.correct_mol(mol)
         if strict:
             try:
                 Chem.SanitizeMol(mol)
@@ -188,7 +188,7 @@ class DruggenDataset(InMemoryDataset):
     
     def process(self, size= None):
         
-        mols = [Chem.MolFromSmiles(line) for line in open("MolecularTransGAN-master/data/zinc_250k.smi", 'r').readlines()]
+        mols = [Chem.MolFromSmiles(line) for line in open("DrugGEN/data/zinc_250k.smi", 'r').readlines()]
         mols = list(filter(lambda x: x.GetNumAtoms() <= 45, mols))
         mols = mols[:size]
         indices = range(len(mols))
@@ -233,5 +233,5 @@ class DruggenDataset(InMemoryDataset):
 
    
 if __name__ == '__main__':
-    data = DruggenDataset("MolecularTransGAN-master/data")
+    data = DruggenDataset("DrugGEN/data")
     
