@@ -22,7 +22,7 @@ Check out our paper below for more details
 
 > [**DrugGEN: Target Centric De Novo Design of Drug Candidate Molecules with Graph Generative Deep Adversarial Networks
 **](Give a link here),            
-> [Atabey Ünlü](Give a link here), [Elif Çevrim](Give a link here), [Ahmet Sarıgün](https://asarigun.github.io/), [Heval Ataş](Give a link here), [Altay Koyaş](Give a link here), [Hayriye Çelikbilek](Give a link here), [Deniz Cansen Kahraman](Give a link here), [Abdurrahman Olğaç](Give a link here), [Ahmet S. Rifaioğlu](https://saezlab.org/person/ahmet-sureyya-rifaioglu/), [Tunca Doğan](https://yunus.hacettepe.edu.tr/~tuncadogan/)     
+> [Atabey Ünlü](https://tr.linkedin.com/in/atabeyunlu), [Elif Çevrim](Give a link here), [Ahmet Sarıgün](https://asarigun.github.io/), [Heval Ataş](Give a link here), [Altay Koyaş](Give a link here), [Hayriye Çelikbilek](Give a link here), [Deniz Cansen Kahraman](Give a link here), [Abdurrahman Olğaç](Give a link here), [Ahmet S. Rifaioğlu](https://saezlab.org/person/ahmet-sureyya-rifaioglu/), [Tunca Doğan](https://yunus.hacettepe.edu.tr/~tuncadogan/)     
 > *Arxiv, 2020* 
 
 ## Features
@@ -73,3 +73,24 @@ source install/install_pip.sh
 source install/install_conda.sh
 ```
 ## Running the Demo
+You could try Google Colab if you don't already have a suitable environment for running this project.
+It enables cost-free project execution in the cloud. You can use the provided notebook to try out our Colab demo:
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](Give a link here)
+
+## Training
+
+<!--ADD HERE TRAINING COMMANDS WITH EXPLAINATIONS-->
+
+## Citation
+<!--ADD BIBTEX AFTER THE PUBLISHING-->
+
+## License
+<!--ADD LICENSE TERMS AND LICENSE FILE AND GIVE A LINK HERE-->
+
+## References
+
+In each file, we indicate whether a function or script is imported from another source. Here are some excellent sources from which we benefit: 
+<!--ADD THE REFERENCES THAT WE USED DURING THE IMPLEMENTATION-->
+- First GAN is borrowed from [MolGAN](https://github.com/yongqyu/MolGAN-pytorch)
+- 
+-
