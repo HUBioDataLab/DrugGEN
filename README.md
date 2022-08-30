@@ -22,7 +22,7 @@ Check out our paper below for more details
 
 > [**DrugGEN: Target Centric De Novo Design of Drug Candidate Molecules with Graph Generative Deep Adversarial Networks
 **](Give a link here),            
-> [Atabey Ünlü](https://tr.linkedin.com/in/atabeyunlu), [Elif Çevrim](Give a link here), [Ahmet Sarıgün](https://asarigun.github.io/), [Heval Ataş](Give a link here), [Altay Koyaş](Give a link here), [Hayriye Çelikbilek](Give a link here), [Deniz Cansen Kahraman](Give a link here), [Abdurrahman Olğaç](Give a link here), [Ahmet S. Rifaioğlu](https://saezlab.org/person/ahmet-sureyya-rifaioglu/), [Tunca Doğan](https://yunus.hacettepe.edu.tr/~tuncadogan/)     
+> [Atabey Ünlü](https://tr.linkedin.com/in/atabeyunlu), [Elif Çevrim](Give a link here), [Ahmet Sarıgün](https://asarigun.github.io/), [Heval Ataş](https://www.linkedin.com/in/heval-atas/), [Altay Koyaş](Give a link here), [Hayriye Çelikbilek](Give a link here), [Deniz Cansen Kahraman](Give a link here), [Abdurrahman Olğaç](Give a link here), [Ahmet S. Rifaioğlu](https://saezlab.org/person/ahmet-sureyya-rifaioglu/), [Tunca Doğan](https://yunus.hacettepe.edu.tr/~tuncadogan/)     
 > *Arxiv, 2020* 
 
 ## Features
