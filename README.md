@@ -8,15 +8,14 @@
 
 <!--PUT HERE SOME QUALITATIVE RESULTS IN THE ASSETS FOLDER-->
 <!--YOU CAN PUT ALSO IN THE GIF OR PNG FORMAT -->
-<p float="center">
+<!--<p float="center">
   <img src="assets/sample1.png" width="49%" />
   <img src="assets/sample2.png" width="49%" />
-</p>
+</p>-->
 
-<!--PUT THE ANIMATED GIF VERSION OF THE DRUGGEN MODEL (Figure 1)-->
-<p float="center">
-  <img src="assets/druggen_figures(1).gif" width="98%" />
-</p>
+| ChEMBL-25                                                                                                | ChEMBL-45                                                                                               |
+|------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
+| ![ChEMBL_25](assets/molecule_1.png) | ![ChEMBL_45](assets/molecule_2.png) |
 
 Check out our paper below for more details
 
@@ -24,6 +23,13 @@ Check out our paper below for more details
 **](Give a link here),            
 > [Atabey Ünlü](https://tr.linkedin.com/in/atabeyunlu), [Elif Çevrim](https://www.linkedin.com/in/elifcevrim/?locale=en_US), [Ahmet Sarıgün](https://asarigun.github.io/), [Heval Ataş](https://www.linkedin.com/in/heval-atas/), [Altay Koyaş](https://www.linkedin.com/in/altay-koya%C5%9F-8a6118a1/?originalSubdomain=tr), [Hayriye Çelikbilek](https://www.linkedin.com/in/hayriye-celikbilek/?originalSubdomain=tr), [Deniz Cansen Kahraman](https://www.linkedin.com/in/deniz-cansen-kahraman-6153894b/?originalSubdomain=tr), [Abdurrahman Olğaç](https://www.linkedin.com/in/aolgac/?originalSubdomain=tr), [Ahmet S. Rifaioğlu](https://saezlab.org/person/ahmet-sureyya-rifaioglu/), [Tunca Doğan](https://yunus.hacettepe.edu.tr/~tuncadogan/)     
 > *Arxiv, 2020* 
+
+<!--PUT THE ANIMATED GIF VERSION OF THE DRUGGEN MODEL (Figure 1)-->
+<p float="center">
+  <img src="assets/druggen_figure1_mod.gif" width="98%" />
+</p>
+
+
 
 ## Features
 
@@ -40,7 +46,7 @@ This implementation:
 <!-- ADD THE ANIMATED GIF VERSION OF THE GAN1 AND GAN2 -->
 | First Generator                                                                                                | Second Generator                                                                                               |
 |------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
-| ![FirstGAN](assets/generator_1.gif) | ![SecondGAN](assets/generator_2.gif) |
+| ![FirstGAN](assets/generator_1_mod.gif) | ![SecondGAN](assets/generator_2_mod.gif) |
 
 ## Overview
 We provide the implementation of the DrugGEN in PyTorch Geometric framework, along with scripts to generate and run. The repository is organised as follows:
