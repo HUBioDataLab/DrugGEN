@@ -38,9 +38,9 @@ This implementation:
 
 
 <!-- ADD THE ANIMATED GIF VERSION OF THE GAN1 AND GAN2 -->
-| First GAN                                                                                                | Second GAN                                                                                               |
+| First Generator                                                                                                | Second Generator                                                                                               |
 |------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
-| ![FirstGAN](assets/gan1.gif) | ![SecondGAN](assets/gan2.gif) |
+| ![FirstGAN](assets/generator_1.gif) | ![SecondGAN](assets/generator_2.gif) |
 
 ## Overview
 We provide the implementation of the DrugGEN in PyTorch Geometric framework, along with scripts to generate and run. The repository is organised as follows:
