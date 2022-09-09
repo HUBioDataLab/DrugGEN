@@ -1,8 +1,5 @@
 # DrugGEN: Target Centric De Novo Design of Drug Candidate Molecules with Graph Generative Deep Adversarial Networks
 
-## Abstract
-
-Discovering novel drug candidate molecules is one of the most fundamental and critical steps in drug development. It is especially challenging to develop new drug-based treatments for complex diseases, such as various cancer subtypes, which have heterogeneous structure and affect multiple biological mechanisms. Generative deep learning models, which create new data points according to a probability distribution at hand, have been developed with the purpose of picking completely new samples from a distribution space that is only partially known. In this study, we propose a novel computational system, DrugGEN, for de novo generation of single and multi-target drug candidate molecules intended for specific drug resistant diseases. The proposed system represents compounds and protein structures as graphs and processes them using serially connected generative adversarial networks comprising graph transformers. For generated molecules to be drug-like, synthetic accessible, and be able to target the intended proteins, the model is conditioned with the properties of intended target proteins. The system is trained in a two-fold manner to design effective and specific inhibitory molecules against protein targets (e.g., AKT1) with critical importance in the hepatocellular carcinoma (HCC) disease, which is a deadly subtype of liver cancer. The resulting de novo molecules are being computationally evaluated and chemically synthesized, which will be followed by the validation of their inhibitory effects on drug resistant HCC cell lines within in vitro experiments. If the expected results are obtained, new and personalized inhibitors will be discovered for the treatment of HCC. DrugGEN has been developed as a generic system that can easily be used to design new molecules for other targets and diseases. ![image](https://user-images.githubusercontent.com/13165170/189448302-d994621f-f2a6-4083-8d11-8523dd6e71d5.png)
 
 
 <p align="center">
@@ -18,9 +15,9 @@ Discovering novel drug candidate molecules is one of the most fundamental and cr
   <img src="assets/sample2.png" width="49%" />
 </p>-->
 
-| ChEMBL-25                                                                                                | ChEMBL-45                                                                                               |
-|------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
-| ![ChEMBL_25](assets/molecule_1.png) | ![ChEMBL_45](assets/molecule_2.png) |
+## Abstract
+
+Discovering novel drug candidate molecules is one of the most fundamental and critical steps in drug development. It is especially challenging to develop new drug-based treatments for complex diseases, such as various cancer subtypes, which have heterogeneous structure and affect multiple biological mechanisms. Generative deep learning models, which create new data points according to a probability distribution at hand, have been developed with the purpose of picking completely new samples from a distribution space that is only partially known. In this study, we propose a novel computational system, DrugGEN, for de novo generation of single and multi-target drug candidate molecules intended for specific drug resistant diseases. The proposed system represents compounds and protein structures as graphs and processes them using serially connected generative adversarial networks comprising graph transformers. For generated molecules to be drug-like, synthetic accessible, and be able to target the intended proteins, the model is conditioned with the properties of intended target proteins. The system is trained in a two-fold manner to design effective and specific inhibitory molecules against protein targets (e.g., AKT1) with critical importance in the hepatocellular carcinoma (HCC) disease, which is a deadly subtype of liver cancer. The resulting de novo molecules are being computationally evaluated and chemically synthesized, which will be followed by the validation of their inhibitory effects on drug resistant HCC cell lines within in vitro experiments. If the expected results are obtained, new and personalized inhibitors will be discovered for the treatment of HCC. DrugGEN has been developed as a generic system that can easily be used to design new molecules for other targets and diseases.
 
 Check out our paper below for more details
 
@@ -52,6 +49,11 @@ This implementation:
 | First Generator                                                                                                | Second Generator                                                                                               |
 |------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
 | ![FirstGAN](assets/generator_1_mod.gif) | ![SecondGAN](assets/generator_2_mod.gif) |
+
+
+| ChEMBL-25                                                                                                | ChEMBL-45                                                                                               |
+|------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
+| ![ChEMBL_25](assets/molecule_1.png) | ![ChEMBL_45](assets/molecule_2.png) |
 
 ## Overview
 We provide the implementation of the DrugGEN in PyTorch Geometric framework, along with scripts to generate and run. The repository is organised as follows:
