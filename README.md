@@ -51,6 +51,8 @@ This implementation:
 | ![FirstGAN](assets/generator_1_mod.gif) | ![SecondGAN](assets/generator_2_mod.gif) |
 
 
+## Preliminary results (generated molecules)
+
 | ChEMBL-25                                                                                                | ChEMBL-45                                                                                               |
 |------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
 | ![ChEMBL_25](assets/molecule_1.png) | ![ChEMBL_45](assets/molecule_2.png) |
