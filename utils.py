@@ -1,3 +1,4 @@
+from statistics import mean
 from sklearn.metrics import classification_report as sk_classification_report
 from sklearn.metrics import confusion_matrix
 import pickle
@@ -241,13 +242,26 @@ class MolecularMetrics(object):
     @staticmethod
     def tanimoto_sim_1v2(data1, data2):
         min_len = data1.size if data1.size > data2.size else data2
-        mean_sim = []
+        sims = []
         for i in range(min_len):
             sim = DataStructs.FingerprintSimilarity(data1[i], data2[i])
-            mean_sim.append(sim)
-        
+            sims.append(sim)
+        mean_sim = mean(sim)
         return mean_sim
 
+    @staticmethod
+    def mol_length(x):
+        if x is not None:
+            return  len([char for char in max(Chem.MolToSmiles(x).split(sep =".")).upper() if char.isalpha()])
+        else:
+            return 0
+    
+    @staticmethod
+    def max_component(data, max_len):
+        
+        return (np.array(list(map(MolecularMetrics.mol_length, data)), dtype=np.float32)/max_len).mean()
+        
+        
 
 def mols2grid_image(mols,path):
     mols = [e if e is not None else Chem.RWMol() for e in mols]
@@ -261,7 +275,7 @@ def mols2grid_image(mols,path):
             continue
 
 
-def all_scores(mols, data,  norm=False):
+def all_scores(mols, data, max_len, norm=False):
     m0 = {k: list(filter(lambda e: e is not None, v)) for k, v in {
         'QED score': MolecularMetrics.quantitative_estimation_druglikeness_scores(mols),
         'NP score': MolecularMetrics.natural_product_scores(mols, norm=norm),
@@ -271,7 +285,8 @@ def all_scores(mols, data,  norm=False):
 
     m1 = {'valid score': MolecularMetrics.valid_total_score(mols) * 100,
           'unique score': MolecularMetrics.unique_total_score(mols) * 100,
-          'novel score': MolecularMetrics.novel_total_score(mols, data) * 100}
+          'novel score': MolecularMetrics.novel_total_score(mols, data) * 100,
+          'max len': MolecularMetrics.max_component(mols,max_len) * 100}
      
     return m0, m1
 def all_scores_for_print(mols, data,  norm=False):

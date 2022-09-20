@@ -34,7 +34,7 @@ class Generator(nn.Module):
     
         
         self.TransformerEncoder = TransformerEncoder(dim=self.dim, depth=self.depth, heads=self.heads,
-                                                                    mlp_ratio=self.mlp_ratio, drop_rate=self.dropout_rate)              
+                                                                    mlp_ratio=self.mlp_ratio, drop_rate=self.dropout_rate)         
      
 
         self.dropout = nn.Dropout(p=dropout)

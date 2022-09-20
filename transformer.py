@@ -69,7 +69,7 @@ class GraphTransformerEncoder(nn.Module):
 class Node_Embeddings(nn.Module):
     def __init__(self, d_atom, d_emb, dropout):
         super(Node_Embeddings, self).__init__()
-        self.lut = nn.Linear(d_atom, d_emb)
+        self.lut = nn.Linear(d_emb, d_emb)
         self.dropout = nn.Dropout(dropout)
         self.d_emb = d_emb
         self.d_atom = d_atom
@@ -82,7 +82,7 @@ class Node_Embeddings(nn.Module):
 class Edge_Embeddings(nn.Module):
     def __init__(self, d_edge, d_emb, dropout):
         super(Edge_Embeddings, self).__init__()
-        self.lut = nn.Linear(d_edge, d_emb)
+        self.lut = nn.Linear(d_emb, d_emb)
         self.dropout = nn.Dropout(dropout)
         self.d_emb = d_emb
 
@@ -142,11 +142,11 @@ class Encoder(nn.Module):
     def forward(self, node_hidden, edge_hidden, adj_matrix):
         """Pass the input through each layer in turn."""
         for layer in self.layers:
-            node_hidden, edge_hidden = layer(node_hidden, edge_hidden, adj_matrix)
+            node_hidden, edge_hidden, attn = layer(node_hidden, edge_hidden, adj_matrix)
             node_hidden, edge_hidden = self.norm(node_hidden), self.norm(edge_hidden)
             
 
-        return node_hidden, edge_hidden
+        return node_hidden, edge_hidden, attn
 
 
 class EncoderLayer(nn.Module):
@@ -166,35 +166,31 @@ class EncoderLayer(nn.Module):
         
         """Follow Figure 1 (left) for connections."""
         
-        # x.shape = (batch, max_length, d_atom)
+        node_hidden_first, edge_hidden_first, attn = self.self_attn(node_hidden, node_hidden, edge_hidden, adj_matrix)
         
-        node_hidden = self.dropout(self.norm(node_hidden))
-        edge_hidden = self.dropout(self.norm(edge_hidden))
+        node_hidden_second = node_hidden_first + node_hidden
+        node_hidden_second = self.dropout(self.norm(node_hidden_second))
         
-        node_hidden_first, edge_hidden_first = self.self_attn(node_hidden, node_hidden, edge_hidden, adj_matrix)
+        node_hidden_third = self.feed_forward(node_hidden_second)
+        node_hidden_last = node_hidden_third + node_hidden_second
         
-        # the first residue block
+        node_hidden_last = self.dropout(self.norm(node_hidden_last))
         
-        edge_hidden_first = edge_hidden + self.dropout(self.norm(edge_hidden_first))
         
-        edge_hidden_second = self.feed_forward(edge_hidden_first)
+        edge_hidden_second = edge_hidden_first + edge_hidden
+        edge_hidden_second = self.dropout(self.norm(edge_hidden_second))
         
-        node_hidden_first = node_hidden + self.dropout(self.norm(node_hidden_first))
+        edge_hidden_third = self.feed_forward(edge_hidden_second)
+        edge_hidden_last = edge_hidden_third + edge_hidden_second
         
-        node_hidden_second = self.feed_forward(node_hidden_first)
-        
-        # the second residue block
-        
-        node_hidden_third = node_hidden_first + self.dropout(self.norm(node_hidden_second))
-        
-        edge_hidden_third = edge_hidden_first + self.dropout(self.norm(edge_hidden_second))
-        
-        return node_hidden_third, edge_hidden_third
+        edge_hidden_last = self.dropout(self.norm(edge_hidden_last))
+
+        return node_hidden_last, edge_hidden_last, attn
 
 class PositionwiseFeedForward(nn.Module):
     """Implements FFN equation."""
 
-    def __init__(self, d_model, N_dense, dropout=0.1, leaky_relu_slope=0.1, dense_output_nonlinearity='tanh'):
+    def __init__(self, d_model, N_dense, dropout=0.1, leaky_relu_slope=0.1, dense_output_nonlinearity='swish'):
         super(PositionwiseFeedForward, self).__init__()
         self.N_dense = N_dense
         self.linears = clones(nn.Linear(d_model, d_model), N_dense)
@@ -270,7 +266,7 @@ def attention(query, key, value, adj_matrix, dropout=None):
     # in_scores.shape = (batch, h, max_length, max_length)
     # normal einsum out = 'bhmd,bhmnd->bhmn' , normal einsum in = 'bhnd,bhmnd->bhnm', normal node = 'bhmn,bhnd->bhmd'
     d_e = query.size(-1)
-    out_scores = torch.einsum('bhmd,bhmnd->bhmn', query, key) / math.sqrt(d_e)
+    out_scores = torch.einsum('bhmd,bhmnd->bhmn', query, key) / math.sqrt(d_e)   #### 128, 4, 9, 32 --- 128, 4, 9,9, 32   ----->>>> 128, 4, 9, 9
     in_scores = torch.einsum('bhnd,bhmnd->bhnm', query, key) / math.sqrt(d_e)
 
     
@@ -283,7 +279,8 @@ def attention(query, key, value, adj_matrix, dropout=None):
     
 
     # add the diffusion caused by distance
-    #message = message * adj_matrix.unsqueeze(1)
+    
+    message = message * adj_matrix.unsqueeze(1)
 
     if dropout is not None:
         message = dropout(message)
@@ -292,7 +289,7 @@ def attention(query, key, value, adj_matrix, dropout=None):
     node_hidden = torch.einsum('bhmn,bhnd->bhmd', message, value)
     
     
-    
+ 
     edge_hidden = message.unsqueeze(-1) * key
     
     
@@ -307,9 +304,9 @@ class MultiHeadedAttention(nn.Module):
         self.d_k = d_model // heads  # We assume d_v always equals d_k
         self.heads = heads
 
-        #self.atten_lambda = torch.nn.Parameter(torch.tensor(attenuation_lambda), requires_grad=True)
+        self.atten_lambda = torch.nn.Parameter(torch.tensor(attenuation_lambda), requires_grad=True)
 
-        self.linears = clones(nn.Linear(d_model, d_model), 5)  # 5 for query, key, value, node update, edge update
+        self.linears = clones(nn.Linear(d_model, d_model), 3)  # 5 for query, key, value, node update, edge update
 
         self.message = None
         self.leaky_relu_slope = leaky_relu_slope
@@ -325,8 +322,8 @@ class MultiHeadedAttention(nn.Module):
         n_batches, max_length, d_model = query_node.shape
 
         # 1) Prepare adjacency matrix with shape (batch, max_length, max_length)
-        #torch.clamp(self.atten_lambda, min=0, max=1)
-        #adj_matrix = self.atten_lambda * adj_matrix
+        torch.clamp(self.atten_lambda, min=0, max=1)
+        adj_matrix = self.atten_lambda * adj_matrix
         
         adj_matrix = self.distance_matrix_kernel(adj_matrix.float())
 
@@ -342,7 +339,8 @@ class MultiHeadedAttention(nn.Module):
         node_hidden = node_hidden.transpose(1, 2).contiguous().view(n_batches, max_length, self.heads * self.d_k)
         edge_hidden = edge_hidden.permute(0, 2, 3, 1, 4).contiguous().view(n_batches, max_length, max_length, self.heads * self.d_k)
         
-        return mish_function(self.linears[3](node_hidden)), mish_function(self.linears[4](edge_hidden))
+        #return mish_function(self.linears[3](node_hidden)), mish_function(self.linears[4](edge_hidden))
+        return swish_function(node_hidden), swish_function(edge_hidden), self.message
 
 
 
@@ -677,7 +675,7 @@ class MultiHeadedAttentionDecoder(nn.Module):
         self.d_k = d_model // heads  # We assume d_v always equals d_k
         self.heads = heads
 
-        self.attenuation_lambda = torch.nn.Parameter(torch.tensor(attenuation_lambda, requires_grad=True))
+        #self.attenuation_lambda = torch.nn.Parameter(torch.tensor(attenuation_lambda, requires_grad=True))
 
         self.linears = clones(nn.Linear(d_model, d_model), 5)  # 5 for query, key, value, node update, edge update
 
@@ -686,7 +684,7 @@ class MultiHeadedAttentionDecoder(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
 
         
-        self.distance_matrix_kernel = lambda x: F.softmax(-x, dim=-1)
+        #self.distance_matrix_kernel = lambda x: F.softmax(-x, dim=-1)
     
 
     def forward(self, query_node, value_node, key_edge, adj_matrix):
@@ -695,10 +693,10 @@ class MultiHeadedAttentionDecoder(nn.Module):
         n_batches, max_length, d_model = query_node.shape
 
         # 1) Prepare adjacency matrix with shape (batch, max_length, max_length)
-        torch.clamp(self.attenuation_lambda, min=0, max=1)
-        adj_matrix = self.attenuation_lambda * adj_matrix
+        #torch.clamp(self.attenuation_lambda, min=0, max=1)
+        #adj_matrix = self.attenuation_lambda * adj_matrix
         
-        adj_matrix = self.distance_matrix_kernel(adj_matrix)
+        #adj_matrix = self.distance_matrix_kernel(adj_matrix)
 
         # 2) Do all the linear projections in batch from d_model => h x d_k
         query = self.linears[0](query_node).view(n_batches, max_length, self.heads, self.d_k).transpose(1, 2)

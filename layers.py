@@ -156,7 +156,7 @@ class enc_dec_attention(nn.Module):
             nn.Linear(dim, dim),
             nn.Dropout(proj_dropout)
         )        
-        self.noise_strength_1 = torch.nn.Parameter(torch.zeros([]))
+        #self.noise_strength_1 = torch.nn.Parameter(torch.zeros([]))
         self.dropout_dec = nn.Dropout(proj_dropout)
 
     def forward(self, mol_annot, prot_annot, mol_adj, prot_adj):

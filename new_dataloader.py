@@ -25,11 +25,11 @@ class DruggenDataset(InMemoryDataset):
     
     @property
     def raw_file_names(self):
-        return ["chembl25.pt","chembl45.pt","qm9.pt","zinc_250k.pt"]
+        return ["chembl25.pt","chembl45.pt","qm9.pt","zinc_250k.pt", "chembl35.pt"]
 
     @property
     def processed_file_names(self):
-        return ['chembl25.pt','chembl45.pt','qm9.pt',"zinc_250k.pt"]
+        return ['chembl25.pt','chembl45.pt','qm9.pt',"zinc_250k.pt", "chembl35.pt"]
 
     def _generate_encoders_decoders(self, data):
         self.data = data
@@ -52,19 +52,19 @@ class DruggenDataset(InMemoryDataset):
         print('Created bonds encoder and decoder with {} bond types and 1 PAD symbol!'.format(
             self.bond_num_types - 1))        
         #dataset_names = str(self.dataset_name)
-        atom_encoders = open("DrugGEN/data/atom_encoders" + "zinc_250k" + ".pkl","wb")
+        atom_encoders = open("DrugGEN/data/atom_encoders" + "chembl35" + ".pkl","wb")
         pickle.dump(self.atom_encoder_m,atom_encoders)
         atom_encoders.close()
         
-        atom_decoders = open("DrugGEN/data/atom_decoders" + "zinc_250k" + ".pkl","wb")
+        atom_decoders = open("DrugGEN/data/atom_decoders" + "chembl35" + ".pkl","wb")
         pickle.dump(self.atom_decoder_m,atom_decoders)
         atom_decoders.close() 
                
-        bond_encoders = open("DrugGEN/data/bond_encoders" + "zinc_250k" + ".pkl","wb")
+        bond_encoders = open("DrugGEN/data/bond_encoders" + "chembl35" + ".pkl","wb")
         pickle.dump(self.bond_encoder_m,bond_encoders)
         bond_encoders.close()  
               
-        bond_decoders = open("DrugGEN/data/bond_decoders" + "zinc_250k" + ".pkl","wb")
+        bond_decoders = open("DrugGEN/data/bond_decoders" + "chembl35" + ".pkl","wb")
         pickle.dump(self.bond_decoder_m,bond_decoders)
         bond_decoders.close()        
         
@@ -91,6 +91,24 @@ class DruggenDataset(InMemoryDataset):
 
         return np.array([self.atom_encoder_m[atom.GetAtomicNum()] for atom in mol.GetAtoms()] + [0] * (
                     max_length - mol.GetNumAtoms()))
+
+    def _genF(self, mol, max_length=None):
+
+        max_length = max_length if max_length is not None else mol.GetNumAtoms()
+
+        features = np.array([[*[a.GetDegree() == i for i in range(5)],
+                              *[a.GetExplicitValence() == i for i in range(9)],
+                              *[int(a.GetHybridization()) == i for i in range(1, 7)],
+                              *[a.GetImplicitValence() == i for i in range(9)],
+                              a.GetIsAromatic(),
+                              a.GetNoImplicit(),
+                              *[a.GetNumExplicitHs() == i for i in range(5)],
+                              *[a.GetNumImplicitHs() == i for i in range(5)],
+                              *[a.GetNumRadicalElectrons() == i for i in range(5)],
+                              a.IsInRing(),
+                              *[a.IsInRingSize(i) for i in range(2, 9)]] for a in mol.GetAtoms()], dtype=np.int32)
+
+        return np.vstack((features, np.zeros((max_length - features.shape[0], features.shape[1]))))
 
     def decoder_load(self, dictionary_name):
         with open("DrugGEN/data/" + dictionary_name + self.dataset_name + '.pkl', 'rb') as f:
@@ -188,8 +206,8 @@ class DruggenDataset(InMemoryDataset):
     
     def process(self, size= None):
         
-        mols = [Chem.MolFromSmiles(line) for line in open("DrugGEN/data/zinc_250k.smi", 'r').readlines()]
-        mols = list(filter(lambda x: x.GetNumAtoms() <= 45, mols))
+        mols = [Chem.MolFromSmiles(line) for line in open("DrugGEN/data/chembl_smiles.smi", 'r').readlines()]
+        mols = list(filter(lambda x: x.GetNumAtoms() <= 35, mols))
         mols = mols[:size]
         indices = range(len(mols))
         
@@ -227,7 +245,7 @@ class DruggenDataset(InMemoryDataset):
 
         pbar.close()
 
-        torch.save(self.collate(data_list), osp.join(self.processed_dir, "zinc_250k.pt"))
+        torch.save(self.collate(data_list), osp.join(self.processed_dir, "chembl35.pt"))
 
 
 

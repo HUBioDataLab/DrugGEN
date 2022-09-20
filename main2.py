@@ -42,16 +42,16 @@ if __name__ == '__main__':
     parser.add_argument('--dim', type=int, default=128, help='Embedding dimension.')
     parser.add_argument('--depth', type=int, default=10, help='Encoder depth.')
     parser.add_argument('--heads', type=int, default=16, help='Number of head for Attention.')
-    parser.add_argument('--dec_depth', type=int, default=3, help='Decoder depth.')
+    parser.add_argument('--dec_depth', type=int, default=10, help='Decoder depth.')
     parser.add_argument('--dec_heads', type=int, default=16, help='Number of head for Decoder-Attention.')    
-    parser.add_argument('--mlp_ratio', type=int, default=1, help='.')
+    parser.add_argument('--mlp_ratio', type=int, default=4, help='.')
     parser.add_argument('--drop_rate', type=float, default=0.1 , help='.')
-    parser.add_argument('--warm_up_steps', type=float, default=0, help='.')
+    parser.add_argument('--warm_up_steps', type=float, default=1, help='.')
     parser.add_argument('--dis_select', type=str, default="conv", help="conv, PNA, TraConv")
     parser.add_argument('--init_type', type=str, default="normal", help="u")
     parser.add_argument('--la', type=float, default=0.5, help="lambda value for Total Discriminator loss balance")
     parser.add_argument('--la2', type=float, default=0.5, help="lambda value for Total Generator loss balance") 
-    parser.add_argument('--gcn_depth', type=int, default=5, help="GCN layer depth")    
+    parser.add_argument('--gcn_depth', type=int, default=4, help="GCN layer depth")    
     # PNA configurations
     parser.add_argument('--aggregators', type=str, default="max,mean,min,std", help='aggregator identifiers - "min","max","std","var","mean","sum"')
     parser.add_argument('--scalers', type=str, default="identity,attenuation,amplification", help='scaler identifiers - "attenuation","amplification","identity","linear", "inverse_linear')
@@ -65,7 +65,7 @@ if __name__ == '__main__':
     parser.add_argument('--graph_add', type=str, default="global_add", help='global_add,set2set,graph_multitrans')   
 
     # Training configuration.
-    parser.add_argument('--batch_size', type=int, default=128, help='mini-batch size')
+    parser.add_argument('--batch_size', type=int, default=64, help='mini-batch size')
     parser.add_argument('--num_iters', type=int, default=300, help='number of total iterations for training D')
     parser.add_argument('--num_iters_decay', type=int, default=100000, help='number of iterations for decaying lr')
     parser.add_argument('--g_lr', type=float, default=0.00001, help='learning rate for G')
@@ -102,7 +102,7 @@ if __name__ == '__main__':
     # Step size.
     parser.add_argument('--log_step', type=int, default=100)
     parser.add_argument('--sample_step', type=int, default=100)
-    parser.add_argument('--model_save_step', type=int, default=10000)
+    parser.add_argument('--model_save_step', type=int, default=1000)
     parser.add_argument('--lr_update_step', type=int, default=100000)
 
     config = parser.parse_args()
