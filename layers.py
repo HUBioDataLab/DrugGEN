@@ -7,7 +7,7 @@ from torch_geometric.nn import  PNAConv, global_add_pool, Set2Set, GraphMultiset
 import math
 
 class MLP(nn.Module):
-    def __init__(self, in_feat, hid_feat=None, out_feat=None,
+    def __init__(self, act, in_feat, hid_feat=None, out_feat=None,
                  dropout=0.):
         super().__init__()
         if not hid_feat:
@@ -15,8 +15,8 @@ class MLP(nn.Module):
         if not out_feat:
             out_feat = in_feat
         self.fc1 = nn.Linear(in_feat, hid_feat)
-        self.act = nn.Sigmoid()
-        self.fc2 = nn.Linear(hid_feat, out_feat)
+        self.act = act
+        self.fc2 = nn.Linear(hid_feat,out_feat)
         self.droprateout = nn.Dropout(dropout)
 
     def forward(self, x):
@@ -26,16 +26,16 @@ class MLP(nn.Module):
         return self.droprateout(x)
 
 class Attention_new(nn.Module):
-    def __init__(self, dim, heads=4, attention_dropout=0., proj_dropout=0.):
+    def __init__(self, dim, heads, act, attention_dropout=0., proj_dropout=0.):
         super().__init__()
         assert dim % heads == 0
         self.heads = heads
         self.scale = 1./dim**0.5
         #self.scale = torch.div(1, torch.pow(dim, 0.5)) #1./torch.pow(dim, 0.5) #dim**0.5 torch.div(x, 0.5)
 
-        self.q = nn.Linear(dim, dim)
-        self.k = nn.Linear(dim, dim)
-        self.v = nn.Linear(dim, dim)
+        self.q = nn.Sequential(nn.Linear(dim, dim), act)
+        self.k = nn.Sequential(nn.Linear(dim, dim), act)
+        self.v = nn.Sequential(nn.Linear(dim, dim), act)
         
         self.attention_dropout = nn.Dropout(attention_dropout)
 
@@ -44,28 +44,28 @@ class Attention_new(nn.Module):
         self.heads = heads
 
 
-        self.out_e = nn.Linear(dim,dim)
-        self.out_n = nn.Linear(dim,dim)
+        #self.out_e = nn.Sequential(nn.Linear(dim, dim), nn.LeakyReLU())
+        self.out_n = nn.Sequential(nn.Linear(dim, dim), act)
         
-    def forward(self, node, edge):
+    def forward(self, node):
         b, n, c = node.shape
-        b1, n1, n2, c1 = edge.shape
+        
         
         q_embed = self.q(node).view(-1, self.heads, n, c//self.heads)
-        k_embed = self.k(edge).view(-1, self.heads, n1, n2, c1//self.heads)
+        k_embed = self.k(node).view(-1, self.heads, n, c//self.heads)
         v_embed = self.v(node).view(-1, self.heads, n, c//self.heads)
         #x = x + torch.randn([x.size(0), x.size(1), 1], device=x.device) * self.noise_strength_1
         
 
 
-        out_scores = torch.einsum('bhmd,bhmnd->bhmn', q_embed, k_embed) / math.sqrt(self.scale)
-        in_scores = torch.einsum('bhmd,bhmnd->bhnm', q_embed, k_embed) / math.sqrt(self.scale)
+        out_scores = torch.einsum('bhmd,bhnd->bhmn', q_embed, k_embed) / math.sqrt(self.scale)
+        #in_scores = torch.einsum('bhmd,bhmnd->bhnm', q_embed, k_embed) / math.sqrt(self.scale)
 
         out_attn = F.softmax(out_scores, dim=-1)
-        in_attn = F.softmax(in_scores, dim=-1)
-        diag_attn = torch.diag_embed(torch.diagonal(out_attn, dim1=-2, dim2=-1), dim1=-2, dim2=-1)
+        #in_attn = F.softmax(in_scores, dim=-1)
+        #diag_attn = torch.diag_embed(torch.diagonal(out_attn, dim1=-2, dim2=-1), dim1=-2, dim2=-1)
 
-        message = out_attn + in_attn - diag_attn
+        message = out_attn #+ in_attn - diag_attn
         
         # add the diffusion caused by distance
     
@@ -76,56 +76,52 @@ class Attention_new(nn.Module):
 
         # message.shape = (batch, h, max_length, max_length), value.shape = (batch, h, max_length, d_k)
         node_hidden = torch.einsum('bhmn,bhnd->bhmd', message, v_embed)
-        edge_hidden = torch.einsum('bhmn,bhand->bhamd', message, k_embed)
+        #edge_hidden = torch.einsum('bhmn,bhand->bhamd', message, k_embed)
     
  
         #edge_hidden = message.unsqueeze(-1) * k_embed
         
         node_hidden = self.out_n(node_hidden.view(b, n, c))
-        edge_hidden = self.out_e(edge_hidden.reshape(b1, n1, n2, c1))
+        #edge_hidden = self.out_e(edge_hidden.reshape(b1, n1, n2, c1))
         
-        return node_hidden, edge_hidden, message
+        return node_hidden, message
 
 class Encoder_Block(nn.Module):
-    def __init__(self, dim, heads, mlp_ratio=4, drop_rate=0.):
+    def __init__(self, dim, heads,act, mlp_ratio=4, drop_rate=0., ):
         super().__init__()
         self.ln1 = nn.LayerNorm(dim)
-        self.ln2 = nn.LayerNorm(dim)
-        self.attn = Attention_new(dim, heads, drop_rate, drop_rate)
+   
+        self.attn = Attention_new(dim, heads, act, drop_rate, drop_rate)
         self.ln3 = nn.LayerNorm(dim)
-        self.ln4 = nn.LayerNorm(dim)
-        self.mlp = MLP(dim, dim*mlp_ratio, dropout=drop_rate)
-        self.mlp2 = MLP(dim, dim*mlp_ratio, dropout=drop_rate)
-        self.ln5 = nn.LayerNorm(dim)
-        self.ln6 = nn.LayerNorm(dim)       
 
-    def forward(self, x, y):
+        self.mlp = MLP(act,dim,dim*mlp_ratio, dim, dropout=drop_rate)
+ 
+        self.ln5 = nn.LayerNorm(dim)
+      
+
+    def forward(self, x):
         x1 = self.ln1(x)
-        y1 = self.ln2(y)
-        x2, y2, attn = self.attn(x1, y1)
+        x2,attn = self.attn(x1)
         x2 = x1 + x2
-        y2 = y1 + y2
-        x2 = self.ln3(x2)
-        y2 = self.ln4(y2)
+        x2 = self.ln3(x2)     
         x = self.ln5(x2 + self.mlp(x2))
-        y = self.ln6(y2 + self.mlp2(y2))
-        return x, y, attn
+        return x, attn
 
 
 class TransformerEncoder(nn.Module):
-    def __init__(self, dim, depth, heads, mlp_ratio=4, drop_rate=0.1):
+    def __init__(self, dim, depth, heads, act, mlp_ratio=4, drop_rate=0.1):
         super().__init__()
         
         self.Encoder_Blocks = nn.ModuleList([
-            Encoder_Block(dim, heads, mlp_ratio, drop_rate)
+            Encoder_Block(dim, heads, act, mlp_ratio, drop_rate)
             for i in range(depth)])
 
-    def forward(self, x, y):
+    def forward(self, x):
         
         for Encoder_Block in self.Encoder_Blocks:
-            x, y, attn = Encoder_Block(x, y)
+            x,  attn = Encoder_Block(x)
             
-        return x, y, attn
+        return x, attn
 
 class enc_dec_attention(nn.Module):
     def __init__(self, dim, heads=4, attention_dropout=0., proj_dropout=0.):
@@ -243,8 +239,8 @@ class Decoder_Block(nn.Module):
         self.ln3_ma = nn.LayerNorm(dim)
         self.ln3_mx = nn.LayerNorm(dim)
 
-        self.mlp_ma = MLP(dim, dim*mlp_ratio, dropout=drop_rate)
-        self.mlp_mx = MLP(dim, dim*mlp_ratio, dropout=drop_rate)
+        self.mlp_ma = MLP(1,dim, dim*mlp_ratio, dropout=drop_rate)
+        self.mlp_mx = MLP(1,dim, dim*mlp_ratio, dropout=drop_rate)
        
         self.ln4_ma = nn.LayerNorm(dim)
         self.ln4_mx = nn.LayerNorm(dim)
