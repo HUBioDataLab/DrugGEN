@@ -11,13 +11,18 @@ import re
 
 class DruggenDataset(InMemoryDataset):
     
-    def __init__(self, root, dataset_file, transform=None, pre_transform=None, pre_filter=None):
-        super().__init__(root, transform, pre_transform, pre_filter)
+    def __init__(self, root, dataset_file, raw_files, max_atom, features, transform=None, pre_transform=None, pre_filter=None):
+        self.dataset_name = dataset_file.split(".")[0]
         self.dataset_file = dataset_file
-        self.dataset_name = self.dataset_file.split(".")[0]
+        self.raw_files = raw_files
+        self.max_atom = max_atom
+        self.features = features
+        super().__init__(root, transform, pre_transform, pre_filter)
         path = osp.join(self.processed_dir, dataset_file)
         self.data, self.slices = torch.load(path)
+        self.root = root
 
+        
     @property
     def processed_dir(self):
         
@@ -25,13 +30,14 @@ class DruggenDataset(InMemoryDataset):
     
     @property
     def raw_file_names(self):
-        return ["chembl25.pt","chembl45.pt","qm9.pt","zinc_250k.pt", "chembl35.pt"]
+        return self.raw_files
 
     @property
     def processed_file_names(self):
-        return ['chembl25.pt','chembl45.pt','qm9.pt',"zinc_250k.pt", "chembl35.pt"]
+        return self.dataset_file
 
     def _generate_encoders_decoders(self, data):
+        
         self.data = data
         print('Creating atoms encoder and decoder..')
         atom_labels = sorted(set([atom.GetAtomicNum() for mol in self.data for atom in mol.GetAtoms()] + [0]))
@@ -52,21 +58,21 @@ class DruggenDataset(InMemoryDataset):
         print('Created bonds encoder and decoder with {} bond types and 1 PAD symbol!'.format(
             self.bond_num_types - 1))        
         #dataset_names = str(self.dataset_name)
-        atom_encoders = open("DrugGEN/data/atom_encoders" + "chembl35" + ".pkl","wb")
-        pickle.dump(self.atom_encoder_m,atom_encoders)
-        atom_encoders.close()
+        with open("DrugGEN/data/encoders/" +"atom_" + self.dataset_name + ".pkl","wb") as atom_encoders:
+            pickle.dump(self.atom_encoder_m,atom_encoders)
         
-        atom_decoders = open("DrugGEN/data/atom_decoders" + "chembl35" + ".pkl","wb")
-        pickle.dump(self.atom_decoder_m,atom_decoders)
-        atom_decoders.close() 
+        
+        with open("DrugGEN/data/decoders/" +"atom_" +  self.dataset_name + ".pkl","wb") as atom_decoders:
+            pickle.dump(self.atom_decoder_m,atom_decoders)
+        
                
-        bond_encoders = open("DrugGEN/data/bond_encoders" + "chembl35" + ".pkl","wb")
-        pickle.dump(self.bond_encoder_m,bond_encoders)
-        bond_encoders.close()  
+        with open("DrugGEN/data/encoders/" +"bond_" +  self.dataset_name + ".pkl","wb") as bond_encoders:
+            pickle.dump(self.bond_encoder_m,bond_encoders)
+        
               
-        bond_decoders = open("DrugGEN/data/bond_decoders" + "chembl35" + ".pkl","wb")
-        pickle.dump(self.bond_decoder_m,bond_decoders)
-        bond_decoders.close()        
+        with open("DrugGEN/data/decoders/" +"bond_" +  self.dataset_name + ".pkl","wb") as bond_decoders:
+            pickle.dump(self.bond_decoder_m,bond_decoders)
+         
         
         
     def _genA(self, mol, connected=True, max_length=None):
@@ -111,15 +117,15 @@ class DruggenDataset(InMemoryDataset):
         return np.vstack((features, np.zeros((max_length - features.shape[0], features.shape[1]))))
 
     def decoder_load(self, dictionary_name):
-        with open("DrugGEN/data/" + dictionary_name + self.dataset_name + '.pkl', 'rb') as f:
+        with open("DrugGEN/data/decoders/" + dictionary_name + "_" + self.dataset_name + '.pkl', 'rb') as f:
             return pickle.load(f)    
     def drugs_decoder_load(self, dictionary_name):
-        with open("DrugGEN/data/" + "drugs_" + dictionary_name + '.pkl', 'rb') as f:
+        with open("DrugGEN/data/decoders/" + dictionary_name +'.pkl', 'rb') as f:
             return pickle.load(f)      
     def matrices2mol(self, node_labels, edge_labels, strict=False):
         mol = Chem.RWMol()
-        atom_decoders = self.decoder_load("atom_decoders")
-        bond_decoders = self.decoder_load("bond_decoders")
+        atom_decoders = self.decoder_load("atom")
+        bond_decoders = self.decoder_load("bond")
         
         for node_label in node_labels:
             mol.AddAtom(Chem.Atom(atom_decoders[node_label]))
@@ -138,8 +144,8 @@ class DruggenDataset(InMemoryDataset):
         return mol
     def matrices2mol_drugs(self, node_labels, edge_labels, strict=False):
         mol = Chem.RWMol()
-        atom_decoders = self.drugs_decoder_load("atom_decoders")
-        bond_decoders = self.drugs_decoder_load("bond_decoders")
+        atom_decoders = self.drugs_decoder_load("atom_drugs_feat")
+        bond_decoders = self.drugs_decoder_load("bond_drugs_feat")
         
         for node_label in node_labels:
             mol.AddAtom(Chem.Atom(atom_decoders[node_label]))
@@ -204,10 +210,19 @@ class DruggenDataset(InMemoryDataset):
 
         return mol
     
+    def label2onehot(self, labels, dim):
+        
+        """Convert label indices to one-hot vectors."""
+        
+        out = torch.zeros(list(labels.size())+[dim])
+        out.scatter_(len(out.size())-1,labels.unsqueeze(-1),1.)
+        
+        return out.float() 
+       
     def process(self, size= None):
         
-        mols = [Chem.MolFromSmiles(line) for line in open("DrugGEN/data/chembl_smiles.smi", 'r').readlines()]
-        mols = list(filter(lambda x: x.GetNumAtoms() <= 35, mols))
+        mols = [Chem.MolFromSmiles(line) for line in open(self.raw_files, 'r').readlines()]
+        mols = list(filter(lambda x: x.GetNumAtoms() <= self.max_atom, mols))
         mols = mols[:size]
         indices = range(len(mols))
         
@@ -219,14 +234,21 @@ class DruggenDataset(InMemoryDataset):
         pbar.set_description(f'Processing chembl dataset')
         max_length = max(mol.GetNumAtoms() for mol in mols)
         data_list = []
+      
+        self.m_dim = len(self.atom_decoder_m)
         for idx in indices:
             mol = mols[idx]
             A = self._genA(mol, connected=True, max_length=max_length)
             if A is not None:
                 
 
-                x = torch.from_numpy(self._genX(mol, max_length=max_length)).to(torch.long).view(-1, 1)
-                
+                x = torch.from_numpy(self._genX(mol, max_length=max_length)).to(torch.long).view(1, -1)
+          
+                x = self.label2onehot(x,self.m_dim).squeeze()
+                if self.features: 
+                    f = torch.from_numpy(self._genF(mol, max_length=max_length)).to(torch.long).view(x.shape[0], -1)
+                    x = torch.concat((x,f), dim=-1)
+             
                 adjacency = torch.from_numpy(A)
                 
                 edge_index = adjacency.nonzero(as_tuple=False).t().contiguous()
@@ -245,7 +267,7 @@ class DruggenDataset(InMemoryDataset):
 
         pbar.close()
 
-        torch.save(self.collate(data_list), osp.join(self.processed_dir, "chembl35.pt"))
+        torch.save(self.collate(data_list), osp.join(self.processed_dir, self.dataset_file))
 
 
 

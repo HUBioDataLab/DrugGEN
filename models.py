@@ -12,9 +12,10 @@ from torch_geometric.nn.dense import DenseGCNConv
     
 class Generator(nn.Module):
     """Generator network."""
-    def __init__(self, conv_dims, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio, drop_rate):
+    def __init__(self, conv_dims, z_dim, act, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio, drop_rate):
         super(Generator, self).__init__()
-
+        
+        g_conv_dim = conv_dims
         self.vertexes = vertexes
         self.edges = edges
         self.nodes = nodes
@@ -23,51 +24,57 @@ class Generator(nn.Module):
         self.heads = heads
         self.mlp_ratio = mlp_ratio
         self.dropout_rate = drop_rate
-        dropout= self.dropout_rate
-    
+        self.dropout = dropout
+        self.z_dim = z_dim
 
+        if act == "relu":
+            act = nn.ReLU()
+        elif act == "leaky":
+            act = nn.LeakyReLU()
+        elif act == "sigmoid":
+            act = nn.Sigmoid()
+        elif act == "tanh":
+            act = nn.Tanh()
+        self.features = vertexes * vertexes * edges + vertexes * nodes
+        self.transformer_dim = vertexes * vertexes * dim + vertexes * dim
         
-        self.layers_edge = nn.Sequential(nn.Linear(self.edges, conv_dims[0]), nn.ReLU(), nn.Linear(conv_dims[0], self.dim))  #  128, 9, 9, 5 --> 128, 9, 9, 128
         
-        self.layers_node = nn.Sequential(nn.Linear(self.nodes, conv_dims[0]), nn.ReLU(), nn.Linear(conv_dims[0], self.dim))  #  128, 9, 5 --> 128, 9, 128
+        self.first_layers = nn.Sequential(nn.Linear(z_dim,g_conv_dim[0]), act,
+                                          nn.Linear(g_conv_dim[0], g_conv_dim[1]), act, nn.Dropout(self.dropout),
+                                          nn.Linear(g_conv_dim[1], g_conv_dim[2]), act, nn.Dropout(self.dropout),
+                                          nn.Linear(g_conv_dim[2], g_conv_dim[3]), act, nn.Dropout(self.dropout),
+                                          nn.Linear(g_conv_dim[3], g_conv_dim[2]), act, nn.Dropout(self.dropout),
+                                          nn.Linear(g_conv_dim[2], g_conv_dim[1]), act, nn.Dropout(self.dropout),
+                                          nn.Linear(g_conv_dim[1], g_conv_dim[0]), act, nn.Dropout(self.dropout),
+                                          nn.Linear(g_conv_dim[0], self.transformer_dim), act, nn.Dropout(self.dropout))
         
-    
-        
-        self.TransformerEncoder = TransformerEncoder(dim=self.dim, depth=self.depth, heads=self.heads,
+        self.TransformerEncoder = TransformerEncoder(dim=self.dim, depth=self.depth, heads=self.heads, act = act,
                                                                     mlp_ratio=self.mlp_ratio, drop_rate=self.dropout_rate)         
      
 
         self.dropout = nn.Dropout(p=dropout)
         
-        self.nodes_output_layer = nn.Linear(self.dim, self.nodes)  # 128 -- > 5
-        self.edges_output_layer = nn.Linear(self.dim, self.edges)  # 128 -- > 5
+        self.readout = nn.Linear(self.transformer_dim, self.features)
       
 
-    def forward(self, z_e,z_n,a,a_tensor,x_tensor):
+    def forward(self, z):
         
-        nodes_logits = self.layers_node(z_n) 
+        graph = self.first_layers(z)
         
-        nodes_logits = self.dropout(nodes_logits)
+        graph = graph.view(-1, self.vertexes * self.vertexes + self.vertexes ,self.dim)
+        #print(graph.shape)
+        graph_transformed, attention = self.TransformerEncoder(graph)
         
-        edges_logits = self.layers_edge(z_e)
-        
-        edges_logits = edges_logits.view(-1,self.dim,self.vertexes,self.vertexes)
-        edges_logits = (edges_logits + edges_logits.permute(0,1,3,2))/2
-        edges_logits = self.dropout(edges_logits)
-        edges_logits = edges_logits.view(-1,self.vertexes,self.vertexes,self.dim)
+        graph_transformed = graph_transformed.view(-1, self.transformer_dim)
 
+        graph_final = self.readout(graph_transformed)
 
-        nodes_logits , edges_logits, attn = self.TransformerEncoder(nodes_logits, edges_logits)
-        
-        edges_logits = self.dropout(edges_logits)
-        nodes_logits = self.dropout(nodes_logits)
-        
-        
-        nodes_logits = self.nodes_output_layer(nodes_logits)
-        edges_logits = self.edges_output_layer(edges_logits)
+        #graph_final = graph_final.view(-1, self.features)
 
-        return edges_logits, nodes_logits, attn
-        
+        return graph_final, attention
+     
+     
+     
 class Generator2(nn.Module):
     def __init__(self, dim, depth, heads, mlp_ratio, drop_rate,drugs_m_dim,drugs_b_dim,b_dim,m_dim):
         super().__init__()
@@ -298,3 +305,29 @@ class PNA_Net(nn.Module):
         x = self.agg_layer(x,torch.tanh)
        
         return self.mlp(x)     
+    
+class simple_disc(nn.Module):
+    def __init__(self, act,m_dim,vertexes,b_dim):
+        super().__init__()
+        act = "tanh"
+        if act == "relu":
+            act = nn.ReLU()
+        elif act == "leaky":
+            act = nn.LeakyReLU()
+        elif act == "sigmoid":
+            act = nn.Sigmoid()
+        elif act == "tanh":
+            act = nn.Tanh()  
+        features = vertexes * m_dim + vertexes * vertexes * b_dim 
+        
+        self.predictor = nn.Sequential(nn.Linear(features,256), act, nn.Linear(256,128), act, nn.Linear(128,64), act,
+                                       nn.Linear(64,32), act, nn.Linear(32,16), act,
+                                       nn.Linear(16,1))
+    
+    def forward(self, x):
+        
+        prediction = self.predictor(x)
+        
+        #prediction = F.softmax(prediction,dim=-1)
+        
+        return prediction

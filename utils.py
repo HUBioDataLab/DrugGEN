@@ -12,6 +12,9 @@ from rdkit.Chem import Draw
 import os
 import math
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 
 NP_model = pickle.load(gzip.open('DrugGEN/data/NP_score.pkl.gz'))
 SA_model = {i[j]: float(i[0]) for i in pickle.load(gzip.open('DrugGEN/data/SA_score.pkl.gz')) for j in range(1, len(i))}
@@ -275,25 +278,25 @@ def mols2grid_image(mols,path):
             continue
 
 
-def all_scores(mols, data, max_len, norm=False):
-    m0 = {k: list(filter(lambda e: e is not None, v)) for k, v in {
+def all_scores_val(mols, data, max_len, norm=False):
+
+    m = {'valid score': MolecularMetrics.valid_total_score(mols) * 100,
+          'unique score': MolecularMetrics.unique_total_score(mols) * 100,
+          'novel score': MolecularMetrics.novel_total_score(mols, data) * 100,
+          'max len': MolecularMetrics.max_component(mols,max_len) * 100}
+     
+    return m
+
+def all_scores_chem(mols, data, max_len, norm=False):
+    
+    m = {k: list(filter(lambda e: e is not None, v)) for k, v in {
         'QED score': MolecularMetrics.quantitative_estimation_druglikeness_scores(mols),
         'NP score': MolecularMetrics.natural_product_scores(mols, norm=norm),
         'drugcandidate score': MolecularMetrics.drugcandidate_scores(mols, data),
         'logP score': MolecularMetrics.water_octanol_partition_coefficient_scores(mols, norm=norm),
         'SA score': MolecularMetrics.synthetic_accessibility_score_scores(mols, norm=norm)}.items()}
 
-    m1 = {'valid score': MolecularMetrics.valid_total_score(mols) * 100,
-          'unique score': MolecularMetrics.unique_total_score(mols) * 100,
-          'novel score': MolecularMetrics.novel_total_score(mols, data) * 100,
-          'max len': MolecularMetrics.max_component(mols,max_len) * 100}
-     
-    return m0, m1
-def all_scores_for_print(mols, data,  norm=False):
-    m0 = {'QED score': MolecularMetrics.quantitative_estimation_druglikeness_scores_forsave(mols),
-        'logP score': MolecularMetrics.water_octanol_partition_coefficient_scores_forsave(mols, norm=norm),
-        'SA score': MolecularMetrics.synthetic_accessibility_score_scores_forsave(mols, norm=norm)}
-
+    return m
 
          #   'diversity score': MolecularMetrics.diversity_scores(mols, data),
         #'drugcandidate score': MolecularMetrics.drugcandidate_scores(mols, data),
@@ -322,11 +325,129 @@ def save_smiles_matrices(mols,edges_hard, nodes_hard,path,data_source = None):
         else:
             continue
                 
+def reward(mols,data):
+    
+    ''' Rewards that can be used for Reinforcement Networks. '''
+    
+    rr = 1.
+    #for m in ('logp,sas,qed,unique' if self.metrics == 'all' else self.metrics).split(','):
+    m = ""
+    if m == 'np':
+        rr *= MolecularMetrics.natural_product_scores(mols, norm=True)
+    elif m == 'logp':
+        rr *= MolecularMetrics.water_octanol_partition_coefficient_scores(mols, norm=True)
+    elif m == 'sas':
+        rr *= MolecularMetrics.synthetic_accessibility_score_scores(mols, norm=True)
+    elif m == 'qed':
+        rr *= MolecularMetrics.quantitative_estimation_druglikeness_scores(mols, norm=True)
+    elif m == 'novelty':
+        rr *= MolecularMetrics.novel_scores(mols, data)
+    elif m == 'dc':
+        rr *= MolecularMetrics.drugcandidate_scores(mols, data)
+    elif m == 'unique':
+        rr *= MolecularMetrics.unique_scores(mols)
+    elif m == 'diversity':
+        rr *= MolecularMetrics.diversity_scores(mols, data)
+    elif m == 'validity':
+        rr *= MolecularMetrics.valid_total_score(mols)
+    else:
+        raise RuntimeError('{} is not defined as a metric'.format(m))
 
+    return rr.reshape(-1, 1)
 
     
+def dense_to_sparse_with_attr(self, adj):
+    ### 
+    assert adj.dim() >= 2 and adj.dim() <= 3
+    assert adj.size(-1) == adj.size(-2)
 
+    index = adj.nonzero(as_tuple=True)
+    edge_attr = adj[index]
 
-        
+    if len(index) == 3:
+        batch = index[0] * adj.size(-1)
+        index = (batch + index[1], batch + index[2])
+        #index = torch.stack(index, dim=0)
+    return index, edge_attr
+"""
+def _genDegree():
     
+    ''' Generates the Degree distribution tensor for PNA, should be used everytime a different
+        dataset is used.
+        Can be called without arguments and saves the tensor for later use. If tensor was created
+        before, it just loads the degree tensor.
+        '''
+    
+    degree_path = os.path.join(self.degree_dir, self.dataset_name + '-degree.pt')
+    if not os.path.exists(degree_path):
         
+        
+        max_degree = -1
+        for data in self.dataset:
+            d = geoutils.degree(data.edge_index[1], num_nodes=data.num_nodes, dtype=torch.long)
+            max_degree = max(max_degree, int(d.max()))
+
+        # Compute the in-degree histogram tensor
+        deg = torch.zeros(max_degree + 1, dtype=torch.long)
+        for data in self.dataset:
+            d = geoutils.degree(data.edge_index[1], num_nodes=data.num_nodes, dtype=torch.long)
+            deg += torch.bincount(d, minlength=deg.numel())
+        torch.save(deg, 'DrugGEN/data/' + self.dataset_name + '-degree.pt')            
+    else:    
+        deg = torch.load(degree_path, map_location=lambda storage, loc: storage)
+        
+    return deg        
+"""    
+
+def plot_attn(self, attn_w, model, iter, epoch):
+    
+    cols = 4
+    rows = int(self.heads/cols)
+
+    fig, axes = plt.subplots( rows,cols, figsize = (30, 14))
+    axes = axes.flat
+    attentions_pos = attn_w[0]
+    attentions_pos = attentions_pos.cpu().detach().numpy()
+    for i,att in enumerate(attentions_pos):
+
+        #im = axes[i].imshow(att, cmap='gray')
+        sns.heatmap(att,vmin = 0, vmax = 1,ax = axes[i])
+        axes[i].set_title(f'head - {i} ')
+        axes[i].set_ylabel('layers')
+    pltsavedir = "/home/atabey/attn/second"
+    plt.savefig(os.path.join(pltsavedir, "attn" + model + "_" + self.dataset_name + "_"  + str(iter) + "_" + str(epoch) +  ".png"), dpi= 500,bbox_inches='tight')
+
+
+def plot_grad_flow(named_parameters, model, iter, epoch):
+    
+    # Based on https://discuss.pytorch.org/t/check-gradient-flow-in-network/15063/10
+    '''Plots the gradients flowing through different layers in the net during training.
+    Can be used for checking for possible gradient vanishing / exploding problems.
+    
+    Usage: Plug this function in Trainer class after loss.backwards() as 
+    "plot_grad_flow(self.model.named_parameters())" to visualize the gradient flow'''
+    ave_grads = []
+    max_grads= []
+    layers = []
+    for n, p in named_parameters:
+        if(p.requires_grad) and ("bias" not in n):
+            print(p.grad,n)
+            layers.append(n)
+            ave_grads.append(p.grad.abs().mean().cpu())
+            max_grads.append(p.grad.abs().max().cpu())
+    plt.bar(np.arange(len(max_grads)), max_grads, alpha=0.1, lw=1, color="c")
+    plt.bar(np.arange(len(max_grads)), ave_grads, alpha=0.1, lw=1, color="b")
+    plt.hlines(0, 0, len(ave_grads)+1, lw=2, color="k" )
+    plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
+    plt.xlim(left=0, right=len(ave_grads))
+    plt.ylim(bottom = -0.001, top=1) # zoom in on the lower gradient regions
+    plt.xlabel("Layers")
+    plt.ylabel("average gradient")
+    plt.title("Gradient flow")
+    plt.grid(True)
+    plt.legend([Line2D([0], [0], color="c", lw=4),
+                Line2D([0], [0], color="b", lw=4),
+                Line2D([0], [0], color="k", lw=4)], ['max-gradient', 'mean-gradient', 'zero-gradient'])
+    pltsavedir = "/home/atabey/gradients/tryout"
+    plt.savefig(os.path.join(pltsavedir, "weights_" + model  + "_"  + str(iter) + "_" + str(epoch) +  ".png"), dpi= 500,bbox_inches='tight')
+
