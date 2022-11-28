@@ -70,7 +70,6 @@ Three different data types (i.e., compound, protein, and bioactivity) were retri
 
 More details on the construction of datasets can be found in our paper referenced above.
 
-
 <!-- ADD SOME INFO HERE -->
 
 ## Updates
