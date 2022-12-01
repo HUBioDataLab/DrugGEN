@@ -113,9 +113,13 @@ It enables cost-free project execution in the cloud. You can use the provided no
 ```bash
 conda activate druggen
 
+# Download the raw files
+
+bash dataset_download.sh
+
 # DrugGEN can be trained with a one-liner
 
-python DrugGEN/main.py --mode="train" --device="cuda"
+python DrugGEN/main.py --mode="train" --device="cuda" --raw_file="DrugGEN/data/chembl_smiles.smi" --dataset_file="chembl45.pt" -- drug_raw_file="drug_smies.smi" --drug_dataset_file="drugs.pt" --max_atom=45
 ```
 
 ** Please find the arguments in the **main.py** file. Explanation of the commands can be found below.
