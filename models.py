@@ -1,21 +1,19 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from layers import PNA, GraphConvolution, GraphAggregation, TransformerEncoder, TransformerDecoder
-import copy 
-from torch_geometric.nn import global_add_pool
-from torch_geometric.nn.conv import TransformerConv
-from torch_geometric.nn.dense import DenseGCNConv
+from layers import TransformerEncoder, TransformerDecoder
+
+
 
     
     
     
 class Generator(nn.Module):
     """Generator network."""
-    def __init__(self, conv_dims, z_dim, act, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio, drop_rate):
+    def __init__(self,z_dim, act, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio):
         super(Generator, self).__init__()
         
-        g_conv_dim = conv_dims
+
         self.vertexes = vertexes
         self.edges = edges
         self.nodes = nodes
@@ -23,7 +21,7 @@ class Generator(nn.Module):
         self.dim = dim
         self.heads = heads
         self.mlp_ratio = mlp_ratio
-        self.dropout_rate = drop_rate
+  
         self.dropout = dropout
         self.z_dim = z_dim
 
@@ -39,39 +37,31 @@ class Generator(nn.Module):
         self.transformer_dim = vertexes * vertexes * dim + vertexes * dim
         
         
-        self.first_layers = nn.Sequential(nn.Linear(z_dim,g_conv_dim[0]), act,
-                                          nn.Linear(g_conv_dim[0], g_conv_dim[1]), act, nn.Dropout(self.dropout),
-                                          nn.Linear(g_conv_dim[1], g_conv_dim[2]), act, nn.Dropout(self.dropout),
-                                          nn.Linear(g_conv_dim[2], g_conv_dim[3]), act, nn.Dropout(self.dropout),
-                                          nn.Linear(g_conv_dim[3], g_conv_dim[2]), act, nn.Dropout(self.dropout),
-                                          nn.Linear(g_conv_dim[2], g_conv_dim[1]), act, nn.Dropout(self.dropout),
-                                          nn.Linear(g_conv_dim[1], g_conv_dim[0]), act, nn.Dropout(self.dropout),
-                                          nn.Linear(g_conv_dim[0], self.transformer_dim), act, nn.Dropout(self.dropout))
-        
+        self.node_layers = nn.Sequential(nn.Linear(z_dim,dim), act, nn.Dropout(self.dropout))
+        self.edge_layers = nn.Sequential(nn.Linear(z_dim,dim), act, nn.Dropout(self.dropout))
         self.TransformerEncoder = TransformerEncoder(dim=self.dim, depth=self.depth, heads=self.heads, act = act,
-                                                                    mlp_ratio=self.mlp_ratio, drop_rate=self.dropout_rate)         
+                                                                    mlp_ratio=self.mlp_ratio, drop_rate=self.dropout)         
      
 
         self.dropout = nn.Dropout(p=dropout)
         
-        self.readout = nn.Linear(self.transformer_dim, self.features)
-      
+        self.readout_e = nn.Linear(self.dim, edges)
+        self.readout_n = nn.Linear(self.dim, nodes)
 
-    def forward(self, z):
+    def forward(self, z_e, z_n):
         
-        graph = self.first_layers(z)
+        node = self.node_layers(z_n)
         
-        graph = graph.view(-1, self.vertexes * self.vertexes + self.vertexes ,self.dim)
-        #print(graph.shape)
-        graph_transformed, attention = self.TransformerEncoder(graph)
+        edge = self.edge_layers(z_e)
         
-        graph_transformed = graph_transformed.view(-1, self.transformer_dim)
+    
+        node, edge = self.TransformerEncoder(node,edge)
 
-        graph_final = self.readout(graph_transformed)
+        node = self.readout_n(node)
+        
+        edge = self.readout_e(edge)
 
-        #graph_final = graph_final.view(-1, self.features)
-
-        return graph_final, attention
+        return node, edge
      
      
      
@@ -86,16 +76,15 @@ class Generator2(nn.Module):
         self.dropout_rate = drop_rate
         self.drugs_m_dim = drugs_m_dim
         self.drugs_b_dim = drugs_b_dim
-        self.prot_n = 7
-        self.prot_e = 1 
+
     
         self.dropoout = nn.Dropout(p=drop_rate)
         
         self.mol_nodes = nn.Linear(m_dim, dim)
         self.mol_edges = nn.Linear(b_dim, dim)
         
-        self.prot_nodes =  nn.Linear(self.prot_n, dim)
-        self.prot_edges =  nn.Linear(self.prot_e, dim)
+        self.drug_nodes =  nn.Linear(self.drugs_m_dim, dim)
+        self.drug_edges =  nn.Linear(self.drugs_b_dim, dim)
         
         self.TransformerDecoder = TransformerDecoder(dim, depth, heads, mlp_ratio=4, drop_rate=0.)
 
@@ -103,15 +92,15 @@ class Generator2(nn.Module):
         self.edges_output_layer = nn.Linear(self.dim, self.drugs_b_dim)
 
 
-    def forward(self, edges_logits, nodes_logits, prot_n, prot_e):
+    def forward(self, edges_logits, nodes_logits, drugs_n, drugs_e):
         
         edges_logits = self.mol_edges(edges_logits)
         nodes_logits = self.mol_nodes(nodes_logits)
+   
+        drug_n = self.drug_nodes(drugs_n)
+        drug_e = self.drug_edges(drugs_e)
         
-        prot_n = self.prot_nodes(prot_n)
-        prot_e = self.prot_edges(prot_e)
-        
-        edges_logits, nodes_logits, dec_attn = self.TransformerDecoder(nodes_logits,prot_n,edges_logits,prot_e)
+        edges_logits, nodes_logits= self.TransformerDecoder(nodes_logits,drug_n,edges_logits,drug_e)
      
         edges_logits = self.edges_output_layer(edges_logits)
         nodes_logits = self.nodes_output_layer(nodes_logits)
@@ -119,10 +108,37 @@ class Generator2(nn.Module):
         edges_logits = self.dropoout(edges_logits)
         nodes_logits = self.dropoout(nodes_logits)
         
-        return edges_logits, nodes_logits, dec_attn
+        return edges_logits, nodes_logits
 
-class Discriminator(nn.Module):
-    """Discriminator network with PatchGAN."""
+
+class simple_disc(nn.Module):
+    def __init__(self, act,m_dim,vertexes,b_dim):
+        super().__init__()
+        act = "tanh"
+        if act == "relu":
+            act = nn.ReLU()
+        elif act == "leaky":
+            act = nn.LeakyReLU()
+        elif act == "sigmoid":
+            act = nn.Sigmoid()
+        elif act == "tanh":
+            act = nn.Tanh()  
+        features = vertexes * m_dim + vertexes * vertexes * b_dim 
+        
+        self.predictor = nn.Sequential(nn.Linear(features,256), act, nn.Linear(256,128), act, nn.Linear(128,64), act,
+                                       nn.Linear(64,32), act, nn.Linear(32,16), act,
+                                       nn.Linear(16,1))
+    
+    def forward(self, x):
+        
+        prediction = self.predictor(x)
+        
+        #prediction = F.softmax(prediction,dim=-1)
+        
+        return prediction
+
+"""class Discriminator(nn.Module):
+  
     def __init__(self,deg,agg,sca,pna_in_ch,pna_out_ch,edge_dim,towers,pre_lay,post_lay,pna_layer_num, graph_add):
         super(Discriminator, self).__init__()
         self.degree = deg
@@ -147,10 +163,10 @@ class Discriminator(nn.Module):
 
         h = activation(h) if activation is not None else h
         
-        return h
+        return h"""
 
-class Discriminator2(nn.Module):
-    """Discriminator network with PatchGAN."""
+"""class Discriminator2(nn.Module):
+
     def __init__(self,deg,agg,sca,pna_in_ch,pna_out_ch,edge_dim,towers,pre_lay,post_lay,pna_layer_num, graph_add):
         super(Discriminator2, self).__init__()
         self.degree = deg
@@ -175,10 +191,10 @@ class Discriminator2(nn.Module):
 
         h = activation(h) if activation is not None else h
         
-        return h
+        return h"""
 
 
-class Discriminator_old(nn.Module):
+"""class Discriminator_old(nn.Module):
 
     def __init__(self, conv_dim, m_dim, b_dim, dropout, gcn_depth):
         super(Discriminator_old, self).__init__()
@@ -217,9 +233,9 @@ class Discriminator_old(nn.Module):
         output = self.output_layer(h)
         output = activation(output) if activation is not None else output
         
-        return output, h
+        return output, h"""
     
-class Discriminator_old2(nn.Module):
+"""class Discriminator_old2(nn.Module):
 
     def __init__(self, conv_dim, m_dim, b_dim, dropout, gcn_depth):
         super(Discriminator_old2, self).__init__()
@@ -258,10 +274,10 @@ class Discriminator_old2(nn.Module):
         output = self.output_layer(h)
         output = activation(output) if activation is not None else output
         
-        return output, h
+        return output, h"""
     
-class Discriminator3(nn.Module):
-    """Discriminator network with PatchGAN."""
+"""class Discriminator3(nn.Module):
+    
     def __init__(self,in_ch):
         super(Discriminator3, self).__init__()
         self.dim = in_ch
@@ -276,10 +292,10 @@ class Discriminator3(nn.Module):
         h = self.mlp(h)
         h = activation(h) if activation is not None else h
         
-        return h
+        return h"""
     
     
-class PNA_Net(nn.Module):
+"""class PNA_Net(nn.Module):
     def __init__(self,deg):
         super().__init__()
 
@@ -304,30 +320,5 @@ class PNA_Net(nn.Module):
 
         x = self.agg_layer(x,torch.tanh)
        
-        return self.mlp(x)     
+        return self.mlp(x) """    
     
-class simple_disc(nn.Module):
-    def __init__(self, act,m_dim,vertexes,b_dim):
-        super().__init__()
-        act = "tanh"
-        if act == "relu":
-            act = nn.ReLU()
-        elif act == "leaky":
-            act = nn.LeakyReLU()
-        elif act == "sigmoid":
-            act = nn.Sigmoid()
-        elif act == "tanh":
-            act = nn.Tanh()  
-        features = vertexes * m_dim + vertexes * vertexes * b_dim 
-        
-        self.predictor = nn.Sequential(nn.Linear(features,256), act, nn.Linear(256,128), act, nn.Linear(128,64), act,
-                                       nn.Linear(64,32), act, nn.Linear(32,16), act,
-                                       nn.Linear(16,1))
-    
-    def forward(self, x):
-        
-        prediction = self.predictor(x)
-        
-        #prediction = F.softmax(prediction,dim=-1)
-        
-        return prediction

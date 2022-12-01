@@ -15,7 +15,7 @@ class MLP(nn.Module):
         if not out_feat:
             out_feat = in_feat
         self.fc1 = nn.Linear(in_feat, hid_feat)
-        self.act = act
+        self.act = torch.nn.ReLU()
         self.fc2 = nn.Linear(hid_feat,out_feat)
         self.droprateout = nn.Dropout(dropout)
 
@@ -31,60 +31,59 @@ class Attention_new(nn.Module):
         assert dim % heads == 0
         self.heads = heads
         self.scale = 1./dim**0.5
-        #self.scale = torch.div(1, torch.pow(dim, 0.5)) #1./torch.pow(dim, 0.5) #dim**0.5 torch.div(x, 0.5)
 
-        self.q = nn.Sequential(nn.Linear(dim, dim), act)
-        self.k = nn.Sequential(nn.Linear(dim, dim), act)
-        self.v = nn.Sequential(nn.Linear(dim, dim), act)
-        
+
+        self.q = nn.Linear(dim, dim)
+        self.k = nn.Linear(dim, dim)
+        self.v = nn.Linear(dim, dim)
+        self.e = nn.Linear(dim, dim)
         self.attention_dropout = nn.Dropout(attention_dropout)
 
-        #self.noise_strength_1 = torch.nn.Parameter(torch.zeros([]))
-        self.d_k = dim // heads  # We assume d_v always equals d_k
+
+        self.d_k = dim // heads  
         self.heads = heads
 
 
-        #self.out_e = nn.Sequential(nn.Linear(dim, dim), nn.LeakyReLU())
-        self.out_n = nn.Sequential(nn.Linear(dim, dim), act)
-        
-    def forward(self, node):
+       
+        self.out_n = nn.Linear(dim, dim)
+        self.out_e = nn.Linear(dim,dim)
+    def forward(self, node, edge):
         b, n, c = node.shape
         
         
-        q_embed = self.q(node).view(-1, self.heads, n, c//self.heads)
-        k_embed = self.k(node).view(-1, self.heads, n, c//self.heads)
-        v_embed = self.v(node).view(-1, self.heads, n, c//self.heads)
-        #x = x + torch.randn([x.size(0), x.size(1), 1], device=x.device) * self.noise_strength_1
+        q_embed = self.q(node).view(-1, n, self.heads, c//self.heads)
+        k_embed = self.k(node).view(-1, n, self.heads, c//self.heads)
+        v_embed = self.v(node).view(-1, n, self.heads, c//self.heads)
+   
+        e_embed = self.e(edge).view(-1, n, n, self.heads, c//self.heads)
+        
+        q_embed = q_embed.unsqueeze(2)
+        k_embed = k_embed.unsqueeze(1)
+        
+        attn = q_embed * k_embed
+        
+        attn = attn/ math.sqrt(self.d_k)
+        
+     
+        attn = attn * (e_embed + 1) * e_embed      
+
+        e_embed = attn.flatten(3)
+        
+        edges = self.out_e(e_embed)
+        
+        attn = F.softmax(attn, dim=2)
+        
+        v_embed = v_embed.unsqueeze(1)
+        
+        v_embed = attn * v_embed
+        
+        v_embed = v_embed.sum(dim=2).flatten(2)
+        
+        nodes  = self.out_n(v_embed)
         
 
-
-        out_scores = torch.einsum('bhmd,bhnd->bhmn', q_embed, k_embed) / math.sqrt(self.scale)
-        #in_scores = torch.einsum('bhmd,bhmnd->bhnm', q_embed, k_embed) / math.sqrt(self.scale)
-
-        out_attn = F.softmax(out_scores, dim=-1)
-        #in_attn = F.softmax(in_scores, dim=-1)
-        #diag_attn = torch.diag_embed(torch.diagonal(out_attn, dim1=-2, dim2=-1), dim1=-2, dim2=-1)
-
-        message = out_attn #+ in_attn - diag_attn
         
-        # add the diffusion caused by distance
-    
-        #message = message * adj_matrix.unsqueeze(1)
-
-        #if dropout is not None:
-        message = self.attention_dropout(message)
-
-        # message.shape = (batch, h, max_length, max_length), value.shape = (batch, h, max_length, d_k)
-        node_hidden = torch.einsum('bhmn,bhnd->bhmd', message, v_embed)
-        #edge_hidden = torch.einsum('bhmn,bhand->bhamd', message, k_embed)
-    
- 
-        #edge_hidden = message.unsqueeze(-1) * k_embed
-        
-        node_hidden = self.out_n(node_hidden.view(b, n, c))
-        #edge_hidden = self.out_e(edge_hidden.reshape(b1, n1, n2, c1))
-        
-        return node_hidden, message
+        return nodes, edges
 
 class Encoder_Block(nn.Module):
     def __init__(self, dim, heads,act, mlp_ratio=4, drop_rate=0., ):
@@ -99,9 +98,9 @@ class Encoder_Block(nn.Module):
         self.ln5 = nn.LayerNorm(dim)
       
 
-    def forward(self, x):
+    def forward(self, x,y):
         x1 = self.ln1(x)
-        x2,attn = self.attn(x1)
+        x2,attn = self.attn(x1,y)
         x2 = x1 + x2
         x2 = self.ln3(x2)     
         x = self.ln5(x2 + self.mlp(x2))
@@ -116,20 +115,20 @@ class TransformerEncoder(nn.Module):
             Encoder_Block(dim, heads, act, mlp_ratio, drop_rate)
             for i in range(depth)])
 
-    def forward(self, x):
+    def forward(self, x,y):
         
         for Encoder_Block in self.Encoder_Blocks:
-            x,  attn = Encoder_Block(x)
+            x,  attn = Encoder_Block(x,y)
             
         return x, attn
 
 class enc_dec_attention(nn.Module):
-    def __init__(self, dim, heads=4, attention_dropout=0., proj_dropout=0.):
+    def __init__(self, dim, heads, attention_dropout=0., proj_dropout=0.):
         super().__init__()
-
+        self.dim = dim
         self.heads = heads
         self.scale = 1./dim**0.5
-        #self.scale = torch.div(1, torch.pow(dim, 0.5)) #1./torch.pow(dim, 0.5) #dim**0.5 torch.div(x, 0.5)
+ 
         
         "query is molecules"
         "key is protein"
@@ -152,72 +151,48 @@ class enc_dec_attention(nn.Module):
             nn.Linear(dim, dim),
             nn.Dropout(proj_dropout)
         )        
-        #self.noise_strength_1 = torch.nn.Parameter(torch.zeros([]))
+    
         self.dropout_dec = nn.Dropout(proj_dropout)
-
-    def forward(self, mol_annot, prot_annot, mol_adj, prot_adj):
-        # query_mol_annot.shape = (batch, h, max_length, d_e) 16,4,25,128
-        # key_prot_annot.shape = (batch, h, max_length, d_e)  16,4,500,128
-        # value_mol_annot.shape = (batch, h, max_length, d_e) 16,4,25,128
+        self.out_nd = nn.Linear(dim, dim)
+        self.out_ed = nn.Linear(dim,dim)
         
-        # query_mol_adj.shape = (batch, h, max_length, max_length, d_e) 16,4,25,25,128
-        # key_prot_adj.shape = (batch, h, max_length, max_length, d_e)  16,4,500,500,128
-        # value_mol_adj.shape = (batch, h, max_length, max_length, d_e) 16,4,25,25,128
-        
-        # out_scores.shape = (batch, h, max_length, max_length) 16,4,25,25
-        # in_scores.shape = (batch, h, max_length, max_length) 
+    def forward(self, mol_annot, drug_annot, mol_adj, drug_adj):
         
         b, n, c = mol_annot.shape
-        bp, np, cp = prot_annot.shape
+        _, m, _ = drug_annot.shape
+     
         
-        b1, n1, n2, c1 = mol_adj.shape
-        bpa, npa, npa2, cpa = prot_adj.shape
+        query_mol_annot = self.q_mx(drug_annot).view(-1,m, self.heads, c//self.heads)
+        key_prot_annot = self.k_px(mol_annot).view(-1,n, self.heads, c//self.heads)
+        value_mol_annot = self.v_mx(drug_annot).view(-1,m, self.heads, c//self.heads)
         
-        query_mol_annot = self.q_mx(mol_annot).view(-1,self.heads, n, c//self.heads)
-        key_prot_annot = self.k_px(prot_annot).view(-1,self.heads, np, cp//self.heads)
-        value_mol_annot = self.v_mx(mol_annot).view(-1,self.heads, n, c//self.heads)
+        drug_e = self.k_pa(drug_adj).view(-1,m,m, self.heads, c//self.heads)
         
-        query_mol_adj = self.q_ma(mol_adj).view(-1, self.heads, n1, n2, c1//self.heads)
-        key_prot_adj = self.k_pa(prot_adj).view(-1, self.heads, npa, npa2, cpa//self.heads)
-        value_mol_adj = self.v_ma(mol_adj).view(-1, self.heads, n1, n2, c1//self.heads)
+        query_mol_annot = query_mol_annot.unsqueeze(2)
+        key_prot_annot = key_prot_annot.unsqueeze(1)
         
+        attn = query_mol_annot * key_prot_annot
         
-        out_scores = torch.einsum('bhmd,bhnd->bhmn', query_mol_annot, key_prot_annot) / math.sqrt(self.scale) # 16, 4, 25, 128 ------ 16, 4, 500, 128
-        in_scores = torch.einsum('bhmd,bhnd->bhnm', query_mol_annot, key_prot_annot) / math.sqrt(self.scale)
-        #out_scores = out_scores * adj_matrix.unsqueeze(1)
+        attn = attn/ math.sqrt(self.dim)
+
         
-        out_attn = F.softmax(out_scores, dim=-1)
-        in_attn = F.softmax(in_scores, dim=-1)
-        #diag_attn = torch.diag_embed(torch.diagonal(out_attn, dim1=-2, dim2=-1), dim1=-2, dim2=-1)
+        attn = attn * (drug_e + 1) * drug_e      
 
-        message = out_attn + in_attn.permute(0,1,3,2) #- diag_attn
-
-        # add the diffusion caused by distance
-        #message = message * adj_matrix.unsqueeze(1)
-
-        message = self.dropout_dec(message)
-
-        node_hidden = torch.einsum('bhmn,bhmd->bhmd', message, value_mol_annot)
-
-
-        out_scores_e = torch.einsum('bhmnd,bhkjd->bhmn', query_mol_adj, key_prot_adj) / math.sqrt(self.scale)
-        in_scores_e = torch.einsum('bhmnd,bhkjd->bhnm', query_mol_adj, key_prot_adj) / math.sqrt(self.scale)
+        drug_e = attn.flatten(3)
         
-        out_attn_e = F.softmax(out_scores_e, dim=-1)
-        in_attn_e = F.softmax(in_scores_e, dim=-1)
-        #diag_attn_e = torch.diag_embed(torch.diagonal(out_attn_e, dim1=-2, dim2=-1), dim1=-2, dim2=-1)    
-        #out_scores_e = out_scores_e * adj_matrix.unsqueeze(1)
+        edges = self.out_ed(drug_e)
         
-        message_e = out_attn_e + in_attn_e.permute(0,1,3,2) #- diag_attn_e
+        attn = F.softmax(attn, dim=2)
+        
+        value_mol_annot = value_mol_annot.unsqueeze(1)
+        
+        value_mol_annot = attn * value_mol_annot
+        
+        value_mol_annot = value_mol_annot.sum(dim=2).flatten(2)
+        
+        nodes  = self.out_nd(value_mol_annot)          
 
-        edge_hidden = torch.einsum('bhmn,bhmkd->bhmnd', message_e, value_mol_adj)
-
-        message_e = self.dropout_dec(message_e)
-
-        node_hidden = self.out_mx(node_hidden.view(b, n, c))
-        edge_hidden = self.out_ma(edge_hidden.reshape(b1, n1, n2, c1))        
-
-        return edge_hidden, node_hidden, message
+        return nodes, edges
 
 class Decoder_Block(nn.Module):
     def __init__(self, dim, heads, mlp_ratio=4, drop_rate=0.):
@@ -239,8 +214,8 @@ class Decoder_Block(nn.Module):
         self.ln3_ma = nn.LayerNorm(dim)
         self.ln3_mx = nn.LayerNorm(dim)
 
-        self.mlp_ma = MLP(1,dim, dim*mlp_ratio, dropout=drop_rate)
-        self.mlp_mx = MLP(1,dim, dim*mlp_ratio, dropout=drop_rate)
+        self.mlp_ma = MLP(dim, dim, dropout=drop_rate)
+        self.mlp_mx = MLP(dim, dim, dropout=drop_rate)
        
         self.ln4_ma = nn.LayerNorm(dim)
         self.ln4_mx = nn.LayerNorm(dim)
@@ -254,7 +229,7 @@ class Decoder_Block(nn.Module):
         ma = self.ln1_ma(mol_adj)
         pa = self.ln1_pa(prot_adj)
         
-        px1, pa1, prot_attn = self.attn2(px, pa)
+        px1, pa1= self.attn2(px, pa)
         
         px1 = px + px1
         pa1 = pa + pa1
@@ -262,7 +237,7 @@ class Decoder_Block(nn.Module):
         px1 = self.ln2_px(px1)
         pa1 = self.ln2_pa(pa1)
         
-        ma1, mx1, attn_dec = self.dec_attn(mx,px1,ma,pa1)
+        mx1, ma1 = self.dec_attn(mx,px1,ma,pa1)
         
         ma1 = ma + ma1
         mx1 = mx + mx1
@@ -279,7 +254,7 @@ class Decoder_Block(nn.Module):
         edge_hidden = self.ln4_ma(ma2)
         node_hidden = self.ln4_mx(mx2)        
     
-        return edge_hidden, node_hidden, attn_dec
+        return edge_hidden, node_hidden
     
 class TransformerDecoder(nn.Module):
     def __init__(self, dim,  depth, heads, mlp_ratio=4, drop_rate=0.):
@@ -292,13 +267,13 @@ class TransformerDecoder(nn.Module):
     def forward(self, mol_annot, prot_annot, mol_adj, prot_adj):
         
         for Decoder_Block in self.Decoder_Blocks:
-            edge_hidden, node_hidden, message = Decoder_Block(mol_annot, prot_annot, mol_adj, prot_adj)
+            edge_hidden, node_hidden = Decoder_Block(mol_annot, prot_annot, mol_adj, prot_adj)
             
-        return edge_hidden, node_hidden, message
+        return edge_hidden, node_hidden
 
 
 
-class PNA(torch.nn.Module):
+"""class PNA(torch.nn.Module):
     def __init__(self,deg,agg,sca,pna_in_ch,pna_out_ch,edge_dim,towers,pre_lay,post_lay,pna_layer_num, graph_add):
         super(PNA,self).__init__()
                                                                  
@@ -347,12 +322,12 @@ class PNA(torch.nn.Module):
             #x = self.graph_multitrans(x,batch.squeeze(),edge_index)
         x = self.mlp(x)
 
-        return  x
+        return  x"""
 
 
 
 
-class GraphConvolution(nn.Module):
+"""class GraphConvolution(nn.Module):
 
     def __init__(self, in_features, out_feature_list, b_dim, dropout,gcn_depth):
         super(GraphConvolution, self).__init__()
@@ -422,9 +397,9 @@ class GraphAggregation(Module):
                  else output
         output = self.dropout(output)
 
-        return output
+        return output"""
 
-class Attention(nn.Module):
+"""class Attention(nn.Module):
     def __init__(self, dim, heads=4, attention_dropout=0., proj_dropout=0.):
         super().__init__()
         self.heads = heads
@@ -459,7 +434,7 @@ class Attention(nn.Module):
 
         x = self.out(x)
      
-        return x, attn
+        return x, attn"""
     
     
     

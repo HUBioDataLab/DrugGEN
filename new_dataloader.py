@@ -8,7 +8,8 @@ import pickle
 import torch
 from tqdm import tqdm
 import re 
-
+from rdkit import RDLogger  
+RDLogger.DisableLog('rdApp.*') 
 class DruggenDataset(InMemoryDataset):
     
     def __init__(self, root, dataset_file, raw_files, max_atom, features, transform=None, pre_transform=None, pre_filter=None):
@@ -119,11 +120,14 @@ class DruggenDataset(InMemoryDataset):
     def decoder_load(self, dictionary_name):
         with open("DrugGEN/data/decoders/" + dictionary_name + "_" + self.dataset_name + '.pkl', 'rb') as f:
             return pickle.load(f)    
+        
     def drugs_decoder_load(self, dictionary_name):
         with open("DrugGEN/data/decoders/" + dictionary_name +'.pkl', 'rb') as f:
             return pickle.load(f)      
+        
     def matrices2mol(self, node_labels, edge_labels, strict=False):
         mol = Chem.RWMol()
+        RDLogger.DisableLog('rdApp.*') 
         atom_decoders = self.decoder_load("atom")
         bond_decoders = self.decoder_load("bond")
         
@@ -142,10 +146,19 @@ class DruggenDataset(InMemoryDataset):
                 mol = None
 
         return mol
+    
+    def drug_decoder_load(self, dictionary_name):
+        
+        ''' Loading the atom and bond decoders '''
+        
+        with open("DrugGEN/data/decoders/" + dictionary_name +"_" + "drugs" +'.pkl', 'rb') as f:
+            
+            return pickle.load(f) 
     def matrices2mol_drugs(self, node_labels, edge_labels, strict=False):
         mol = Chem.RWMol()
-        atom_decoders = self.drugs_decoder_load("atom_drugs_feat")
-        bond_decoders = self.drugs_decoder_load("bond_drugs_feat")
+        RDLogger.DisableLog('rdApp.*') 
+        atom_decoders = self.drug_decoder_load("atom")
+        bond_decoders = self.drug_decoder_load("bond")
         
         for node_label in node_labels:
             mol.AddAtom(Chem.Atom(atom_decoders[node_label]))
@@ -205,6 +218,7 @@ class DruggenDataset(InMemoryDataset):
                         
                         #mol.AddBond(start, end, self.decoder_load('bond_decoders')[t])
                     # if '.' in Chem.MolToSmiles(mol, isomericSmiles=True):
+                    #     mol.AddBond(start, end, self.decoder_load('bond_decoders')[t])
                     #     print(tt)
                     #     print(Chem.MolToSmiles(mol, isomericSmiles=True))
 
@@ -222,6 +236,7 @@ class DruggenDataset(InMemoryDataset):
     def process(self, size= None):
         
         mols = [Chem.MolFromSmiles(line) for line in open(self.raw_files, 'r').readlines()]
+     
         mols = list(filter(lambda x: x.GetNumAtoms() <= self.max_atom, mols))
         mols = mols[:size]
         indices = range(len(mols))
