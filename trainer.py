@@ -1,10 +1,8 @@
-import numpy as np
 import os
 import time
-import datetime
 import torch.nn
 import torch
-import torch.nn.functional as F
+
 from utils import *
 from models import Generator, Generator2, simple_disc
 import torch_geometric.utils as geoutils
@@ -15,12 +13,16 @@ from new_dataloader import DruggenDataset
 import torch.utils.data
 from moses.metrics.metrics import get_all_metrics
 from rdkit import RDLogger  
+import pickle
+from rdkit.Chem.Scaffolds import MurckoScaffold
 torch.set_num_threads(3)
 RDLogger.DisableLog('rdApp.*') 
- 
-class Solver(object):
+from loss import discriminator_loss, generator_loss, discriminator2_loss, generator2_loss
+from training_data import load_data
+
+class Trainer(object):
     
-    """Solver for training and testing DrugGEN."""
+    """Trainer for training and testing DrugGEN."""
 
     def __init__(self, config):
         
@@ -40,7 +42,11 @@ class Solver(object):
         
         self.drugs_dataset_file = config.drug_dataset_file  # Drug dataset file name for the second GAN. 
                                                             # Contains drug molecules only. (In this case AKT1 inhibitors.)
-                                                            
+        
+        self.mol_data_dir = config.mol_data_dir  # Directory where the dataset files are stored.
+        
+        self.drug_data_dir = config.drug_data_dir  # Directory where the drug dataset files are stored.
+                                                         
         self.dataset_name = self.dataset_file.split(".")[0]
         self.drugs_name = self.drugs_dataset_file.split(".")[0]
         
@@ -53,7 +59,7 @@ class Solver(object):
         
         self.batch_size = config.batch_size  # Batch size for training.
         
-        self.dataset = DruggenDataset(config.mol_data_dir,
+        self.dataset = DruggenDataset(self.mol_data_dir,
                                       self.dataset_file, 
                                       self.raw_file, 
                                       self.max_atom, 
@@ -68,7 +74,7 @@ class Solver(object):
                                  batch_size=self.batch_size, 
                                  drop_last=True)  # PyG dataloader for the first GAN.
 
-        self.drugs = DruggenDataset(config.drug_data_dir, 
+        self.drugs = DruggenDataset(self.drug_data_dir, 
                                     self.drugs_dataset_file, 
                                     self.drug_raw_file, 
                                     self.max_atom, 
@@ -129,6 +135,8 @@ class Solver(object):
         
         self.dec_heads = config.dec_heads 
         
+        self.dec_dim = config.dec_dim
+        
         self.dis_select = config.dis_select 
         
         """self.la = config.la
@@ -162,6 +170,8 @@ class Solver(object):
         self.d2_lr = config.d2_lr
               
         self.dropout = config.dropout
+        
+        self.dec_dropout = config.dec_dropout
         
         self.n_critic = config.n_critic 
         
@@ -207,9 +217,6 @@ class Solver(object):
 
              
     def build_model(self):
-        self.tra_conv = False    
-        if self.dis_select == "TraConv":
-            self.tra_conv = True
         """Create generators and discriminators."""
         
         ''' Generator is based on Transformer Encoder: 
@@ -239,16 +246,17 @@ class Solver(object):
                            mlp_ratio=self.mlp_ratio)
          
         self.G2 = Generator2(self.dim,
+                           self.dec_dim,
                            self.depth,
                            self.heads,
                            self.mlp_ratio,
-                           self.dropout,
+                           self.dec_dropout,
                            self.drugs_m_dim,
                            self.drugs_b_dim,
                            self.b_dim, 
                            self.m_dim)
         
-        self.softmax = torch.nn.Softmax(dim = -1) 
+        
         
         ''' Discriminator implementation with PNA:
         
@@ -284,28 +292,26 @@ class Solver(object):
             '''        
         
         #self.D = Discriminator_old(self.d_conv_dim, self.m_dim , self.b_dim, self.dropout, self.gcn_depth) 
-        self.D2 = simple_disc(self.act, self.drugs_m_dim, self.drug_vertexes, self.drugs_b_dim)
-        self.D = simple_disc(self.act, self.m_dim, self.vertexes, self.b_dim)
-        #self.V = Discriminator_old(self.d_conv_dim, self.m_dim , self.b_dim, self.dropout, self.gcn_depth)
-        #self.V2 = Discriminator_old2(self.d_conv_dim, self.drugs_m_dim , self.drugs_b_dim, self.dropout, self.gcn_depth)
+        self.D2 = simple_disc("tanh", self.drugs_m_dim, self.drug_vertexes, self.drugs_b_dim)
+        self.D = simple_disc("tanh", self.m_dim, self.vertexes, self.b_dim)
+        self.V = simple_disc("tanh", self.m_dim, self.vertexes, self.b_dim)
+        self.V2 = simple_disc("tanh", self.drugs_m_dim, self.drug_vertexes, self.drugs_b_dim)
         
         ''' Optimizers for G1, G2, D1, and D2:
             
             Adam Optimizer is used and different beta1 and beta2s are used for GAN1 and GAN2
             '''
         
-        self.g_optimizer = torch.optim.AdamW(self.G.parameters(),
-                                            self.g_lr, [self.beta1, self.beta2])
-        self.g2_optimizer = torch.optim.AdamW(self.G2.parameters(),
-                                            self.g2_lr, [self.beta1, self.beta2])
+        self.g_optimizer = torch.optim.AdamW(self.G.parameters(), self.g_lr, [self.beta1, self.beta2])
+        self.g2_optimizer = torch.optim.AdamW(self.G2.parameters(), self.g2_lr, [self.beta1, self.beta2])
         
         self.d_optimizer = torch.optim.AdamW(self.D.parameters(), self.d_lr, [self.beta1, self.beta2])
         self.d2_optimizer = torch.optim.AdamW(self.D2.parameters(), self.d2_lr, [self.beta1, self.beta2])
         
         
         
-        #self.v_optimizer = torch.optim.AdamW(self.V.parameters(), self.d_lr, [self.beta1, self.beta2])       
-        #self.v2_optimizer = torch.optim.AdamW(self.V2.parameters(), self.d2_lr, [self.beta1, self.beta2]) 
+        self.v_optimizer = torch.optim.AdamW(self.V.parameters(), self.d_lr, [self.beta1, self.beta2])       
+        self.v2_optimizer = torch.optim.AdamW(self.V2.parameters(), self.d2_lr, [self.beta1, self.beta2]) 
         ''' Learning rate scheduler:
             
             Changes learning rate based on loss.
@@ -329,14 +335,14 @@ class Solver(object):
         self.G.to(self.device)
         self.D.to(self.device)
 
-        #self.V.to(self.device)
-        
+        self.V.to(self.device)
+        self.V2.to(self.device)
         self.G2.to(self.device)
         self.D2.to(self.device)
   
         #self.V2.to(self.device)      
         #self.modules_of_the_model = (self.G, self.D, self.G2, self.D2)
-        for p in self.G.parameters():
+        """for p in self.G.parameters():
             if p.dim() > 1:
                 if self.init_type == 'uniform':
                     torch.nn.init.xavier_uniform_(p)
@@ -370,7 +376,7 @@ class Solver(object):
                     elif self.init_type == 'normal':
                         torch.nn.init.xavier_normal_(p)  
                     elif self.init_type == 'random_normal':
-                        torch.nn.init.normal_(p, 0.0, 0.02)     
+                        torch.nn.init.normal_(p, 0.0, 0.02)"""     
 
         
     def decoder_load(self, dictionary_name):
@@ -401,40 +407,47 @@ class Solver(object):
         print("The number of parameters: {}".format(num_params))
 
 
-    def restore_model(self, resume_iters):
+    def restore_model(self, resume_iters, model_directory):
         
         """Restore the trained generator and discriminator."""
         
         print('Loading the trained models from step {}...'.format(resume_iters))
         
-        G_path = os.path.join(self.model_directory, '{}-G.ckpt'.format(resume_iters))
-        D_path = os.path.join(self.model_directory, '{}-D.ckpt'.format(resume_iters))
-        V_path = os.path.join(self.model_directory, '{}-V.ckpt'.format(resume_iters))
+        G_path = os.path.join(model_directory, '{}-G.ckpt'.format(resume_iters))
+        D_path = os.path.join(model_directory, '{}-D.ckpt'.format(resume_iters))
         
         self.G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
         self.D.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
-        self.V.load_state_dict(torch.load(V_path, map_location=lambda storage, loc: storage))
+      
         
-        G2_path = os.path.join(self.model_directory, '{}-G2.ckpt'.format(resume_iters))
-        D2_path = os.path.join(self.model_directory, '{}-D2.ckpt'.format(resume_iters))
-        V2_path = os.path.join(self.model_directory, '{}-V2.ckpt'.format(resume_iters))
+        G2_path = os.path.join(model_directory, '{}-G2.ckpt'.format(resume_iters))
+        D2_path = os.path.join(model_directory, '{}-D2.ckpt'.format(resume_iters))
         
         self.G2.load_state_dict(torch.load(G2_path, map_location=lambda storage, loc: storage))
         self.D2.load_state_dict(torch.load(D2_path, map_location=lambda storage, loc: storage))
-        self.V2.load_state_dict(torch.load(V2_path, map_location=lambda storage, loc: storage))
-   
 
+   
+    def save_model(self, model_directory, idx,i):
+        G_path = os.path.join(model_directory, '{}/{}-G.ckpt'.format(idx+1,i+1))
+        D_path = os.path.join(model_directory, '{}/{}-D.ckpt'.format(idx+1,i+1))
+        G2_path = os.path.join(model_directory, '{}/{}-G2.ckpt'.format(idx+1,i+1))
+        D2_path = os.path.join(model_directory, '{}/{}-D2.ckpt'.format(idx+1,i+1))
+        torch.save(self.G.state_dict(), G_path)     
+        torch.save(self.D.state_dict(), D_path)     
+        torch.save(self.G2.state_dict(), G2_path)         
+        torch.save(self.D2.state_dict(), D2_path)  
+        
     def reset_grad(self):
         
         """Reset the gradient buffers."""
         
         self.g_optimizer.zero_grad()
+        self.v_optimizer.zero_grad()
         self.g2_optimizer.zero_grad()
+        self.v2_optimizer.zero_grad()
             
         self.d_optimizer.zero_grad()
         self.d2_optimizer.zero_grad()
-        
-
 
     def gradient_penalty(self, y, x):
         
@@ -453,86 +466,6 @@ class Solver(object):
         
         return gradient_penalty
 
-
-    def label2onehot(self, labels, dim):
-        
-        """Convert label indices to one-hot vectors."""
-        
-        out = torch.zeros(list(labels.size())+[dim]).to(self.device)
-        out.scatter_(len(out.size())-1,labels.unsqueeze(-1),1.)
-        
-        return out.float()
-
-
-    def sample_z_node(self, batch_size):
-        
-        ''' Random noise for nodes logits. '''
-        
-        return np.random.normal(0,1, size=(batch_size,self.vertexes, self.z_dim))  #  128, 9, 5
-    
-    
-    def sample_z_edge(self, batch_size):
-        
-        ''' Random noise for edges logits. '''
-        
-        return np.random.normal(0,1, size=(batch_size,self.vertexes,self.vertexes,self.z_dim)) # 128, 9, 9, 5
-    
-    def sample_z(self, batch_size):
-        
-        ''' Random noise. '''
-        
-        return np.random.normal(0,1, size=(batch_size,self.z_dim))  #  128, 9, 5       
-  
-
-
-    def model_save(self, model,model_name, idx, i, dire):
-        
-        path = os.path.join(self.model_directory, '{}_{}_{}.ckpt'.format(model_name,idx+1,i+1))
-        torch.save(model.state_dict(), path)
-        print('Saved model checkpoints into {}...'.format(dire))
-
-    def mol_sample(self,model_name, mol, edges, nodes, idx, i):
-        sample_path = os.path.join(self.sample_directory,"{}-{}_{}-epoch_iteration".format(model_name,idx+1, i+1))
-        
-        if not os.path.exists(sample_path):
-            os.makedirs(sample_path)
-            
-        mols2grid_image(mol,sample_path)
-        
-        save_smiles_matrices(mol,edges.detach(), nodes.detach(), sample_path)
-        
-        if len(os.listdir(sample_path)) == 0:
-            os.rmdir(sample_path)
-                                
-        print("Valid molecules are saved.")
-        print("Valid matrices and smiles are saved")
-        
-    def logging(self, mols, gen_smiles, train_smiles, i,idx, loss, batch_size,model_num):
-        
-            
-        et = time.time() - self.start_time
-        et = str(datetime.timedelta(seconds=et))[:-7]
-        log = "Elapsed [{}], Epoch/Iteration [{}/{}] for GAN{}".format(et, idx,  i+1, model_num)
-        
-        # Log update
-        m0 = get_all_metrics(gen = gen_smiles, train = train_smiles, batch_size=batch_size, k = None)
-        #m0= all_scores_val(fake_mol, mols, full_mols, full_smiles, vert, norm=True)     # 'mols' is output of Fake Reward
-        #m1 =all_scores_chem(fake_mol, mols, vert, norm=True)
-        #m0.update(m1)
-        maxlen = MolecularMetrics.max_component(mols, 45)
-        m0 = {k: np.array(v).mean() for k, v in m0.items()}
-        loss.update(m0)
-        loss.update({'maxlen': maxlen})
-        #wandb.log({"maxlen": maxlen})
-  
-        for tag, value in loss.items():
-            
-            log += ", {}: {:.4f}".format(tag, value)
-        with open(self.log_path, "a") as f:
-            f.write(log)                                 
-        print(log) 
-        print("\n")  
-        
     def train(self):
         
         ''' Training Script starts from here'''
@@ -556,12 +489,18 @@ class Solver(object):
 
 
         # protein data
-        full_smiles = [line in line for line in open("DrugGEN/data/chembl_smiles.smi", 'r').readlines()]
-        akt1_human_adj = torch.load("DrugGEN/data/akt/AKT1_human_adj.pt")
-        akt1_human_annot = torch.load("DrugGEN/data/akt/AKT1_human_annot.pt")  
+        full_smiles = [line for line in open("DrugGEN/data/chembl_smiles.smi", 'r').read().splitlines()]
+        drug_smiles = [line for line in open("DrugGEN/data/drugs_smiles.smi", 'r').read().splitlines()]
+        
+        drug_mols = [Chem.MolFromSmiles(smi) for smi in drug_smiles]
+        drug_scaf = [MurckoScaffold.GetScaffoldForMol(x) for x in drug_mols]
+        fps_r = [Chem.RDKFingerprint(x) for x in drug_scaf]
+
+        #akt1_human_adj = torch.load("DrugGEN/data/akt/AKT1_human_adj.pt")
+        #akt1_human_annot = torch.load("DrugGEN/data/akt/AKT1_human_annot.pt")  
       
         # Start training.
-        ##wandb.watch(self.modules_of_the_model, log="all", log_freq=100)
+        
         print('Start training...')
         self.start_time = time.time()
         for idx in range(self.epoch):
@@ -580,284 +519,126 @@ class Solver(object):
                 except StopIteration:
                     dataloader_iterator = iter(self.drugs_loader)
                     drugs = next(dataloader_iterator)
-                
+
                 # Preprocess both dataset 
-                z = self.sample_z(self.batch_size)                                                   # (batch,max_len)          
-            
-                z = torch.from_numpy(z).to(self.device).float().requires_grad_(True)                
-                data = data.to(self.device)
-                drugs = drugs.to(self.device)                                               
-                z_e = self.sample_z_edge(self.batch_size)                                                   # (batch,max_len,max_len)    
-                z_n = self.sample_z_node(self.batch_size)                                                   # (batch,max_len)          
-                z_edge = torch.from_numpy(z_e).to(self.device).float().requires_grad_(True)                                      # Edge noise.(batch,max_len,max_len)
-                z_node = torch.from_numpy(z_n).to(self.device).float().requires_grad_(True)                                      # Node noise.(batch,max_len)       
-                a = geoutils.to_dense_adj(edge_index = data.edge_index,batch=data.batch,edge_attr=data.edge_attr, max_num_nodes=int(data.batch.shape[0]/self.batch_size)) 
-                x = data.x.view(self.batch_size,int(data.batch.shape[0]/self.batch_size),-1)
-
-                a_tensor = self.label2onehot(a, self.b_dim)
-                #x_tensor = self.label2onehot(x, self.m_dim)
-                x_tensor = x
-           
-                #a_tensor = a_tensor + torch.randn([a_tensor.size(0), a_tensor.size(1), a_tensor.size(2),1], device=a_tensor.device) * self.noise_strength_0
-                #x_tensor = x_tensor + torch.randn([x_tensor.size(0), x_tensor.size(1),1], device=x_tensor.device) * self.noise_strength_1
                 
-                drugs_a = geoutils.to_dense_adj(edge_index = drugs.edge_index,batch=drugs.batch,edge_attr=drugs.edge_attr, max_num_nodes=int(drugs.batch.shape[0]/self.batch_size))
-    
-                drugs_x = drugs.x.view(self.batch_size,int(drugs.batch.shape[0]/self.batch_size),-1)
+                bulk_data = load_data(data,
+                                     drugs,
+                                     self.batch_size, 
+                                     self.device,
+                                     self.b_dim,
+                                     self.m_dim,
+                                     self.drugs_b_dim,
+                                     self.drugs_m_dim,
+                                     self.z_dim,
+                                     self.vertexes)   
                 
-                drugs_a = drugs_a.to(self.device).long() 
-                drugs_x = drugs_x.to(self.device).long() 
-                drugs_a_tensor = self.label2onehot(drugs_a, self.drugs_b_dim)
-                drugs_x_tensor = drugs_x
-   
-                drugs_a_tensor = drugs_a_tensor + torch.randn([drugs_a_tensor.size(0), drugs_a_tensor.size(1), drugs_a_tensor.size(2),1], device=drugs_a_tensor.device) * self.noise_strength_2
-                drugs_x_tensor = drugs_x_tensor + torch.randn([drugs_x_tensor.size(0), drugs_x_tensor.size(1),1], device=drugs_x_tensor.device) * self.noise_strength_3
-                prot_n = akt1_human_annot[None,:].to(self.device).float()        
-                prot_e = akt1_human_adj[None,None,:].view(1,546,546,1).to(self.device).float()
-
-                zeros = torch.zeros(self.batch_size,1,requires_grad=True).to(self.device).float()
-                ones = torch.ones(self.batch_size,1,requires_grad=True).to(self.device).float() 
-                       
-                
-                a_tensor_vec = a_tensor.reshape(self.batch_size,-1)
-                x_tensor_vec = x_tensor.reshape(self.batch_size,-1)               
-                real_graphs = torch.concat((x_tensor_vec,a_tensor_vec),dim=-1)                      
-                
-                a_drug_vec = drugs_a_tensor.reshape(self.batch_size,-1)
-                x_drug_vec = drugs_x_tensor.reshape(self.batch_size,-1)               
-                drug_graphs = torch.concat((x_drug_vec,a_drug_vec),dim=-1)                 
+                drug_graphs, real_graphs, a_tensor, x_tensor, drugs_a_tensor, drugs_x_tensor, z, z_edge, z_node = bulk_data         
                 # =================================================================================== #
                 #                             2. Train the discriminator                              #
                 # =================================================================================== #
+                loss = {}
                 self.reset_grad()
-                # Compute loss with real molecules.
                 
+                # Compute discriminator loss.
+                
+                d_loss = discriminator_loss(self.G, 
+                                            self.D, 
+                                            drug_graphs, 
+                                            a_tensor, 
+                                            x_tensor, 
+                                            self.batch_size, 
+                                            self.device, 
+                                            self.gradient_penalty, 
+                                            self.lambda_gp) 
      
-            
-                logits_real = self.D(real_graphs)
-              
-                                  
-                prediction_real =  - torch.mean(logits_real)
-
-                #d_loss_real = bce_loss(torch.sigmoid(logits_real), y_real)
-                
-                
-
-                # Compute loss with fake molecules.
-
-                node, edge= self.G(z_edge, z_node)
-    
-                edges_hat = self.softmax(edge).view(self.batch_size, -1)
-                
-                nodes_hat = self.softmax(node).view(self.batch_size, -1)
-
-                graph = torch.cat((nodes_hat, edges_hat), dim=-1)
-                
-
-     
-                    
-                logits_fake = self.D(graph)
-                    
-                prediction_fake = torch.mean(logits_fake)
-                
-                #d_loss_fake = bce_loss(torch.sigmoid(logits_fake),y_fake)
-                
-                # Compute gradient loss.
-                #print(a_tensor.shape, edges_hat.shape, x_tensor.shape, nodes_hat.shape)
-                eps = torch.rand(graph.size(0),1).to(self.device)
-                x_int0 = (eps * real_graphs + (1. - eps) * graph).requires_grad_(True)
-               
-
-           
-                grad0 = self.D(x_int0)
-                d_loss_gp = self.gradient_penalty(grad0, x_int0) 
-               
-                # Calculate total loss
-               
-                d_loss = prediction_fake + prediction_real +  d_loss_gp * self.lambda_gp
-                
                 # Feed the loss
                 
-                d_loss.backward()
-                if self.dis_select == "conv":
-                    torch.nn.utils.clip_grad_norm_(self.D.parameters(), self.clipping_value) 
+                d_loss.backward(retain_graph = True)
+           
+                #torch.nn.utils.clip_grad_norm_(self.D.parameters(), self.clipping_value) 
                  
-
-                
-
-                    
+                #plot_grad_flow(self.D.named_parameters(), "D", i, idx)
+      
                 self.d_optimizer.step()
               
-                  
                 # Logging.
                 
-                loss = {}
                 #loss['D/d_loss_real'] = prediction_real.item()
                 #loss['D/d_loss_fake'] = prediction_fake.item()
-
                 #loss['D/loss_gp'] = d_loss_gp.item()
-                loss["D/d_loss"] = d_loss.item()
-                #wandb.log({"d_loss": d_loss, "iteration/epoch":[i,idx]})       
+                loss["d_loss"] = d_loss.item()
+                
+                #wandb.log({"d_loss": d_loss, "iteration/epoch":[i,idx]})    
                 # =================================================================================== #
                 #                            3. Train the generator                                   #
                 # =================================================================================== #                
                 if (i+1) % self.n_critic == 0:
+                    
                     self.reset_grad()
-                    # Generate fake molecules.
 
-                    node, edge = self.G(z_edge, z_node)
+                    generator_output = generator_loss(self.G,
+                                                      self.D,
+                                                      self.V,
+                                                      a_tensor,
+                                                      x_tensor,
+                                                      self.batch_size,
+                                                      sim_reward,
+                                                      self.dataset.matrices2mol_drugs,
+                                                      fps_r)
+  
+                    g_loss, fake_mol, g_edges_hat_sample, g_nodes_hat_sample, reward, node, edge = generator_output
                     
-                    edges = self.softmax(edge).view(self.batch_size, -1)
-                    
-                    nodes = self.softmax(node).view(self.batch_size, -1)
-                 
-                    graph = torch.cat((nodes, edges), dim=-1)
-            
-                    edges_hat = self.softmax(edge)
-                    
-                    nodes_hat= self.softmax(node) 
-
-                    g_edges_hat_sample, g_nodes_hat_sample = torch.max(edges_hat, -1)[1], torch.max(nodes_hat, -1)[1]
-                    
-
-
-                        
-                    g_logits_fake = self.D(graph)
+                    g_loss.backward(retain_graph = True)
                 
-                                        
-                    g_prediction_fake = - torch.mean(g_logits_fake) 
-                    #g_loss_fake = bce_loss(torch.sigmoid(g_logits_fake),y_real)
-                    
-              
-                   
-                    # Real Reward
-                    
-                    #rewardR = torch.from_numpy(self.reward(mols)).to(self.device)
-                    
-                    # Fake Reward
-                    
-                    #rewardF = torch.from_numpy(self.reward(fake_mol)).to(self.device)
-                    
-                    
-                
-                    # Reinforcement Loss
-                    
-                    #value_logit_real,_ = self.V(a_tensor, None, x_tensor,torch.sigmoid)
-                    #value_logit_fake,_ = self.V(g_edges_hat, None, g_nodes_hat, torch.sigmoid)
-                    #g_loss_value_pred =  torch.mean((value_logit_real - rewardR) ** 2 + (value_logit_fake - rewardF) ** 2)
-                    #g_loss_value_pred =  (1 - rewardF) ** 2
-                    #g_loss_value = bce_loss(torch.sigmoid(g_loss_value_pred),y_fake_value)
-                 
-
-                    # Clone edge and node logits for GAN2
-                    
-                    
-         
-                    # Backward and optimize. 
-                    
-                    g_loss =   g_prediction_fake # + (1. - self.la) * g_loss_value_pred 
-                    
-                    g_loss.backward()
-                    torch.nn.utils.clip_grad_norm_(self.G.parameters(), self.clipping_value)
+                    #torch.nn.utils.clip_grad_norm_(self.G.parameters(), self.clipping_value)
                     #torch.nn.utils.clip_grad_norm_(self.V.parameters(), self.clipping_value)
-                
+
+                    #plot_grad_flow(self.G.named_parameters(), "G", i, idx)
+                    #plot_grad_flow(self.V.named_parameters(), "V", i, idx)
+
                     self.g_optimizer.step()
-                    #self.v_optimizer.step()
+                    self.v_optimizer.step()
+                    
                     #self.scheduler_g.step(g_loss)
                     #self.scheduler_v.step(g_loss)
-                    
-                    
+
                     # Logging.
                     
                     #loss['G/g_loss_fake'] =  g_prediction_fake.item()
                     #loss['G/g_loss_value'] = g_loss_value_pred.item() 
-                    
-                    loss["G/g_loss"] = g_loss.item() 
+                    loss["g_loss"] = g_loss.item() 
                     #wandb.log({ "g_loss": g_loss, "iteration/epoch":[i,idx]})
-                    #g_edges_logits_forGAN2, g_nodes_logits_forGAN2 =  edges_logits.detach().clone(), nodes_logits.detach().clone()
-                    if (i+1) % 1000 == 0:
-                
-                        fake_mol = [self.dataset.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True) 
-                                    for e_, n_ in zip(g_edges_hat_sample, g_nodes_hat_sample)]    
-                                
-            
-                        gen_smiles =  []    
-                        for line in fake_mol:
-                            if line is not None:
-                                gen_smiles.append(Chem.MolToSmiles(line))
-                            elif line is None:
-                                gen_smiles.append(None)
-                   
-                        #print(gen_smiles) 
-                        et = time.time() - self.start_time
-                        et = str(datetime.timedelta(seconds=et))[:-7]
-                        log = "Elapsed [{}], Epoch/Iteration [{}/{}] for GAN1".format(et, idx,  i+1)
-                        #gen_smiles = [re.sub('\*', '', line)  for line in gen_smiles]
-                        #gen_smiles = [re.sub('\.', '', line)  for line in gen_smiles]  
-                        #print(gen_smiles) 
-                        #if str in gen_smiles:   
-                        if not all(isinstance(x, type(None)) for x in gen_smiles):  
-                      
-      
-                            self.mol_sample("GAN1",fake_mol, g_edges_hat_sample.detach(), g_nodes_hat_sample.detach(), idx, i)
-                            self.logging(fake_mol, gen_smiles, full_smiles,i,idx,loss,self.batch_size,1) 
-                        
-                        else:
-                            for tag, value in loss.items():
-            
-                                log += ", {}: {:.4f}".format(tag, value)
-                            with open(self.log_path, "a") as f:
-                                f.write(log)     
-                            
-                            print(log) 
-                GAN2_edges, GAN2_nodes = edge.detach(), node.detach()              
+                    
+                    if (i+1) % self.log_step == 0:
+                     
+                        logging(self.log_path, self.start_time, fake_mol, full_smiles, i, idx, loss, 1,self.sample_directory) 
+                        mol_sample(self.sample_directory,"GAN1",fake_mol, g_edges_hat_sample.detach(), g_nodes_hat_sample.detach(), idx, i)
+                        print("reward: ", reward)
+             
+                    GAN2_edges, GAN2_nodes = edge.detach(), node.detach()              
                 loss2 = {}
                 
                 if (idx+1 > self.warm_up_steps) & (i+1 > 10):
-                    
+                    self.reset_grad()
                     # =================================================================================== #
                     #                             4. Train the discriminator - 2                          #
                     # =================================================================================== #
-  
-                    dr_edges, dr_nodes = self.G2(GAN2_edges, 
-                                                GAN2_nodes, 
-                                                drugs_x_tensor,
-                                                drugs_a_tensor)
-                    
-     
-                    dr_edges_hat = self.softmax(dr_edges).view(self.batch_size, -1)
-                    
-                    dr_nodes_hat = self.softmax(dr_nodes).view(self.batch_size, -1)
 
-                    graph = torch.cat((dr_nodes_hat, dr_edges_hat), dim=-1)                    
-
-                    
-                    dr_logits_fake = self.D2(graph)
-      
-                    d2_loss_fake = torch.mean(dr_logits_fake)
-                    
-                    
-                    dr_logits_real2 = self.D2(drug_graphs)
-                    
-
-            
-                    d2_loss_real = - torch.mean(dr_logits_real2)
-                    
-                    
-                    
-                    eps = torch.rand(drug_graphs.size(0),1).to(self.device)
-                    x_int0 = (eps * drug_graphs + (1. - eps) * graph).requires_grad_(True)
-                
-             
-                    grad0 = self.D2(x_int0)
-                    d2_loss_gp = self.gradient_penalty(grad0, x_int0) 
-                    d2_loss = d2_loss_fake + d2_loss_real + d2_loss_gp * self.lambda_gp
-         
-
-                
-                    self.reset_grad()
-                    d2_loss.backward(retain_graph=True)
-                    torch.nn.utils.clip_grad_norm_(self.D2.parameters(), self.clipping_value)      
+                    d2_loss = discriminator2_loss(self.G2, 
+                                                  self.D2, 
+                                                  real_graphs,
+                                                  GAN2_edges, 
+                                                  GAN2_nodes, 
+                                                  drugs_a_tensor, 
+                                                  drugs_x_tensor, 
+                                                  self.batch_size, 
+                                                  self.device,
+                                                  self.gradient_penalty, 
+                                                  self.lambda_gp)
+              
+                    d2_loss.backward(retain_graph = True)
+                    #torch.nn.utils.clip_grad_norm_(self.D2.parameters(), self.clipping_value)      
            
                     self.d2_optimizer.step()
                                          
@@ -866,247 +647,240 @@ class Solver(object):
                     #loss2['D2/d2_loss_real'] = d2_loss_real.item()
                     #loss2['D2/d2_loss_fake'] = d2_loss_fake.item()
                     #loss['D2/loss_gp'] = d2_loss_gp_tra.item()           
-                    loss2["D2/d2_loss"] = d2_loss.item()     
+                    loss2["d2_loss"] = d2_loss.item()     
                     ##wandb.log({"d2_loss_fake": d2_loss_fake, "d2_loss_real": d2_loss_real, "d2_loss": d2_loss, "iteration/epoch":[i,idx]})       
                     # =================================================================================== #
                     #                             5. Train the generator - 2                              #
                     # =================================================================================== #
                                    
-                if ((idx+1 > self.warm_up_steps) & ((i+1) % self.n_critic == 0)):
-                
+                    if (i+1) % self.n_critic == 0:
+                        self.reset_grad()
+ 
+                        output = generator2_loss(self.G2,
+                                                 self.D2,
+                                                 self.V2,
+                                                 GAN2_edges,
+                                                 GAN2_nodes,
+                                                 drugs_a_tensor,
+                                                 drugs_x_tensor,
+                                                 self.batch_size,
+                                                 sim_reward,
+                                                 self.dataset.matrices2mol_drugs,
+                                                 fps_r)
+                     
+                        g2_loss, fake_mol_g, dr_g_edges_hat_sample, dr_g_nodes_hat_sample, reward2 = output
                     
-                    dr_edges, dr_nodes = self.G2(GAN2_edges, 
-                                                GAN2_nodes, 
-                                                drugs_x_tensor,
-                                                drugs_a_tensor)
-
-                    
-                    
-                    dr_edges_hat = self.softmax(dr_edges).view(self.batch_size, -1)
-                    
-                    dr_nodes_hat = self.softmax(dr_nodes).view(self.batch_size, -1)
-
-                    graph = torch.cat((dr_nodes_hat, dr_edges_hat), dim=-1)      
-                    
-                    edges_hat = self.softmax(dr_edges)
-                    
-                    nodes_hat= self.softmax(dr_nodes) 
-
-                    g_edges_hat_sample, g_nodes_hat_sample = torch.max(edges_hat, -1)[1], torch.max(nodes_hat, -1)[1]
-                    
-                    
-                            
-                    g_tra_logits_fake2 = self.D2(graph)
+                        g2_loss.backward()
                         
+                        #torch.nn.utils.clip_grad_norm_(self.G2.parameters(), self.clipping_value)      
+                        
+                        #plot_grad_flow(self.G2.named_parameters(), "G2", i, idx)
+                        #plot_grad_flow(self.V2.named_parameters(), "V2", i, idx)
+                        #plot_grad_flow(self.D2.named_parameters(), "D2", i, idx)                    
+                        self.g2_optimizer.step()
+                        self.v2_optimizer.step()
 
-                    g2_loss_fake = - torch.mean(g_tra_logits_fake2)                                                  
-                              
-                    #rewardR2 = torch.from_numpy(self.reward(drugs_mol)).to(self.device)
-                    
-                    #rewardF2 = torch.from_numpy(self.reward(fake_mol2)).to(self.device)                
-                
-                    #value_logit_real2,value_f_real2 = self.V2(drugs_a_tensor, None, drugs_x_tensor, torch.sigmoid)
-                
-                    #value_logit_fake2,value_f_fake2 = self.V2(g_tra_edges_hat, None, g_tra_nodes_hat, torch.sigmoid)
-                
-                    #g2_loss_value = torch.mean(torch.abs(value_logit_real2 - rewardR2)) + torch.mean(torch.abs(value_logit_fake2 - rewardF2))
-        
-                    g2_loss =  g2_loss_fake 
-                
-                    self.reset_grad()
-                
-                    g2_loss.backward()
-                    torch.nn.utils.clip_grad_norm_(self.G2.parameters(), self.clipping_value)      
-                    self.g2_optimizer.step()
-                
-                    
-
-                    #loss2["G2/g2_loss_fake"] = g2_loss_fake.item()
-                    loss2["G2/g2_loss"] = g2_loss.item()        
-                    ##wandb.log({ "g2_loss": g2_loss, "iteration/epoch":[i,idx]})
-                    if (i+1) % 1000 == 0:
-                
-                        fake_mol = [self.dataset.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True) 
-                                    for e_, n_ in zip(g_edges_hat_sample, g_nodes_hat_sample)]    
-                                
-            
-                        gen_smiles_dr =  []    
-                        for line in fake_mol:
-                            if line is not None:
-                                gen_smiles_dr.append(Chem.MolToSmiles(line))
-                            elif line is None:
-                                gen_smiles_dr.append(None)
-                   
-                        #print(gen_smiles) 
-                        et = time.time() - self.start_time
-                        et = str(datetime.timedelta(seconds=et))[:-7]
-                        log = "Elapsed [{}], Epoch/Iteration [{}/{}] for GAN2".format(et, idx,  i+1)
-                        #gen_smiles = [re.sub('\*', '', line)  for line in gen_smiles]
-                        #gen_smiles = [re.sub('\.', '', line)  for line in gen_smiles]  
-                        #print(gen_smiles) 
-                        #if str in gen_smiles:   
-                        if not all(isinstance(x, type(None)) for x in gen_smiles_dr):  
+                        #loss2["G2/g2_loss_fake"] = g2_loss_fake.item()
+                        loss2["g2_loss"] = g2_loss.item()        
+                        ##wandb.log({ "g2_loss": g2_loss, "iteration/epoch":[i,idx]})
+                        
+                        if (i+1) % self.log_step == 0:
+                          
+                            mol_sample(self.sample_directory,"GAN2",fake_mol_g, dr_g_edges_hat_sample.detach(), dr_g_nodes_hat_sample.detach(), idx, i)
+                            logging(self.log_path, self.start_time, fake_mol_g, drug_smiles, i, idx, loss, 2,self.sample_directory) 
+                            print("reward2: ",reward2)   
+                 
+            #self.save_model(self.model_directory,idx,i)        
+                            
                       
-      
-                            self.mol_sample("GAN2",fake_mol, g_edges_hat_sample.detach(), g_nodes_hat_sample.detach(), idx, i)
-                            self.logging(fake_mol, gen_smiles, full_smiles,i,idx,loss2,self.batch_size,2) 
-                        
-                        else:
-                            for tag, value in loss2.items():
-            
-                                log += ", {}: {:.4f}".format(tag, value)
-                            with open(self.log_path, "a") as f:
-                                f.write(log)     
-                            
-                            print(log) 
-        G_path = os.path.join(self.model_directory, '{}-G.ckpt'.format(i+1))
-        D_path = os.path.join(self.model_directory, '{}-D.ckpt'.format(i+1))
-        G2_path = os.path.join(self.model_directory, '{}-G2.ckpt'.format(i+1))
-        D2_path = os.path.join(self.model_directory, '{}-D2.ckpt'.format(i+1))
-        torch.save(self.G.state_dict(), G_path)     
-        torch.save(self.D.state_dict(), D_path)     
-        torch.save(self.G2.state_dict(), G2_path)         
-        torch.save(self.D2.state_dict(), D2_path)                        
   
-    def test(self):
+    def inference(self):
         # Load the trained generator.
-        self.restore_model(self.test_iters)
-        akt1_human_adj = torch.load("DrugGEN/data/akt/AKT1_human_adj.pt")
-        akt1_human_annot = torch.load("DrugGEN/data/akt/AKT1_human_annot.pt")  
-        prot_n = akt1_human_annot[None,:].to(self.device)          
-        prot_e = akt1_human_adj[None,None,:].view(1,546,546,1).to(self.device).long()
+        self.G.to(self.device)
+        #self.D.to(self.device)
+        self.G2.to(self.device)
+        #self.D2.to(self.device)        
+        self.restore_model(6195,"DrugGEN/experiments/models/glr1e-05_dlr1e-05_g2lr1e-05_d2lr1e-05_dim128_depth4_heads8_decdepth4_decheads8_ncritic5_batch256_epoch20_warmup0_datasetchembl45_disc-conv_la0.5_dropout0.1")
+        
+
+        self.G.eval()
+        #self.D.eval()
+        self.G2.eval()
+        #self.D2.eval()
+        
+        self.inf_batch_size =256
+        self.inf_dataset = DruggenDataset(self.mol_data_dir,
+                                      self.dataset_file, 
+                                      self.raw_file, 
+                                      self.max_atom, 
+                                      self.features) # Dataset for the first GAN. Custom dataset class from PyG parent class. 
+                                                     # Can create any molecular graph dataset given smiles string. 
+                                                     # Nonisomeric SMILES are suggested but not necessary.
+                                                     # Uses sparse matrix representation for graphs, 
+                                                     # For computational and speed efficiency.
+        
+        self.inf_loader = DataLoader(self.inf_dataset, 
+                                 shuffle=True,
+                                 batch_size=self.inf_batch_size, 
+                                 drop_last=True)  # PyG dataloader for the first GAN.
+
+        self.inf_drugs = DruggenDataset(self.drug_data_dir, 
+                                    self.drugs_dataset_file, 
+                                    self.drug_raw_file, 
+                                    self.max_atom, 
+                                    self.features)   # Dataset for the second GAN. Custom dataset class from PyG parent class. 
+                                                     # Can create any molecular graph dataset given smiles string. 
+                                                     # Nonisomeric SMILES are suggested but not necessary.
+                                                     # Uses sparse matrix representation for graphs, 
+                                                     # For computational and speed efficiency.
+        
+        self.inf_drugs_loader = DataLoader(self.inf_drugs, 
+                                       shuffle=True,
+                                       batch_size=self.inf_batch_size, 
+                                       drop_last=True)  # PyG dataloader for the second GAN.        
+        start_time = time.time()
+        metric_calc_mol = []
+        metric_calc_dr = []
         date = time.time()
-        with torch.no_grad():
-            for idx in range(self.num_test_epoch):
+        drug_x = torch.ones((self.inf_batch_size, self.max_atom,  self.drugs_m_dim)).to(self.device)
+        drug_a = torch.ones((self.inf_batch_size, self.max_atom, self.max_atom, self.drugs_b_dim)).to(self.device)
+        with torch.inference_mode():
 
-            # =================================================================================== #
-            #                             1. Preprocess input data                                #
-            # =================================================================================== #
-          
-            # Load the data 
-            
-                dataloader_iterator = iter(self.drugs_loader)
-            
-                for i, data in enumerate(self.loader):   
-                    try:
-                        drugs = next(dataloader_iterator)
-                    except StopIteration:
-                        dataloader_iterator = iter(self.drugs_loader)
-                        drugs = next(dataloader_iterator)
+
+        # =================================================================================== #
+        #                             1. Preprocess input data                                #
+        # =================================================================================== #
+        
+        # Load the data 
+        
+            dataloader_iterator = iter(self.drugs_loader)
+        
+            for i, data in enumerate(self.loader):   
+                try:
+                    drugs = next(dataloader_iterator)
+                except StopIteration:
+                    dataloader_iterator = iter(self.drugs_loader)
+                    drugs = next(dataloader_iterator)
+                    
+                data = data.to(self.device)
                         
-                    data = data.to(self.device)
+                drugs = drugs.to(self.device)                                               
+                z_e = self.sample_z_edge(self.inf_batch_size)                                                   # (batch,max_len,max_len)    
+                z_n = self.sample_z_node(self.inf_batch_size)                                                   # (batch,max_len)          
+                z_edge = torch.from_numpy(z_e).to(self.device).float()                                      # Edge noise.(batch,max_len,max_len)
+                z_node = torch.from_numpy(z_n).to(self.device).float()                                      # Node noise.(batch,max_len)       
+                a = geoutils.to_dense_adj(edge_index = data.edge_index,batch=data.batch,edge_attr=data.edge_attr, max_num_nodes=int(data.batch.shape[0]/self.inf_batch_size))
+                x = data.x.view(-1,int(data.batch.shape[0]/self.inf_batch_size))
+            
+                a_tensor = self.label2onehot(a, self.b_dim)
+                #x_tensor = self.label2onehot(x, self.m_dim)
+                
+                drugs_a = geoutils.to_dense_adj(edge_index = drugs.edge_index,batch=drugs.batch,edge_attr=drugs.edge_attr, max_num_nodes=int(drugs.batch.shape[0]/self.inf_batch_size))
+                drugs_x = drugs.x.view(self.batch_size,int(drugs.batch.shape[0]/self.batch_size),-1)
+                
+                drugs_a = drugs_a.to(self.device).long()
+                drugs_x = drugs_x.to(self.device).float() 
+                drugs_a_tensor = self.label2onehot(drugs_a, self.drugs_b_dim).float()
+                drugs_x_tensor = drugs_x
                             
-                    drugs = drugs.to(self.device)                                               
-                    z_e = self.sample_z_edge(self.batch_size)                                                   # (batch,max_len,max_len)    
-                    z_n = self.sample_z_node(self.batch_size)                                                   # (batch,max_len)          
-                    z_edge = torch.from_numpy(z_e).to(self.device).float()                                      # Edge noise.(batch,max_len,max_len)
-                    z_node = torch.from_numpy(z_n).to(self.device).float()                                      # Node noise.(batch,max_len)       
-                    a = geoutils.to_dense_adj(edge_index = data.edge_index,batch=data.batch,edge_attr=data.edge_attr, max_num_nodes=int(data.batch.shape[0]/self.batch_size))
-                    x = data.x.view(-1,int(data.batch.shape[0]/self.batch_size))
+        
+                # =================================================================================== #
+                #                             2. GAN1 Inference                                       #
+                # =================================================================================== #            
+                node, edge = self.G(z_edge, z_node)
                 
-                    a_tensor = self.label2onehot(a, self.b_dim)
-                    x_tensor = self.label2onehot(x, self.m_dim)
-                    
-                    drugs_a = geoutils.to_dense_adj(edge_index = drugs.edge_index,batch=drugs.batch,edge_attr=drugs.edge_attr, max_num_nodes=int(drugs.batch.shape[0]/self.batch_size))
-                    drugs_x = drugs.x.view(-1,int(drugs.batch.shape[0]/self.batch_size))
-                    
-                    drugs_a = drugs_a.to(self.device).long() 
-                    drugs_x = drugs_x.to(self.device).long() 
-                    drugs_a_tensor = self.label2onehot(drugs_a, self.drugs_b_dim)
-                    drugs_x_tensor = self.label2onehot(drugs_x, self.drugs_m_dim)
-                    drugs_a_tensor = drugs_a_tensor + torch.randn([drugs_a_tensor.size(0), drugs_a_tensor.size(1), drugs_a_tensor.size(2),1], device=drugs_a_tensor.device) * self.noise_strength_2
-                    drugs_x_tensor = drugs_x_tensor + torch.randn([drugs_x_tensor.size(0), drugs_x_tensor.size(1),1], device=drugs_x_tensor.device) * self.noise_strength_3
-                    real_edge_attr_for_traconv = self.attr_mlp(data.edge_attr.view(-1,1).float())
-                    real_nodes_for_traconv = self.nodes_mlp(data.x.view(-1,1).float())        
-                    mols = [self.dataset.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=False) 
-                                for e_, n_ in zip(a, x)]                     
+        
+                edges_hat = self.softmax(edge)
+                
+                nodes_hat= self.softmax(node)                     
+             
+                g_edges_hard, g_nodes_hard = torch.max(edges_hat, -1)[1], torch.max(nodes_hat, -1)[1] 
+
+        
+                # =================================================================================== #
+                #                             3. GAN2 Inference                                       #
+                # =================================================================================== #           
+                #edges_logits_forGAN2, nodes_logits_forGAN2 = edge.detach().clone(), node.detach().clone()
+             
+                dr_edges, dr_nodes = self.G2(edges_hat, 
+                                            nodes_hat, 
+                                            drug_x,
+                                            drugs_a_tensor)
+
+           
+                
+                #dr_edges_hat = self.softmax(dr_edges).view(self.inf_batch_size, -1)
+                
+                #dr_nodes_hat = self.softmax(dr_nodes).view(self.inf_batch_size, -1)
+
+                #graph = torch.cat((dr_nodes_hat, dr_edges_hat), dim=-1)      
+                
+                dr_edges_hat = self.softmax(dr_edges)
+                
+                dr_nodes_hat= self.softmax(dr_nodes) 
+
+                dr_edges_hat, dr_nodes_hat = torch.max(dr_edges_hat, -1)[1], torch.max(dr_nodes_hat, -1)[1]
             
-                    # =================================================================================== #
-                    #                             2. GAN1 Inference                                       #
-                    # =================================================================================== #            
-                    edges_hat, nodes_hat, edges_logits, nodes_logits, nodes_fake,fake_edge_index,fake_edge_attr, attr_for_traconv, nodes_for_traconv = self.G(z_edge,z_node,a,a_tensor,x_tensor)   
-                    edges_hat = edges_hat.view(-1, self.vertexes,self.vertexes,self.b_dim)
-                    if self.dis_select == "conv":
-                    
-                        logits_real, features_real = self.D(a_tensor, None, x_tensor)
-                        
-                        
 
-                    if self.dis_select == "conv":
-                    
-                        logits_fake, features_fake = self.D(edges_hat, None, nodes_hat)
-                        
-                    g_edges_hard, g_nodes_hard = torch.max(edges_hat, 1)[1], torch.max(nodes_hat, -1)[1] 
-                    fake_mol = [self.dataset.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True) 
-                                for e_, n_ in zip(g_edges_hard, g_nodes_hard)] 
-                                           
-                    d_loss_fake = torch.mean(logits_fake)
-                    g_loss = - torch.mean(logits_fake)
-                    # =================================================================================== #
-                    #                             3. GAN2 Inference                                       #
-                    # =================================================================================== #           
-                    edges_logits_forGAN2, nodes_logits_forGAN2 = edges_logits.detach().clone(), nodes_logits.detach().clone()
-                    tra_edges_hat, tra_nodes_hat, edges_hard, nodes_hard, nodes_fake2, fake_edge_index2, fake_edge_attr2,g2_attr_for_traconv,g2_nodes_for_traconv = self.G2(edges_logits_forGAN2, nodes_logits_forGAN2,prot_n,prot_e)
-   
-                    
-                    if self.dis_select == "conv":
-                        
-                        logits_fake2, features_fake2 = self.D2(tra_edges_hat, None, tra_nodes_hat)
-
-
-                        
-                    d2_loss_fake = torch.mean(logits_fake2)
-                    
-                    if self.dis_select == "conv":
-      
-                        logits_real2, features_real2 = self.D2(drugs_a_tensor, None,drugs_x_tensor)
-                    
-
-                    d2_loss_real = - torch.mean(logits_real2)
-                    d2_loss = d2_loss_fake + d2_loss_real
-                    g2_loss = - torch.mean(logits_fake2)
-                    fake_mol2 = [self.dataset.matrices2mol_drugs(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True) 
-                                        for e_, n_ in zip(edges_hard, nodes_hard)]     
-                    
-                    drugs_mol = [self.dataset.matrices2mol_drugs(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True) 
-                                        for e_, n_ in zip(drugs_a, drugs_x)]        
-                                          
+                                        
                 # Log update
-                m0, m1 = all_scores_val(fake_mol, mols, norm=True)     # 'mols' is output of Fake Reward
-                m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
-                m0.update(m1)
-                m2, m3 = all_scores_chem(fake_mol, mols, norm=True)
-                m2 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m2.items()}
-                m2.update(m3)
+                inferece_mols = [self.dataset.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=False) 
+                        for e_, n_ in zip(g_edges_hard, g_nodes_hard)] 
+                inference_drugs = [self.dataset.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=False) 
+                                for e_, n_ in zip(dr_edges_hat, dr_nodes_hat)]
                 
-                sample_path = os.path.join(self.sample_path,"inference",date)
-                sample_path_GAN2 = os.path.join(self.sample_path_GAN2,"inference",date)
-                if not os.path.exists(sample_path_GAN2):
-                            os.makedirs(sample_path_GAN2)  
-                if not os.path.exists(sample_path):
-                            os.makedirs(sample_path)                          
-                mols2grid_image(fake_mol,self.sample_path)
-                save_smiles_matrices(fake_mol,g_edges_hard.detach(), g_nodes_hard.detach(), sample_path)
-                mols2grid_image(fake_mol2,self.sample_path_GAN2)
-                save_smiles_matrices(fake_mol2,edges_hard.detach(), nodes_hard.detach(), sample_path_GAN2)                           
-                log = "Test started [{}]".format("now")
-                for tag, value in m0.items():
-                    log += ", {}: {:.4f}".format(tag, value)
-                print(log)
-                if ((i * self.batch_size) // self.inference_sample_num) >= 1 :
+                inference_drugs = [Chem.MolToSmiles(line) for line in inference_drugs]   
+                inference_drugs = [re.sub('\*', '', line)  for line in inference_drugs]
+                inference_drugs = [re.sub('\.', '', line)  for line in inference_drugs] 
+                
+                inference_smiles = [Chem.MolToSmiles(line) for line in inferece_mols]   
+                inference_smiles = [re.sub('\*', '', line)  for line in inference_smiles]
+                #inference_smiles = [re.sub('\.', '', line)  for line in inference_smiles] 
+
+                print("molecule batch {} inferred".format(i))  
+                
+                with open("DrugGEN/experiments/inference/inference_drugs.txt", "a") as f:
+                    for idxs in range(g_nodes_hard.shape[0]):
+                        
+                        f.write(inference_drugs[idxs])
+                        f.write("\n")
+                        metric_calc_dr.append(inference_drugs[idxs])
+             
+
+                """with open("DrugGEN/experiments/inference/inference_mols.txt", "a") as f:
+                    for idxs in range(g_nodes_hard.shape[0]):
+                        
+                        f.write(inference_smiles[idxs])
+                        f.write("\n")
+                        metric_calc_mol.append(inference_smiles[idxs])"""
+                 
+                                            
+                if i == 120:
                     break
+        
+        et = time.time() - start_time
+        print("Inference mode is lasted for {:.2f} seconds".format(et))
+        
+        print("Metrics calculation started using MOSES.")
+        #full_smiles = [line for line in open("DrugGEN/data/chembl_nonisomeric.txt", "r").readlines()]               
+        full_drugs = [line for line in open('DrugGEN/data/akt1_nonisomeric.smi', 'r').readlines()] 
+        print(get_all_metrics(metric_calc_dr, test = full_drugs, train = full_drugs))
+        et = time.time() - start_time
+        print("Metrics for generated drugs are calculated and lasted for {:.2f} seconds".format(et))
+        #print(get_all_metrics(metric_calc_mol, test = full_smiles, train = full_smiles))
+        et = time.time() - start_time
+        print("Metrics for generated molecules are calculated and lasted for {:.2f} seconds".format(et))
 
 
-
-  # Compute loss for gradient penalty. 
-            
-            #    eps_node = torch.rand(nodes.size(0)).to(self.device)
-            #    eps_attr = torch.rand(logits_real.size(0),1,1,).to(self.device)
-            #    eps_idx = torch.rand(logits_real.size(0),1,1,).to(self.device)
-            #    x_int0 = (eps * edge_attr + (1. - eps) * fake_edge_attr).requires_grad_(True)
-            #    x_int1 = (eps.squeeze(-1) * nodes + (1. - eps.squeeze(-1)) * nodes_fake).requires_grad_(True)
-            #    x_int2 = ((eps.squeeze(-1) * edge_index + (1. - eps.squeeze(-1)) * fake_edge_index).requires_grad_(True)) 
-            #
-            #    grad0= self.D(x_int1, x_int0, x_int2,node_index)
-            #    d_loss_gp = self.gradient_penalty(grad0, x_int0) + self.gradient_penalty(grad1, x_int1) 
-            
+# Compute loss for gradient penalty. 
+        
+        #    eps_node = torch.rand(nodes.size(0)).to(self.device)
+        #    eps_attr = torch.rand(logits_real.size(0),1,1,).to(self.device)
+        #    eps_idx = torch.rand(logits_real.size(0),1,1,).to(self.device)
+        #    x_int0 = (eps * edge_attr + (1. - eps) * fake_edge_attr).requires_grad_(True)
+        #    x_int1 = (eps.squeeze(-1) * nodes + (1. - eps.squeeze(-1)) * nodes_fake).requires_grad_(True)
+        #    x_int2 = ((eps.squeeze(-1) * edge_index + (1. - eps.squeeze(-1)) * fake_edge_index).requires_grad_(True)) 
+        #
+        #    grad0= self.D(x_int1, x_int0, x_int2,node_index)
+        #    d_loss_gp = self.gradient_penalty(grad0, x_int0) + self.gradient_penalty(grad1, x_int1) 
+        

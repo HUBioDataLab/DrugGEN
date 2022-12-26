@@ -32,21 +32,18 @@ class Attention_new(nn.Module):
         self.heads = heads
         self.scale = 1./dim**0.5
 
-
         self.q = nn.Linear(dim, dim)
         self.k = nn.Linear(dim, dim)
         self.v = nn.Linear(dim, dim)
         self.e = nn.Linear(dim, dim)
-        self.attention_dropout = nn.Dropout(attention_dropout)
-
+        #self.attention_dropout = nn.Dropout(attention_dropout)
 
         self.d_k = dim // heads  
         self.heads = heads
-
-
-       
-        self.out_n = nn.Linear(dim, dim)
         self.out_e = nn.Linear(dim,dim)
+        self.out_n = nn.Linear(dim, dim)
+        
+        
     def forward(self, node, edge):
         b, n, c = node.shape
         
@@ -65,25 +62,21 @@ class Attention_new(nn.Module):
         attn = attn/ math.sqrt(self.d_k)
         
      
-        attn = attn * (e_embed + 1) * e_embed      
+        attn = attn * (e_embed + 1) * e_embed
 
-        e_embed = attn.flatten(3)
-        
-        edges = self.out_e(e_embed)
-        
+        edge = self.out_e(attn.flatten(3))  
+      
         attn = F.softmax(attn, dim=2)
         
         v_embed = v_embed.unsqueeze(1)
-        
+  
         v_embed = attn * v_embed
         
         v_embed = v_embed.sum(dim=2).flatten(2)
         
-        nodes  = self.out_n(v_embed)
-        
-
-        
-        return nodes, edges
+        node  = self.out_n(v_embed)
+           
+        return node, edge
 
 class Encoder_Block(nn.Module):
     def __init__(self, dim, heads,act, mlp_ratio=4, drop_rate=0., ):
@@ -92,19 +85,23 @@ class Encoder_Block(nn.Module):
    
         self.attn = Attention_new(dim, heads, act, drop_rate, drop_rate)
         self.ln3 = nn.LayerNorm(dim)
-
+        self.ln4 = nn.LayerNorm(dim)
         self.mlp = MLP(act,dim,dim*mlp_ratio, dim, dropout=drop_rate)
- 
+        self.mlp2 = MLP(act,dim,dim*mlp_ratio, dim, dropout=drop_rate)
         self.ln5 = nn.LayerNorm(dim)
-      
+        self.ln6 = nn.LayerNorm(dim)
 
     def forward(self, x,y):
         x1 = self.ln1(x)
-        x2,attn = self.attn(x1,y)
+        x2,y1 = self.attn(x1,y)
         x2 = x1 + x2
-        x2 = self.ln3(x2)     
+        y2 = y1 + y
+        x2 = self.ln3(x2)   
+        y2 = self.ln4(y2)   
+        
         x = self.ln5(x2 + self.mlp(x2))
-        return x, attn
+        y = self.ln6(y2 + self.mlp2(y2))
+        return x, y
 
 
 class TransformerEncoder(nn.Module):
@@ -118,9 +115,9 @@ class TransformerEncoder(nn.Module):
     def forward(self, x,y):
         
         for Encoder_Block in self.Encoder_Blocks:
-            x,  attn = Encoder_Block(x,y)
+            x,  y = Encoder_Block(x,y)
             
-        return x, attn
+        return x, y
 
 class enc_dec_attention(nn.Module):
     def __init__(self, dim, heads, attention_dropout=0., proj_dropout=0.):
@@ -131,28 +128,21 @@ class enc_dec_attention(nn.Module):
  
         
         "query is molecules"
-        "key is protein"
+        "key is drug"
         "values is again molecule"
         self.q_mx = nn.Linear(dim,dim)
         self.k_px = nn.Linear(dim,dim)
         self.v_mx = nn.Linear(dim,dim)
         
-        self.q_ma = nn.Linear(dim,dim)
+        
         self.k_pa = nn.Linear(dim,dim)
         self.v_ma = nn.Linear(dim,dim)
         
     
-        self.attention_dropout = nn.Dropout(attention_dropout)
-        self.out_mx = nn.Sequential(
-            nn.Linear(dim, dim),
-            nn.Dropout(proj_dropout)
-        )
-        self.out_ma = nn.Sequential(
-            nn.Linear(dim, dim),
-            nn.Dropout(proj_dropout)
-        )        
+
+ 
     
-        self.dropout_dec = nn.Dropout(proj_dropout)
+        #self.dropout_dec = nn.Dropout(proj_dropout)
         self.out_nd = nn.Linear(dim, dim)
         self.out_ed = nn.Linear(dim,dim)
         
@@ -166,6 +156,7 @@ class enc_dec_attention(nn.Module):
         key_prot_annot = self.k_px(mol_annot).view(-1,n, self.heads, c//self.heads)
         value_mol_annot = self.v_mx(drug_annot).view(-1,m, self.heads, c//self.heads)
         
+        mol_e = self.v_ma(mol_adj).view(-1,m,m, self.heads, c//self.heads)
         drug_e = self.k_pa(drug_adj).view(-1,m,m, self.heads, c//self.heads)
         
         query_mol_annot = query_mol_annot.unsqueeze(2)
@@ -176,7 +167,7 @@ class enc_dec_attention(nn.Module):
         attn = attn/ math.sqrt(self.dim)
 
         
-        attn = attn * (drug_e + 1) * drug_e      
+        attn = attn * (drug_e + 1) * mol_e      
 
         drug_e = attn.flatten(3)
         
@@ -192,7 +183,7 @@ class enc_dec_attention(nn.Module):
         
         nodes  = self.out_nd(value_mol_annot)          
 
-        return nodes, edges
+        return nodes, edges, mol_adj, mol_annot
 
 class Decoder_Block(nn.Module):
     def __init__(self, dim, heads, mlp_ratio=4, drop_rate=0.):
@@ -221,40 +212,40 @@ class Decoder_Block(nn.Module):
         self.ln4_mx = nn.LayerNorm(dim)
     
         
-    def forward(self,mol_annot, prot_annot, mol_adj, prot_adj):
+    def forward(self,mol_annot, drug_annot, mol_adj, drug_adj):
 
-        mx = self.ln1_mx(mol_annot)
-        px = self.ln1_px(prot_annot)
+        mol_annot = self.ln1_mx(mol_annot)
+        mol_adj = self.ln1_ma(mol_adj)
         
-        ma = self.ln1_ma(mol_adj)
-        pa = self.ln1_pa(prot_adj)
+        drug_annot = self.ln1_px(drug_annot)
+        drug_adj = self.ln1_pa(drug_adj)
         
-        px1, pa1= self.attn2(px, pa)
+        px1, pa1= self.attn2(drug_annot, drug_adj)
         
-        px1 = px + px1
-        pa1 = pa + pa1
+        px1 = drug_annot + px1
+        pa1 = drug_adj + pa1
         
         px1 = self.ln2_px(px1)
         pa1 = self.ln2_pa(pa1)
         
-        mx1, ma1 = self.dec_attn(mx,px1,ma,pa1)
+        px1, pa1, mol_adj, mol_annot = self.dec_attn(mol_annot,px1,mol_adj,pa1)
         
-        ma1 = ma + ma1
-        mx1 = mx + mx1
+        pa1 = drug_adj + pa1
+        px1 = drug_annot + px1
         
-        ma1 = self.ln3_ma(ma1)
-        mx1 = self.ln3_mx(mx1)
+        pa1 = self.ln3_ma(pa1)
+        px1 = self.ln3_mx(px1)
         
-        ma2 = self.mlp_ma(ma1)
-        mx2 = self.mlp_mx(mx1)
+        pa2 = self.mlp_ma(pa1)
+        px2 = self.mlp_mx(px1)
         
-        ma2 = ma2 + ma1
-        mx2 = mx2 + mx1
+        pa2 = pa2 + pa1
+        px2 = px2 + px1
         
-        edge_hidden = self.ln4_ma(ma2)
-        node_hidden = self.ln4_mx(mx2)        
+        drug_adj = self.ln4_ma(pa2)
+        drug_annot = self.ln4_mx(px2)        
     
-        return edge_hidden, node_hidden
+        return drug_adj, drug_annot, mol_adj, mol_annot
     
 class TransformerDecoder(nn.Module):
     def __init__(self, dim,  depth, heads, mlp_ratio=4, drop_rate=0.):
@@ -264,12 +255,12 @@ class TransformerDecoder(nn.Module):
             Decoder_Block(dim, heads, mlp_ratio, drop_rate)
             for i in range(depth)])
         
-    def forward(self, mol_annot, prot_annot, mol_adj, prot_adj):
+    def forward(self, mol_annot, drug_annot, mol_adj, drug_adj):
         
         for Decoder_Block in self.Decoder_Blocks:
-            edge_hidden, node_hidden = Decoder_Block(mol_annot, prot_annot, mol_adj, prot_adj)
+            drug_adj, drug_annot, mol_adj, mol_annot = Decoder_Block(mol_annot, drug_annot, mol_adj, drug_adj)
             
-        return edge_hidden, node_hidden
+        return drug_adj, drug_annot, mol_adj, mol_annot
 
 
 

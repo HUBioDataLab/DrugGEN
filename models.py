@@ -35,10 +35,11 @@ class Generator(nn.Module):
             act = nn.Tanh()
         self.features = vertexes * vertexes * edges + vertexes * nodes
         self.transformer_dim = vertexes * vertexes * dim + vertexes * dim
+        self.pos_enc_dim = 5
+        #self.pos_enc = nn.Linear(self.pos_enc_dim, self.dim)
+        self.node_layers = nn.Sequential(nn.Linear(nodes,dim), act, nn.Dropout(self.dropout))
+        self.edge_layers = nn.Sequential(nn.Linear(edges,dim), act, nn.Dropout(self.dropout))
         
-        
-        self.node_layers = nn.Sequential(nn.Linear(z_dim,dim), act, nn.Dropout(self.dropout))
-        self.edge_layers = nn.Sequential(nn.Linear(z_dim,dim), act, nn.Dropout(self.dropout))
         self.TransformerEncoder = TransformerEncoder(dim=self.dim, depth=self.depth, heads=self.heads, act = act,
                                                                     mlp_ratio=self.mlp_ratio, drop_rate=self.dropout)         
      
@@ -47,6 +48,25 @@ class Generator(nn.Module):
         
         self.readout_e = nn.Linear(self.dim, edges)
         self.readout_n = nn.Linear(self.dim, nodes)
+        self.softmax = nn.Softmax(dim = -1) 
+    def _generate_square_subsequent_mask(self, sz):
+        mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
+        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+        return mask
+    
+    def laplacian_positional_enc(self, adj):
+        
+        A = adj
+        D = torch.diag(torch.count_nonzero(A, dim=-1))
+        L = torch.eye(A.shape[0], device=A.device) - D * A * D
+        
+        EigVal, EigVec = torch.linalg.eig(L)
+    
+        idx = torch.argsort(torch.real(EigVal))
+        EigVal, EigVec = EigVal[idx], torch.real(EigVec[:,idx])
+        pos_enc = EigVec[:,1:self.pos_enc_dim + 1]
+        
+        return pos_enc
 
     def forward(self, z_e, z_n):
         
@@ -54,19 +74,26 @@ class Generator(nn.Module):
         
         edge = self.edge_layers(z_e)
         
-    
+        #lap = [self.laplacian_positional_enc(torch.max(x,-1)[1]) for x in edge]
+        
+        #lap = torch.stack(lap).to(node.device)
+        
+        #pos_enc = self.pos_enc(lap)
+        
+        #node = node + pos_enc
+        
         node, edge = self.TransformerEncoder(node,edge)
 
-        node = self.readout_n(node)
+        node_sample = self.softmax(self.readout_n(node))
         
-        edge = self.readout_e(edge)
-
-        return node, edge
+        edge_sample = self.softmax(self.readout_e(edge))
+        
+        return node, edge, node_sample, edge_sample
      
      
      
 class Generator2(nn.Module):
-    def __init__(self, dim, depth, heads, mlp_ratio, drop_rate,drugs_m_dim,drugs_b_dim,b_dim,m_dim):
+    def __init__(self, dim, dec_dim, depth, heads, mlp_ratio, drop_rate,drugs_m_dim,drugs_b_dim,b_dim,m_dim):
         super().__init__()
 
         self.depth = depth
@@ -77,20 +104,35 @@ class Generator2(nn.Module):
         self.drugs_m_dim = drugs_m_dim
         self.drugs_b_dim = drugs_b_dim
 
+        self.pos_enc_dim = 5
+        
+        #self.pos_enc = nn.Linear(self.pos_enc_dim, self.dim)
+  
+        
+        self.mol_nodes = nn.Linear(dim, dec_dim)
+        self.mol_edges = nn.Linear(dim, dec_dim)
+        
+        self.drug_nodes =  nn.Linear(self.drugs_m_dim, dec_dim)
+        self.drug_edges =  nn.Linear(self.drugs_b_dim, dec_dim)
+        
+        self.TransformerDecoder = TransformerDecoder(dec_dim, depth, heads, mlp_ratio=4, drop_rate=0.)
+
+        self.nodes_output_layer = nn.Linear(dec_dim, self.drugs_m_dim)
+        self.edges_output_layer = nn.Linear(dec_dim, self.drugs_b_dim)
+        self.softmax = nn.Softmax(dim = -1) 
+    def laplacian_positional_enc(self, adj):
+        
+        A = adj
+        D = torch.diag(torch.count_nonzero(A, dim=-1))
+        L = torch.eye(A.shape[0], device=A.device) - D * A * D
+        
+        EigVal, EigVec = torch.linalg.eig(L)
     
-        self.dropoout = nn.Dropout(p=drop_rate)
+        idx = torch.argsort(torch.real(EigVal))
+        EigVal, EigVec = EigVal[idx], torch.real(EigVec[:,idx])
+        pos_enc = EigVec[:,1:self.pos_enc_dim + 1]
         
-        self.mol_nodes = nn.Linear(m_dim, dim)
-        self.mol_edges = nn.Linear(b_dim, dim)
-        
-        self.drug_nodes =  nn.Linear(self.drugs_m_dim, dim)
-        self.drug_edges =  nn.Linear(self.drugs_b_dim, dim)
-        
-        self.TransformerDecoder = TransformerDecoder(dim, depth, heads, mlp_ratio=4, drop_rate=0.)
-
-        self.nodes_output_layer = nn.Linear(self.dim, self.drugs_m_dim)
-        self.edges_output_layer = nn.Linear(self.dim, self.drugs_b_dim)
-
+        return pos_enc
 
     def forward(self, edges_logits, nodes_logits, drugs_n, drugs_e):
         
@@ -99,16 +141,24 @@ class Generator2(nn.Module):
    
         drug_n = self.drug_nodes(drugs_n)
         drug_e = self.drug_edges(drugs_e)
+
+        #lap = [self.laplacian_positional_enc(torch.max(x,-1)[1]) for x in drug_e]
         
-        edges_logits, nodes_logits= self.TransformerDecoder(nodes_logits,drug_n,edges_logits,drug_e)
+        #lap = torch.stack(lap).to(drug_e.device)
+
+        #pos_enc = self.pos_enc(lap)
+        
+        #drug_n = drug_n + pos_enc
+                
+        drug_e,drug_n, edges_logits, nodes_logits = self.TransformerDecoder(nodes_logits,drug_n,edges_logits,drug_e)
      
-        edges_logits = self.edges_output_layer(edges_logits)
-        nodes_logits = self.nodes_output_layer(nodes_logits)
+        drug_e = self.edges_output_layer(drug_e)
+        drug_n = self.nodes_output_layer(drug_n)
         
-        edges_logits = self.dropoout(edges_logits)
-        nodes_logits = self.dropoout(nodes_logits)
-        
-        return edges_logits, nodes_logits
+        drug_e = self.softmax(drug_e)
+        drug_n = self.softmax(drug_n)
+          
+        return drug_e, drug_n
 
 
 class simple_disc(nn.Module):

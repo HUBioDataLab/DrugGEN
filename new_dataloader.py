@@ -125,7 +125,7 @@ class DruggenDataset(InMemoryDataset):
         with open("DrugGEN/data/decoders/" + dictionary_name +'.pkl', 'rb') as f:
             return pickle.load(f)      
         
-    def matrices2mol(self, node_labels, edge_labels, strict=False):
+    def matrices2mol(self, node_labels, edge_labels, strict=True):
         mol = Chem.RWMol()
         RDLogger.DisableLog('rdApp.*') 
         atom_decoders = self.decoder_load("atom")
@@ -154,13 +154,14 @@ class DruggenDataset(InMemoryDataset):
         with open("DrugGEN/data/decoders/" + dictionary_name +"_" + "drugs" +'.pkl', 'rb') as f:
             
             return pickle.load(f) 
-    def matrices2mol_drugs(self, node_labels, edge_labels, strict=False):
+    def matrices2mol_drugs(self, node_labels, edge_labels, strict=True):
         mol = Chem.RWMol()
         RDLogger.DisableLog('rdApp.*') 
         atom_decoders = self.drug_decoder_load("atom")
         bond_decoders = self.drug_decoder_load("bond")
         
         for node_label in node_labels:
+            
             mol.AddAtom(Chem.Atom(atom_decoders[node_label]))
 
         for start, end in zip(*np.nonzero(edge_labels)):
@@ -224,6 +225,8 @@ class DruggenDataset(InMemoryDataset):
 
         return mol
     
+    
+        
     def label2onehot(self, labels, dim):
         
         """Convert label indices to one-hot vectors."""
