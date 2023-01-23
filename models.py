@@ -3,11 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from layers import TransformerEncoder, TransformerDecoder
 
-
-
-    
-    
-    
 class Generator(nn.Module):
     """Generator network."""
     def __init__(self,z_dim, act, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio):
@@ -37,8 +32,8 @@ class Generator(nn.Module):
         self.transformer_dim = vertexes * vertexes * dim + vertexes * dim
         self.pos_enc_dim = 5
         #self.pos_enc = nn.Linear(self.pos_enc_dim, self.dim)
-        self.node_layers = nn.Sequential(nn.Linear(nodes,dim), act, nn.Dropout(self.dropout))
-        self.edge_layers = nn.Sequential(nn.Linear(edges,dim), act, nn.Dropout(self.dropout))
+        self.node_layers = nn.Sequential(nn.Linear(nodes,64), act, nn.Linear(64,dim), act, nn.Dropout(self.dropout))
+        self.edge_layers = nn.Sequential(nn.Linear(edges,64), act, nn.Linear(64,dim), act, nn.Dropout(self.dropout))
         
         self.TransformerEncoder = TransformerEncoder(dim=self.dim, depth=self.depth, heads=self.heads, act = act,
                                                                     mlp_ratio=self.mlp_ratio, drop_rate=self.dropout)         
@@ -69,7 +64,13 @@ class Generator(nn.Module):
         return pos_enc
 
     def forward(self, z_e, z_n):
-        
+        b, n, c = z_n.shape
+        _, _, _ , d = z_e.shape
+        #random_mask_e = torch.randint(low=0,high=2,size=(b,n,n,d)).to(z_e.device).float()
+        #random_mask_n = torch.randint(low=0,high=2,size=(b,n,c)).to(z_n.device).float()
+        #z_e = F.relu(z_e - random_mask_e)
+        #z_n = F.relu(z_n - random_mask_n)
+
         node = self.node_layers(z_n)
         
         edge = self.edge_layers(z_e)
@@ -107,13 +108,17 @@ class Generator2(nn.Module):
         self.pos_enc_dim = 5
         
         #self.pos_enc = nn.Linear(self.pos_enc_dim, self.dim)
-  
+
+        self.prot_n = torch.nn.Linear(3822, 45)   ## exact dimension of protein features
+        self.prot_e = torch.nn.Linear(298116, 2025) ## exact dimension of protein features
         
+        self.protn_dim = torch.nn.Linear(1,dec_dim)
+        self.prote_dim = torch.nn.Linear(1,dec_dim)
         self.mol_nodes = nn.Linear(dim, dec_dim)
         self.mol_edges = nn.Linear(dim, dec_dim)
         
-        self.drug_nodes =  nn.Linear(self.drugs_m_dim, dec_dim)
-        self.drug_edges =  nn.Linear(self.drugs_b_dim, dec_dim)
+        #self.drug_nodes =  nn.Linear(self.drugs_m_dim, dec_dim)
+        #self.drug_edges =  nn.Linear(self.drugs_b_dim, dec_dim)
         
         self.TransformerDecoder = TransformerDecoder(dec_dim, depth, heads, mlp_ratio=4, drop_rate=0.)
 
@@ -133,32 +138,36 @@ class Generator2(nn.Module):
         pos_enc = EigVec[:,1:self.pos_enc_dim + 1]
         
         return pos_enc
-
-    def forward(self, edges_logits, nodes_logits, drugs_n, drugs_e):
+    def _generate_square_subsequent_mask(self, sz):
+        mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
+        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+        return mask
+    def forward(self, edges_logits, nodes_logits ,akt1_adj,akt1_annot):
         
         edges_logits = self.mol_edges(edges_logits)
         nodes_logits = self.mol_nodes(nodes_logits)
-   
-        drug_n = self.drug_nodes(drugs_n)
-        drug_e = self.drug_edges(drugs_e)
+
+        akt1_adj = self.prote_dim(self.prot_e(akt1_adj).view(1,45,45,1))
+        akt1_annot = self.protn_dim(self.prot_n(akt1_annot).view(1,45,1))
+        
+                
+        #drug_n = self.drug_nodes(drugs_n)
+        #drug_e = self.drug_edges(drugs_e)
 
         #lap = [self.laplacian_positional_enc(torch.max(x,-1)[1]) for x in drug_e]
-        
         #lap = torch.stack(lap).to(drug_e.device)
-
         #pos_enc = self.pos_enc(lap)
-        
         #drug_n = drug_n + pos_enc
                 
-        drug_e,drug_n, edges_logits, nodes_logits = self.TransformerDecoder(nodes_logits,drug_n,edges_logits,drug_e)
+        nodes_logits,akt1_annot, edges_logits, akt1_adj = self.TransformerDecoder(nodes_logits,akt1_annot,edges_logits,akt1_adj)
      
-        drug_e = self.edges_output_layer(drug_e)
-        drug_n = self.nodes_output_layer(drug_n)
+        edges_logits = self.edges_output_layer(edges_logits)
+        nodes_logits = self.nodes_output_layer(nodes_logits)
         
-        drug_e = self.softmax(drug_e)
-        drug_n = self.softmax(drug_n)
-          
-        return drug_e, drug_n
+        edges_logits = self.softmax(edges_logits)
+        nodes_logits = self.softmax(nodes_logits)
+ 
+        return edges_logits, nodes_logits
 
 
 class simple_disc(nn.Module):

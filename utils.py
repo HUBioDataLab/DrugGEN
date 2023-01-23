@@ -72,7 +72,7 @@ def sim_reward(mol_gen, fps_r):
         fps = np.array(fps)
         fps_r = np.array(fps_r)
     
-        rew =  average_agg_tanimoto(fps_r,fps)
+        rew =  average_agg_tanimoto(fps_r,fps)[0]
         if math.isnan(rew):
             rew = 1
     
@@ -143,18 +143,18 @@ def label2onehot(labels, dim, device):
     return out.float()
 
 
-def sample_z_node(batch_size, vertexes, z_dim):
+def sample_z_node(batch_size, vertexes, nodes):
     
     ''' Random noise for nodes logits. '''
     
-    return np.random.normal(0,1, size=(batch_size,vertexes, z_dim))  #  128, 9, 5
+    return np.random.normal(0,1, size=(batch_size,vertexes, nodes))  #  128, 9, 5
 
 
-def sample_z_edge(batch_size, vertexes, z_dim):
+def sample_z_edge(batch_size, vertexes, edges):
     
     ''' Random noise for edges logits. '''
     
-    return np.random.normal(0,1, size=(batch_size, vertexes, vertexes, z_dim)) # 128, 9, 9, 5
+    return np.random.normal(0,1, size=(batch_size, vertexes, vertexes, edges)) # 128, 9, 9, 5
 
 def sample_z( batch_size, z_dim):
     
@@ -192,9 +192,9 @@ def logging(log_path, start_time, mols, train_smiles, i,idx, loss,model_num, sav
         elif line is None:
             gen_smiles.append(None)
 
-    gen_smiles_saves = [None if x is None else re.sub('\*', '', x) for x in gen_smiles]
-    gen_smiles_saves = [None if x is None else re.sub('\.', '', x) for x in gen_smiles_saves]
-    gen_smiles_saves = [None if x == '' else x for x in gen_smiles_saves]
+    #gen_smiles_saves = [None if x is None else re.sub('\*', '', x) for x in gen_smiles]
+    #gen_smiles_saves = [None if x is None else re.sub('\.', '', x) for x in gen_smiles_saves]
+    gen_smiles_saves = [None if x is None else max(x.split('.'), key=len) for x in gen_smiles]
 
     sample_save_dir = os.path.join(save_path, "samples-GAN{}.txt".format(model_num))
     with open(sample_save_dir, "a") as f:
@@ -213,9 +213,9 @@ def logging(log_path, start_time, mols, train_smiles, i,idx, loss,model_num, sav
     
     # Log update
     #m0 = get_all_metrics(gen = gen_smiles, train = train_smiles, batch_size=batch_size, k = valid_mol_num, device=self.device)
-    valid = fraction_valid(gen_smiles)
-    unique = fraction_unique(gen_smiles, k, check_validity=False)
-    novel = novelty(gen_smiles, train_smiles)
+    valid = fraction_valid(gen_smiles_saves)
+    unique = fraction_unique(gen_smiles_saves, k, check_validity=False)
+    novel = novelty(gen_smiles_saves, train_smiles)
     
     #qed = [QED(mol) for mol in mols if mol is not None]
     #sa = [SA(mol) for mol in mols if mol is not None]

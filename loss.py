@@ -1,6 +1,6 @@
 
 import torch
-
+import time
 def discriminator_loss(generator, discriminator, mol_graph, adj, annot, batch_size, device, grad_pen, lambda_gp):
     
     # Compute loss with real molecules.
@@ -31,55 +31,58 @@ def discriminator_loss(generator, discriminator, mol_graph, adj, annot, batch_si
     
     d_loss = prediction_fake + prediction_real +  d_loss_gp * lambda_gp
     
-    return d_loss
+    return node, edge,d_loss
 
     
-def generator_loss(generator, discriminator, v, adj, annot, batch_size, penalty, matrices2mol, fps_r):
+def generator_loss(generator, discriminator, v, adj, annot, batch_size, penalty, matrices2mol, fps_r,submodel):
     
     # Compute loss with fake molecules.
-
+   
     node, edge, node_sample, edge_sample  = generator(adj,  annot)
-
-    graph = torch.cat((node_sample.view(batch_size, -1), edge_sample.view(batch_size, -1)), dim=-1)
+   
     
+    graph = torch.cat((node_sample.view(batch_size, -1), edge_sample.view(batch_size, -1)), dim=-1)
+   
+ 
     logits_fake_disc = discriminator(graph)
-        
+    
     prediction_fake = - torch.mean(logits_fake_disc)
-
+    
     # Produce molecules.
 
     g_edges_hat_sample = torch.max(edge_sample, -1)[1] 
     g_nodes_hat_sample = torch.max(node_sample , -1)[1]   
-                        
+                
     fake_mol = [matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True) 
             for e_, n_ in zip(g_edges_hat_sample, g_nodes_hat_sample)]        
-    
+    g_loss = prediction_fake
     # Compute penalty loss.
+    if submodel == "RL":
+        reward = penalty(fake_mol, fps_r)
     
-    reward = penalty(fake_mol, fps_r)
+        # Reinforcement Loss
+   
+        rew_fake = v(graph)
 
-    # Reinforcement Loss
+        reward_loss =  torch.mean(rew_fake) ** 2 + reward    
     
-    rew_fake = v(graph)
+        # Calculate total loss
     
-    reward_loss =  torch.mean(rew_fake) ** 2 + reward    
+        g_loss = prediction_fake + reward_loss * 1
     
-    # Calculate total loss
     
-    g_loss = prediction_fake + reward_loss * 1
-    
-    return g_loss, fake_mol, g_edges_hat_sample, g_nodes_hat_sample, reward, node, edge
+    return g_loss, fake_mol, g_edges_hat_sample, g_nodes_hat_sample, node, edge
 
-def discriminator2_loss(generator, discriminator, mol_graph, adj, annot, adj2, annot2, batch_size, device, grad_pen, lambda_gp):
+def discriminator2_loss(generator, discriminator, mol_graph, adj, annot, batch_size, device, grad_pen, lambda_gp,akt1_adj,akt1_annot):
 
     # Generate molecules.
     
     dr_edges, dr_nodes = generator(adj, 
                                 annot, 
-                                annot2,
-                                adj2)
+                                akt1_adj,
+                                akt1_annot)
     
-
+    
     dr_edges_hat = dr_edges.view(batch_size, -1)
     
     dr_nodes_hat = dr_nodes.view(batch_size, -1)
@@ -113,15 +116,15 @@ def discriminator2_loss(generator, discriminator, mol_graph, adj, annot, adj2, a
     
     return d2_loss
 
-def generator2_loss(generator, discriminator, v, adj, annot,adj2, annot2, batch_size, penalty, matrices2mol, fps_r):
+def generator2_loss(generator, discriminator, v, adj, annot, batch_size, penalty, matrices2mol, fps_r,ak1_adj,akt1_annot, submodel):
     
     # Generate molecules.
     
     dr_edges_g, dr_nodes_g = generator(adj, 
                                 annot, 
-                                annot2,
-                                adj2)
- 
+                                ak1_adj,
+                                akt1_annot)
+    
     dr_edges_hat_g = dr_edges_g.view(batch_size, -1)
     
     dr_nodes_hat_g = dr_nodes_g.view(batch_size, -1)
@@ -131,25 +134,25 @@ def generator2_loss(generator, discriminator, v, adj, annot,adj2, annot2, batch_
     # Compute loss with fake molecules.
 
     dr_g_edges_hat_sample, dr_g_nodes_hat_sample = torch.max(dr_edges_g, -1)[1], torch.max(dr_nodes_g, -1)[1]
-            
+         
     g_tra_logits_fake2 = discriminator(dr_graph_g)      
-
+   
     g2_loss_fake = - torch.mean(g_tra_logits_fake2)                                                            
 
     # Reward
-    
     fake_mol_g = [matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True) 
                 for e_, n_ in zip(dr_g_edges_hat_sample, dr_g_nodes_hat_sample)]       
-                     
-    reward2 = penalty(fake_mol_g, fps_r)
-
-    # Reinforcement Loss
+    g2_loss =  g2_loss_fake    
+    if submodel == "RL":
+        reward2 = penalty(fake_mol_g, fps_r)
     
-    rew_fake2 = v(dr_graph_g)
-    reward_loss2 =  torch.mean(rew_fake2) ** 2 + reward2
+        # Reinforcement Loss
+        
+        rew_fake2 = v(dr_graph_g)
+        reward_loss2 =  torch.mean(rew_fake2) ** 2 + reward2
+        
+        # Calculate total loss
+        
+        g2_loss =  g2_loss_fake + reward_loss2 * 10    
     
-    # Calculate total loss
-    
-    g2_loss =  g2_loss_fake + reward_loss2 * 10    
-    
-    return g2_loss, fake_mol_g, dr_g_edges_hat_sample, dr_g_nodes_hat_sample, reward2
+    return g2_loss, fake_mol_g, dr_g_edges_hat_sample, dr_g_nodes_hat_sample#, reward2

@@ -15,7 +15,7 @@ from moses.metrics.metrics import get_all_metrics
 from rdkit import RDLogger  
 import pickle
 from rdkit.Chem.Scaffolds import MurckoScaffold
-torch.set_num_threads(3)
+torch.set_num_threads(5)
 RDLogger.DisableLog('rdApp.*') 
 from loss import discriminator_loss, generator_loss, discriminator2_loss, generator2_loss
 from training_data import load_data
@@ -28,7 +28,7 @@ class Trainer(object):
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
         """Initialize configurations."""
-        
+        config.submodel = self.submodel
         # Data loader.
         self.raw_file = config.raw_file  # SMILES containing text file for first dataset. 
                                          # Write the full path to file.
@@ -475,7 +475,7 @@ class Trainer(object):
         
         # Defining sampling paths and creating logger
        
-        self.arguments = "glr{}_dlr{}_g2lr{}_d2lr{}_dim{}_depth{}_heads{}_decdepth{}_decheads{}_ncritic{}_batch{}_epoch{}_warmup{}_dataset{}_disc-{}_dropout{}".format(self.g_lr,self.d_lr,self.g2_lr,self.d2_lr,self.dim,self.depth,self.heads,self.dec_depth,self.dec_heads,self.n_critic,self.batch_size,self.epoch,self.warm_up_steps,self.dataset_name,self.dis_select,self.dropout)
+        self.arguments = "glr{}_dlr{}_g2lr{}_d2lr{}_dim{}_depth{}_heads{}_decdepth{}_decheads{}_ncritic{}_batch{}_epoch{}_warmup{}_dataset{}_submodel-{}_dropout{}".format(self.g_lr,self.d_lr,self.g2_lr,self.d2_lr,self.dim,self.depth,self.heads,self.dec_depth,self.dec_heads,self.n_critic,self.batch_size,self.epoch,self.warm_up_steps,self.dataset_name,self.submodel,self.dropout)
        
         self.model_directory= os.path.join(self.model_save_dir,self.arguments)
         self.sample_directory=os.path.join(self.sample_dir,self.arguments)
@@ -496,8 +496,8 @@ class Trainer(object):
         drug_scaf = [MurckoScaffold.GetScaffoldForMol(x) for x in drug_mols]
         fps_r = [Chem.RDKFingerprint(x) for x in drug_scaf]
 
-        #akt1_human_adj = torch.load("DrugGEN/data/akt/AKT1_human_adj.pt")
-        #akt1_human_annot = torch.load("DrugGEN/data/akt/AKT1_human_annot.pt")  
+        akt1_human_adj = torch.load("DrugGEN/akt/AKT1_human_adj.pt").reshape(1,-1).to(self.device).float() 
+        akt1_human_annot = torch.load("DrugGEN/akt/AKT1_human_annot.pt").reshape(1,-1).to(self.device).float() 
       
         # Start training.
         
@@ -533,7 +533,50 @@ class Trainer(object):
                                      self.z_dim,
                                      self.vertexes)   
                 
-                drug_graphs, real_graphs, a_tensor, x_tensor, drugs_a_tensor, drugs_x_tensor, z, z_edge, z_node = bulk_data         
+                drug_graphs, real_graphs, a_tensor, x_tensor, drugs_a_tensor, drugs_x_tensor, z, z_edge, z_node = bulk_data
+                
+                if self.submodel == "CrossLoss":
+                    GAN1_input_e = a_tensor
+                    GAN1_input_x = x_tensor
+                    GAN1_disc_e = drugs_a_tensor
+                    GAN1_disc_x = drugs_x_tensor
+                    GAN2_input_e = drugs_a_tensor
+                    GAN2_input_x = drugs_x_tensor
+                    GAN2_disc_e = a_tensor
+                    GAN2_disc_x = x_tensor
+                elif self.submodel == "Ligand":
+                    GAN1_input_e = a_tensor
+                    GAN1_input_x = x_tensor
+                    GAN1_disc_e = a_tensor
+                    GAN1_disc_x = x_tensor
+                    GAN2_input_e = drugs_a_tensor
+                    GAN2_input_x = drugs_x_tensor
+                    GAN2_disc_e = drugs_a_tensor
+                    GAN2_disc_x = drugs_x_tensor            
+                elif self.submodel == "Prot":        
+                    GAN1_input_e = a_tensor
+                    GAN1_input_x = x_tensor
+                    GAN1_disc_e = a_tensor
+                    GAN1_disc_x = x_tensor
+                    GAN2_input_e = akt1_human_adj
+                    GAN2_input_x = akt1_human_annot
+                    GAN2_disc_e = drugs_a_tensor
+                    GAN2_disc_x = drugs_x_tensor        
+                elif self.submodel == "RL":
+                    GAN1_input_e = z_edge
+                    GAN1_input_x = z_node
+                    GAN1_disc_e = a_tensor
+                    GAN1_disc_x = x_tensor
+                    GAN2_input_e = drugs_a_tensor
+                    GAN2_input_x = drugs_x_tensor
+                    GAN2_disc_e = drugs_a_tensor
+                    GAN2_disc_x = drugs_x_tensor    
+                elif self.submodel == "NoTarget":
+                    GAN1_input_e = z_edge
+                    GAN1_input_x = z_node
+                    GAN1_disc_e = a_tensor
+                    GAN1_disc_x = x_tensor                                                  
+                         
                 # =================================================================================== #
                 #                             2. Train the discriminator                              #
                 # =================================================================================== #
@@ -541,113 +584,177 @@ class Trainer(object):
                 self.reset_grad()
                 
                 # Compute discriminator loss.
-                
-                d_loss = discriminator_loss(self.G, 
+     
+                node, edge, d_loss = discriminator_loss(self.G, 
                                             self.D, 
                                             drug_graphs, 
-                                            a_tensor, 
-                                            x_tensor, 
+                                            GAN1_disc_e, 
+                                            GAN1_disc_x, 
                                             self.batch_size, 
                                             self.device, 
                                             self.gradient_penalty, 
-                                            self.lambda_gp) 
-     
+                                            self.lambda_gp)
+                #loss["d_loss"] = d_loss.item()
+                #d_loss.backward()
+                #self.d_optimizer.step()   
+                #self.reset_grad()
+                d_total = d_loss
+                if self.submodel != "NoTarget":
+                    d2_loss = discriminator2_loss(self.G2, 
+                                                    self.D2, 
+                                                    drug_graphs,
+                                                    edge, 
+                                                    node, 
+                                                    self.batch_size, 
+                                                    self.device,
+                                                    self.gradient_penalty, 
+                                                    self.lambda_gp,
+                                                    GAN2_disc_e,
+                                                    GAN2_disc_x)
+                    d_total = d_loss + d2_loss
+                
+                loss["d_total"] = d_total.item()
+                d_total.backward()
+                self.d_optimizer.step()
+                if self.submodel != "NoTarget":
+                    self.d2_optimizer.step()
+                self.reset_grad()
+                generator_output = generator_loss(self.G,
+                                                    self.D,
+                                                    self.V,
+                                                    GAN1_input_e,
+                                                    GAN1_input_x,
+                                                    self.batch_size,
+                                                    sim_reward,
+                                                    self.dataset.matrices2mol_drugs,
+                                                    fps_r,
+                                                    self.submodel)        
+                
+                g_loss, fake_mol, g_edges_hat_sample, g_nodes_hat_sample, node, edge = generator_output    
+                #loss["g_loss"] = g_loss.item()
+                #g_loss.backward()
+                #self.g_optimizer.step()
+                #self.reset_grad()
+                #loss2 = {}
+
+                #loss2["d2_loss"] = d2_loss.item()
+                #d2_loss.backward()
+                #self.d2_optimizer.step()
+                self.reset_grad()
+                g_total = g_loss
+                if self.submodel != "NoTarget":
+                    output = generator2_loss(self.G2,
+                                                self.D2,
+                                                self.V2,
+                                                edge,
+                                                node,
+                                                self.batch_size,
+                                                sim_reward,
+                                                self.dataset.matrices2mol_drugs,
+                                                fps_r,
+                                                GAN2_input_e,
+                                                GAN2_input_x,
+                                                self.submodel)
+                
+                    g2_loss, fake_mol_g, dr_g_edges_hat_sample, dr_g_nodes_hat_sample = output     
+                
+                    g_total = g_loss + g2_loss     
+                #torch.nn.utils.clip_grad_norm_(self.D2.parameters(), self.clipping_value)
+                #loss2["g2_loss"] = g2_loss.item()    
+                #g2_loss.backward()
+                #self.g2_optimizer.step()
+                loss["g_total"] = g_total.item()
+                g_total.backward()
+                self.g_optimizer.step()
+                if self.submodel != "NoTarget":
+                    self.g2_optimizer.step()
+                
+                if self.submodel == "RL":
+                    self.v_optimizer.step()
+                    self.v2_optimizer.step()
+                  
                 # Feed the loss
                 
-                d_loss.backward(retain_graph = True)
+                #d_loss.backward(retain_graph = True)
            
                 #torch.nn.utils.clip_grad_norm_(self.D.parameters(), self.clipping_value) 
                  
                 #plot_grad_flow(self.D.named_parameters(), "D", i, idx)
       
-                self.d_optimizer.step()
+                #self.d_optimizer.step()
               
                 # Logging.
                 
                 #loss['D/d_loss_real'] = prediction_real.item()
                 #loss['D/d_loss_fake'] = prediction_fake.item()
                 #loss['D/loss_gp'] = d_loss_gp.item()
-                loss["d_loss"] = d_loss.item()
+            
                 
                 #wandb.log({"d_loss": d_loss, "iteration/epoch":[i,idx]})    
                 # =================================================================================== #
                 #                            3. Train the generator                                   #
                 # =================================================================================== #                
-                if (i+1) % self.n_critic == 0:
+                #if (i+1) % self.n_critic == 0:
                     
-                    self.reset_grad()
 
-                    generator_output = generator_loss(self.G,
-                                                      self.D,
-                                                      self.V,
-                                                      a_tensor,
-                                                      x_tensor,
-                                                      self.batch_size,
-                                                      sim_reward,
-                                                      self.dataset.matrices2mol_drugs,
-                                                      fps_r)
-  
-                    g_loss, fake_mol, g_edges_hat_sample, g_nodes_hat_sample, reward, node, edge = generator_output
-                    
-                    g_loss.backward(retain_graph = True)
+
+
+           
+
+         
                 
-                    #torch.nn.utils.clip_grad_norm_(self.G.parameters(), self.clipping_value)
-                    #torch.nn.utils.clip_grad_norm_(self.V.parameters(), self.clipping_value)
-
-                    #plot_grad_flow(self.G.named_parameters(), "G", i, idx)
-                    #plot_grad_flow(self.V.named_parameters(), "V", i, idx)
-
-                    self.g_optimizer.step()
-                    self.v_optimizer.step()
-                    
-                    #self.scheduler_g.step(g_loss)
-                    #self.scheduler_v.step(g_loss)
-
-                    # Logging.
-                    
-                    #loss['G/g_loss_fake'] =  g_prediction_fake.item()
-                    #loss['G/g_loss_value'] = g_loss_value_pred.item() 
-                    loss["g_loss"] = g_loss.item() 
-                    #wandb.log({ "g_loss": g_loss, "iteration/epoch":[i,idx]})
-                    
-                    if (i+1) % self.log_step == 0:
-                     
-                        logging(self.log_path, self.start_time, fake_mol, full_smiles, i, idx, loss, 1,self.sample_directory) 
-                        mol_sample(self.sample_directory,"GAN1",fake_mol, g_edges_hat_sample.detach(), g_nodes_hat_sample.detach(), idx, i)
-                        print("reward: ", reward)
-             
-                    GAN2_edges, GAN2_nodes = edge.detach(), node.detach()              
-                loss2 = {}
+                #torch.nn.utils.clip_grad_norm_(self.G2.parameters(), self.clipping_value)      
                 
-                if (idx+1 > self.warm_up_steps) & (i+1 > 10):
+                #plot_grad_flow(self.G2.named_parameters(), "G2", i, idx)
+                #plot_grad_flow(self.V2.named_parameters(), "V2", i, idx)
+                #plot_grad_flow(self.D2.named_parameters(), "D2", i, idx)                    
+                         
+                #g_loss.backward(retain_graph = True)
+            
+                #torch.nn.utils.clip_grad_norm_(self.G.parameters(), self.clipping_value)
+                #torch.nn.utils.clip_grad_norm_(self.V.parameters(), self.clipping_value)
+
+                #plot_grad_flow(self.G.named_parameters(), "G", i, idx)
+                #plot_grad_flow(self.V.named_parameters(), "V", i, idx)
+
+                #self.g_optimizer.step()
+                #self.v_optimizer.step()
+                
+                #self.scheduler_g.step(g_loss)
+                #self.scheduler_v.step(g_loss)
+
+                # Logging.
+                
+                #loss['G/g_loss_fake'] =  g_prediction_fake.item()
+                #loss['G/g_loss_value'] = g_loss_value_pred.item() 
+           
+                #wandb.log({ "g_loss": g_loss, "iteration/epoch":[i,idx]})
+                
+                if (i+1) % self.log_step == 0:
+              
+                    logging(self.log_path, self.start_time, fake_mol, full_smiles, i, idx, loss, 1,self.sample_directory) 
+                    mol_sample(self.sample_directory,"GAN1",fake_mol, g_edges_hat_sample.detach(), g_nodes_hat_sample.detach(), idx, i)
+                    #logging(self.log_path, self.start_time, fake_mol_g, drug_smiles, i, idx, loss, 2,self.sample_directory)     
+                    #mol_sample(self.sample_directory,"GAN2",fake_mol_g, dr_g_edges_hat_sample.detach(), dr_g_nodes_hat_sample.detach(), idx, i)
+                                  
+            
+                    #GAN2_edges, GAN2_nodes = edge.detach(), node.detach()              
+                """loss2 = {}
+                
+                if (idx+1) > self.warm_up_steps :
                     self.reset_grad()
                     # =================================================================================== #
                     #                             4. Train the discriminator - 2                          #
                     # =================================================================================== #
 
-                    d2_loss = discriminator2_loss(self.G2, 
-                                                  self.D2, 
-                                                  real_graphs,
-                                                  GAN2_edges, 
-                                                  GAN2_nodes, 
-                                                  drugs_a_tensor, 
-                                                  drugs_x_tensor, 
-                                                  self.batch_size, 
-                                                  self.device,
-                                                  self.gradient_penalty, 
-                                                  self.lambda_gp)
-              
-                    d2_loss.backward(retain_graph = True)
-                    #torch.nn.utils.clip_grad_norm_(self.D2.parameters(), self.clipping_value)      
-           
-                    self.d2_optimizer.step()
+
                                          
               
                     
                     #loss2['D2/d2_loss_real'] = d2_loss_real.item()
                     #loss2['D2/d2_loss_fake'] = d2_loss_fake.item()
                     #loss['D2/loss_gp'] = d2_loss_gp_tra.item()           
-                    loss2["d2_loss"] = d2_loss.item()     
+                    loss["d2_loss"] = d2_loss.item()     
                     ##wandb.log({"d2_loss_fake": d2_loss_fake, "d2_loss_real": d2_loss_real, "d2_loss": d2_loss, "iteration/epoch":[i,idx]})       
                     # =================================================================================== #
                     #                             5. Train the generator - 2                              #
@@ -656,41 +763,18 @@ class Trainer(object):
                     if (i+1) % self.n_critic == 0:
                         self.reset_grad()
  
-                        output = generator2_loss(self.G2,
-                                                 self.D2,
-                                                 self.V2,
-                                                 GAN2_edges,
-                                                 GAN2_nodes,
-                                                 drugs_a_tensor,
-                                                 drugs_x_tensor,
-                                                 self.batch_size,
-                                                 sim_reward,
-                                                 self.dataset.matrices2mol_drugs,
-                                                 fps_r)
-                     
-                        g2_loss, fake_mol_g, dr_g_edges_hat_sample, dr_g_nodes_hat_sample, reward2 = output
-                    
-                        g2_loss.backward()
-                        
-                        #torch.nn.utils.clip_grad_norm_(self.G2.parameters(), self.clipping_value)      
-                        
-                        #plot_grad_flow(self.G2.named_parameters(), "G2", i, idx)
-                        #plot_grad_flow(self.V2.named_parameters(), "V2", i, idx)
-                        #plot_grad_flow(self.D2.named_parameters(), "D2", i, idx)                    
-                        self.g2_optimizer.step()
-                        self.v2_optimizer.step()
 
                         #loss2["G2/g2_loss_fake"] = g2_loss_fake.item()
-                        loss2["g2_loss"] = g2_loss.item()        
+                        loss["g2_loss"] = g2_loss.item()        
                         ##wandb.log({ "g2_loss": g2_loss, "iteration/epoch":[i,idx]})
                         
                         if (i+1) % self.log_step == 0:
                           
                             mol_sample(self.sample_directory,"GAN2",fake_mol_g, dr_g_edges_hat_sample.detach(), dr_g_nodes_hat_sample.detach(), idx, i)
                             logging(self.log_path, self.start_time, fake_mol_g, drug_smiles, i, idx, loss, 2,self.sample_directory) 
-                            print("reward2: ",reward2)   
+                            print("reward2: ",reward2)"""   
                  
-            #self.save_model(self.model_directory,idx,i)        
+                            #self.save_model(self.model_directory,idx,i)        
                             
                       
   
