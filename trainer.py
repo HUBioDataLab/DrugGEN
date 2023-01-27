@@ -28,7 +28,7 @@ class Trainer(object):
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
         """Initialize configurations."""
-        self.submodel = config.submodel
+        config.submodel = self.submodel
         # Data loader.
         self.raw_file = config.raw_file  # SMILES containing text file for first dataset. 
                                          # Write the full path to file.
@@ -734,8 +734,8 @@ class Trainer(object):
               
                     logging(self.log_path, self.start_time, fake_mol, full_smiles, i, idx, loss, 1,self.sample_directory) 
                     mol_sample(self.sample_directory,"GAN1",fake_mol, g_edges_hat_sample.detach(), g_nodes_hat_sample.detach(), idx, i)
-                    logging(self.log_path, self.start_time, fake_mol_g, drug_smiles, i, idx, loss, 2,self.sample_directory)     
-                    mol_sample(self.sample_directory,"GAN2",fake_mol_g, dr_g_edges_hat_sample.detach(), dr_g_nodes_hat_sample.detach(), idx, i)
+                    #logging(self.log_path, self.start_time, fake_mol_g, drug_smiles, i, idx, loss, 2,self.sample_directory)     
+                    #mol_sample(self.sample_directory,"GAN2",fake_mol_g, dr_g_edges_hat_sample.detach(), dr_g_nodes_hat_sample.detach(), idx, i)
                                   
             
                     #GAN2_edges, GAN2_nodes = edge.detach(), node.detach()              
@@ -774,10 +774,7 @@ class Trainer(object):
                             logging(self.log_path, self.start_time, fake_mol_g, drug_smiles, i, idx, loss, 2,self.sample_directory) 
                             print("reward2: ",reward2)"""   
                  
-                            #self.save_model(self.model_directory,idx,i)       
-            # Save model checkpoints.   
-            
-            self.save_model(self.model_directory,idx,i)
+                            #self.save_model(self.model_directory,idx,i)        
                             
                       
   

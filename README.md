@@ -169,7 +169,7 @@ Dataset arguments:
 In each file, we indicate whether a function or script is imported from another source. Here are some excellent sources from which we benefit: 
 <!--ADD THE REFERENCES THAT WE USED DURING THE IMPLEMENTATION-->
 - First GAN is inspired from [MolGAN](https://github.com/yongqyu/MolGAN-pytorch).
-- [PNA](https://github.com/lukecavabarrett/pna) implementation was used to create a PNA-Discriminator.
+- [PNA](https://github.com/lukecavabarrett/pna) implementation wa used create a PNA-Discriminator.
 - [MOSES](https://github.com/molecularsets/moses) was used for performance calculation.
 - GCN-discriminator is modified version of [GCN](https://github.com/tkipf/gcn).
 - [PyG](https://github.com/pyg-team/pytorch_geometric) was used to construct the custom dataset.
