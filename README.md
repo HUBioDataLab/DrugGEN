@@ -28,7 +28,7 @@ Discovering novel drug candidate molecules is one of the most fundamental and cr
 
 <!--PUT THE ANIMATED GIF VERSION OF THE DRUGGEN MODEL (Figure 1)-->
 <p float="center">
-  <img src="assets/DrugGEN_Figure1.gif" width="63%" />
+  <img src="assets/DrugGEN_Figure1_2.gif" width="90%" />
 </p>
 
 
@@ -90,7 +90,7 @@ More details on the construction of datasets can be found in our paper reference
 
 ## Updates
 
-- 01/01/2021: Five different DrugGEN models are released.
+- 00/00/2022: First version script of DrugGEN is released.
 
 ## Getting Started
 DrugGEN has been implemented and tested on Ubuntu 18.04 with python >= 3.9. It supports both GPU and CPU inference.
@@ -118,7 +118,7 @@ bash dataset_download.sh
 
 # DrugGEN can be trained with a one-liner
 
-python DrugGEN/main.py --submodel="CrossLoss" --mode="train" --device="cuda" --raw_file="DrugGEN/data/chembl_smiles.smi" --dataset_file="chembl45.pt" -- drug_raw_file="drug_smies.smi" --drug_dataset_file="drugs.pt" --max_atom=45
+python DrugGEN/main.py --submodel --mode="train" --device="cuda" --raw_file="DrugGEN/data/chembl_smiles.smi" --dataset_file="chembl45.pt" -- drug_raw_file="drug_smies.smi" --drug_dataset_file="drugs.pt" --max_atom=45
 ```
 
 ** Please find the arguments in the **main.py** file. Explanation of the commands can be found below.
