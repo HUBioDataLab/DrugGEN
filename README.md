@@ -28,7 +28,7 @@ Discovering novel drug candidate molecules is one of the most fundamental and cr
 
 <!--PUT THE ANIMATED GIF VERSION OF THE DRUGGEN MODEL (Figure 1)-->
 <p float="center">
-  <img src="assets/druggen_figure1_mod.gif" width="98%" />
+  <img src="assets/DrugGEN_Figure1.gif" width="63%" />
 </p>
 
 
