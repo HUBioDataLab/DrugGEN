@@ -34,7 +34,7 @@ def main(config):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--submodel', type=str, default="NoTarget", help="Chose model subtype: Prot, CrossLoss, Ligand, Prot, NoTarget ")
+    parser.add_argument('--submodel', type=str, default="Prot", help="Chose model subtype: Prot, CrossLoss, Ligand, Prot, NoTarget ")
 
     # Model configuration.
     parser.add_argument('--act', type=str, default="relu", help="Activation function for the model.")
@@ -47,15 +47,15 @@ if __name__ == '__main__':
     
     parser.add_argument('--dim', type=int, default=128, help='Dimension of the Transformer Encoder model for GAN1.')
     
-    parser.add_argument('--depth', type=int, default=1, help='Depth of the Transformer model from the first GAN.')
+    parser.add_argument('--depth', type=int, default=8, help='Depth of the Transformer model from the first GAN.')
     
     parser.add_argument('--heads', type=int, default=8, help='Number of heads for the MultiHeadAttention module from the first GAN.')
     
-    parser.add_argument('--dec_depth', type=int, default=10, help='Depth of the Transformer model from the second GAN.')
+    parser.add_argument('--dec_depth', type=int, default=8, help='Depth of the Transformer model from the second GAN.')
     
     parser.add_argument('--dec_heads', type=int, default=8, help='Number of heads for the MultiHeadAttention module from the second GAN.')   
     
-    parser.add_argument('--dec_dim', type=int, default=512, help='Dimension of the Transformer Decoder model for GAN2.')
+    parser.add_argument('--dec_dim', type=int, default=128, help='Dimension of the Transformer Decoder model for GAN2.')
      
     parser.add_argument('--mlp_ratio', type=int, default=3, help='MLP ratio for the Transformers.')
     
@@ -74,17 +74,17 @@ if __name__ == '__main__':
     # Training configuration.
     parser.add_argument('--batch_size', type=int, default=128, help='Batch size for the training.')
     
-    parser.add_argument('--epoch', type=int, default=122, help='Epoch number for Training.')
+    parser.add_argument('--epoch', type=int, default=100, help='Epoch number for Training.')
     
-    parser.add_argument('--g_lr', type=float, default=0.0001, help='learning rate for G')
+    parser.add_argument('--g_lr', type=float, default=0.00001, help='learning rate for G')
     
     parser.add_argument('--d_lr', type=float, default=0.00001, help='learning rate for D')
     
-    parser.add_argument('--g2_lr', type=float, default=0.0001, help='learning rate for G2')
+    parser.add_argument('--g2_lr', type=float, default=0.00001, help='learning rate for G2')
     
     parser.add_argument('--d2_lr', type=float, default=0.00001, help='learning rate for D2')
     
-    parser.add_argument('--dropout', type=float, default=0., help='dropout rate')
+    parser.add_argument('--dropout', type=float, default=0.4, help='dropout rate')
     
     parser.add_argument('--dec_dropout', type=float, default=0.01, help='dropout rate')
     
@@ -130,13 +130,13 @@ if __name__ == '__main__':
     
     parser.add_argument('--result_dir', type=str, default='DrugGEN/experiments/results')
     
-    parser.add_argument('--dataset_file', type=str, default='chembl45.pt')    
+    parser.add_argument('--dataset_file', type=str, default='chembl45_train.pt')    
     
-    parser.add_argument('--drug_dataset_file', type=str, default='drugs.pt')        
+    parser.add_argument('--drug_dataset_file', type=str, default='drugs_train.pt')        
     
-    parser.add_argument('--raw_file', type=str, default='DrugGEN/data/chembl_smiles.smi')     
+    parser.add_argument('--raw_file', type=str, default='DrugGEN/data/chembl_train.smi')     
       
-    parser.add_argument('--drug_raw_file', type=str, default='DrugGEN/data/drugs_smiles.smi')   
+    parser.add_argument('--drug_raw_file', type=str, default='DrugGEN/data/drugs_train.smi')   
        
     # Step size.
     parser.add_argument('--log_sample_step', type=int, default=100)

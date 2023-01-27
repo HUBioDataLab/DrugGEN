@@ -587,7 +587,7 @@ class Trainer(object):
      
                 node, edge, d_loss = discriminator_loss(self.G, 
                                             self.D, 
-                                            drug_graphs, 
+                                            real_graphs, 
                                             GAN1_disc_e, 
                                             GAN1_disc_x, 
                                             self.batch_size, 
@@ -609,8 +609,8 @@ class Trainer(object):
                                                     self.device,
                                                     self.gradient_penalty, 
                                                     self.lambda_gp,
-                                                    GAN2_disc_e,
-                                                    GAN2_disc_x)
+                                                    GAN2_input_e,
+                                                    GAN2_input_x)
                     d_total = d_loss + d2_loss
                 
                 loss["d_total"] = d_total.item()
