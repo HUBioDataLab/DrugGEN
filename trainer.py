@@ -28,7 +28,7 @@ class Trainer(object):
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
         """Initialize configurations."""
-        config.submodel = self.submodel
+        self.submodel = config.submodel
         # Data loader.
         self.raw_file = config.raw_file  # SMILES containing text file for first dataset. 
                                          # Write the full path to file.
@@ -254,7 +254,8 @@ class Trainer(object):
                            self.drugs_m_dim,
                            self.drugs_b_dim,
                            self.b_dim, 
-                           self.m_dim)
+                           self.m_dim,
+                           self.submodel)
         
         
         
@@ -428,10 +429,10 @@ class Trainer(object):
 
    
     def save_model(self, model_directory, idx,i):
-        G_path = os.path.join(model_directory, '{}/{}-G.ckpt'.format(idx+1,i+1))
-        D_path = os.path.join(model_directory, '{}/{}-D.ckpt'.format(idx+1,i+1))
-        G2_path = os.path.join(model_directory, '{}/{}-G2.ckpt'.format(idx+1,i+1))
-        D2_path = os.path.join(model_directory, '{}/{}-D2.ckpt'.format(idx+1,i+1))
+        G_path = os.path.join(model_directory, '{}-{}-G.ckpt'.format(idx+1,i+1))
+        D_path = os.path.join(model_directory, '{}-{}-D.ckpt'.format(idx+1,i+1))
+        G2_path = os.path.join(model_directory, '{}-{}-G2.ckpt'.format(idx+1,i+1))
+        D2_path = os.path.join(model_directory, '{}-{}-D2.ckpt'.format(idx+1,i+1))
         torch.save(self.G.state_dict(), G_path)     
         torch.save(self.D.state_dict(), D_path)     
         torch.save(self.G2.state_dict(), G2_path)         
@@ -475,7 +476,7 @@ class Trainer(object):
         
         # Defining sampling paths and creating logger
        
-        self.arguments = "glr{}_dlr{}_g2lr{}_d2lr{}_dim{}_depth{}_heads{}_decdepth{}_decheads{}_ncritic{}_batch{}_epoch{}_warmup{}_dataset{}_submodel-{}_dropout{}".format(self.g_lr,self.d_lr,self.g2_lr,self.d2_lr,self.dim,self.depth,self.heads,self.dec_depth,self.dec_heads,self.n_critic,self.batch_size,self.epoch,self.warm_up_steps,self.dataset_name,self.submodel,self.dropout)
+        self.arguments = "{}_glr{}_dlr{}_g2lr{}_d2lr{}_dim{}_depth{}_heads{}_decdepth{}_decheads{}_ncritic{}_batch{}_epoch{}_warmup{}_dataset{}_dropout{}".format(self.submodel,self.g_lr,self.d_lr,self.g2_lr,self.d2_lr,self.dim,self.depth,self.heads,self.dec_depth,self.dec_heads,self.n_critic,self.batch_size,self.epoch,self.warm_up_steps,self.dataset_name,self.dropout)
        
         self.model_directory= os.path.join(self.model_save_dir,self.arguments)
         self.sample_directory=os.path.join(self.sample_dir,self.arguments)
@@ -594,10 +595,7 @@ class Trainer(object):
                                             self.device, 
                                             self.gradient_penalty, 
                                             self.lambda_gp)
-                #loss["d_loss"] = d_loss.item()
-                #d_loss.backward()
-                #self.d_optimizer.step()   
-                #self.reset_grad()
+        
                 d_total = d_loss
                 if self.submodel != "NoTarget":
                     d2_loss = discriminator2_loss(self.G2, 
@@ -631,15 +629,7 @@ class Trainer(object):
                                                     self.submodel)        
                 
                 g_loss, fake_mol, g_edges_hat_sample, g_nodes_hat_sample, node, edge = generator_output    
-                #loss["g_loss"] = g_loss.item()
-                #g_loss.backward()
-                #self.g_optimizer.step()
-                #self.reset_grad()
-                #loss2 = {}
-
-                #loss2["d2_loss"] = d2_loss.item()
-                #d2_loss.backward()
-                #self.d2_optimizer.step()
+            
                 self.reset_grad()
                 g_total = g_loss
                 if self.submodel != "NoTarget":
@@ -659,10 +649,7 @@ class Trainer(object):
                     g2_loss, fake_mol_g, dr_g_edges_hat_sample, dr_g_nodes_hat_sample = output     
                 
                     g_total = g_loss + g2_loss     
-                #torch.nn.utils.clip_grad_norm_(self.D2.parameters(), self.clipping_value)
-                #loss2["g2_loss"] = g2_loss.item()    
-                #g2_loss.backward()
-                #self.g2_optimizer.step()
+              
                 loss["g_total"] = g_total.item()
                 g_total.backward()
                 self.g_optimizer.step()
@@ -673,108 +660,19 @@ class Trainer(object):
                     self.v_optimizer.step()
                     self.v2_optimizer.step()
                   
-                # Feed the loss
-                
-                #d_loss.backward(retain_graph = True)
-           
-                #torch.nn.utils.clip_grad_norm_(self.D.parameters(), self.clipping_value) 
-                 
-                #plot_grad_flow(self.D.named_parameters(), "D", i, idx)
-      
-                #self.d_optimizer.step()
-              
-                # Logging.
-                
-                #loss['D/d_loss_real'] = prediction_real.item()
-                #loss['D/d_loss_fake'] = prediction_fake.item()
-                #loss['D/loss_gp'] = d_loss_gp.item()
-            
-                
-                #wandb.log({"d_loss": d_loss, "iteration/epoch":[i,idx]})    
-                # =================================================================================== #
-                #                            3. Train the generator                                   #
-                # =================================================================================== #                
-                #if (i+1) % self.n_critic == 0:
-                    
-
-
-
-           
-
-         
-                
-                #torch.nn.utils.clip_grad_norm_(self.G2.parameters(), self.clipping_value)      
-                
-                #plot_grad_flow(self.G2.named_parameters(), "G2", i, idx)
-                #plot_grad_flow(self.V2.named_parameters(), "V2", i, idx)
-                #plot_grad_flow(self.D2.named_parameters(), "D2", i, idx)                    
-                         
-                #g_loss.backward(retain_graph = True)
-            
-                #torch.nn.utils.clip_grad_norm_(self.G.parameters(), self.clipping_value)
-                #torch.nn.utils.clip_grad_norm_(self.V.parameters(), self.clipping_value)
-
-                #plot_grad_flow(self.G.named_parameters(), "G", i, idx)
-                #plot_grad_flow(self.V.named_parameters(), "V", i, idx)
-
-                #self.g_optimizer.step()
-                #self.v_optimizer.step()
-                
-                #self.scheduler_g.step(g_loss)
-                #self.scheduler_v.step(g_loss)
-
-                # Logging.
-                
-                #loss['G/g_loss_fake'] =  g_prediction_fake.item()
-                #loss['G/g_loss_value'] = g_loss_value_pred.item() 
-           
-                #wandb.log({ "g_loss": g_loss, "iteration/epoch":[i,idx]})
                 
                 if (i+1) % self.log_step == 0:
               
                     logging(self.log_path, self.start_time, fake_mol, full_smiles, i, idx, loss, 1,self.sample_directory) 
                     mol_sample(self.sample_directory,"GAN1",fake_mol, g_edges_hat_sample.detach(), g_nodes_hat_sample.detach(), idx, i)
-                    #logging(self.log_path, self.start_time, fake_mol_g, drug_smiles, i, idx, loss, 2,self.sample_directory)     
-                    #mol_sample(self.sample_directory,"GAN2",fake_mol_g, dr_g_edges_hat_sample.detach(), dr_g_nodes_hat_sample.detach(), idx, i)
+                    if self.submodel != "NoTarget":
+                        logging(self.log_path, self.start_time, fake_mol_g, drug_smiles, i, idx, loss, 2,self.sample_directory)     
+                        mol_sample(self.sample_directory,"GAN2",fake_mol_g, dr_g_edges_hat_sample.detach(), dr_g_nodes_hat_sample.detach(), idx, i)
                                   
-            
-                    #GAN2_edges, GAN2_nodes = edge.detach(), node.detach()              
-                """loss2 = {}
-                
-                if (idx+1) > self.warm_up_steps :
-                    self.reset_grad()
-                    # =================================================================================== #
-                    #                             4. Train the discriminator - 2                          #
-                    # =================================================================================== #
 
-
-                                         
-              
-                    
-                    #loss2['D2/d2_loss_real'] = d2_loss_real.item()
-                    #loss2['D2/d2_loss_fake'] = d2_loss_fake.item()
-                    #loss['D2/loss_gp'] = d2_loss_gp_tra.item()           
-                    loss["d2_loss"] = d2_loss.item()     
-                    ##wandb.log({"d2_loss_fake": d2_loss_fake, "d2_loss_real": d2_loss_real, "d2_loss": d2_loss, "iteration/epoch":[i,idx]})       
-                    # =================================================================================== #
-                    #                             5. Train the generator - 2                              #
-                    # =================================================================================== #
-                                   
-                    if (i+1) % self.n_critic == 0:
-                        self.reset_grad()
- 
-
-                        #loss2["G2/g2_loss_fake"] = g2_loss_fake.item()
-                        loss["g2_loss"] = g2_loss.item()        
-                        ##wandb.log({ "g2_loss": g2_loss, "iteration/epoch":[i,idx]})
-                        
-                        if (i+1) % self.log_step == 0:
-                          
-                            mol_sample(self.sample_directory,"GAN2",fake_mol_g, dr_g_edges_hat_sample.detach(), dr_g_nodes_hat_sample.detach(), idx, i)
-                            logging(self.log_path, self.start_time, fake_mol_g, drug_smiles, i, idx, loss, 2,self.sample_directory) 
-                            print("reward2: ",reward2)"""   
-                 
-                            #self.save_model(self.model_directory,idx,i)        
+            if (idx+1) % 10 == 0:   
+                self.save_model(self.model_directory,idx,i) 
+                print("model saved at epoch {} and iteration {}".format(idx,i))       
                             
                       
   

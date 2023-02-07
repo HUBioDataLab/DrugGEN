@@ -34,12 +34,12 @@ def main(config):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--submodel', type=str, default="Prot", help="Chose model subtype: Prot, CrossLoss, Ligand, Prot, NoTarget ")
+    parser.add_argument('--submodel', type=str, default="CrossLoss", help="Chose model subtype: Prot, CrossLoss, Ligand, RL, NoTarget ")
 
     # Model configuration.
     parser.add_argument('--act', type=str, default="relu", help="Activation function for the model.")
     
-    parser.add_argument('--z_dim', type=int, default=16, help='Prior noise for the first GAN')
+    parser.add_argument('--z_dim', type=int, default=8, help='Prior noise for the first GAN')
     
     parser.add_argument('--max_atom', type=int, default=45, help='Max atom number for molecules must be specified.')    
     
@@ -47,11 +47,11 @@ if __name__ == '__main__':
     
     parser.add_argument('--dim', type=int, default=128, help='Dimension of the Transformer Encoder model for GAN1.')
     
-    parser.add_argument('--depth', type=int, default=8, help='Depth of the Transformer model from the first GAN.')
+    parser.add_argument('--depth', type=int, default=1, help='Depth of the Transformer model from the first GAN.')
     
     parser.add_argument('--heads', type=int, default=8, help='Number of heads for the MultiHeadAttention module from the first GAN.')
     
-    parser.add_argument('--dec_depth', type=int, default=8, help='Depth of the Transformer model from the second GAN.')
+    parser.add_argument('--dec_depth', type=int, default=1, help='Depth of the Transformer model from the second GAN.')
     
     parser.add_argument('--dec_heads', type=int, default=8, help='Number of heads for the MultiHeadAttention module from the second GAN.')   
     
@@ -72,9 +72,10 @@ if __name__ == '__main__':
     parser.add_argument('--gcn_depth', type=int, default=0, help="GCN layer depth")""" 
 
     # Training configuration.
+    
     parser.add_argument('--batch_size', type=int, default=128, help='Batch size for the training.')
     
-    parser.add_argument('--epoch', type=int, default=100, help='Epoch number for Training.')
+    parser.add_argument('--epoch', type=int, default=50, help='Epoch number for Training.')
     
     parser.add_argument('--g_lr', type=float, default=0.00001, help='learning rate for G')
     
@@ -86,7 +87,7 @@ if __name__ == '__main__':
     
     parser.add_argument('--dropout', type=float, default=0.4, help='dropout rate')
     
-    parser.add_argument('--dec_dropout', type=float, default=0.01, help='dropout rate')
+    parser.add_argument('--dec_dropout', type=float, default=0.4, help='dropout rate')
     
     parser.add_argument('--n_critic', type=int, default=1, help='number of D updates per each G update')
     

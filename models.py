@@ -39,7 +39,7 @@ class Generator(nn.Module):
                                                                     mlp_ratio=self.mlp_ratio, drop_rate=self.dropout)         
      
 
-        self.dropout = nn.Dropout(p=dropout)
+    
         
         self.readout_e = nn.Linear(self.dim, edges)
         self.readout_n = nn.Linear(self.dim, nodes)
@@ -94,9 +94,9 @@ class Generator(nn.Module):
      
      
 class Generator2(nn.Module):
-    def __init__(self, dim, dec_dim, depth, heads, mlp_ratio, drop_rate,drugs_m_dim,drugs_b_dim,b_dim,m_dim):
+    def __init__(self, dim, dec_dim, depth, heads, mlp_ratio, drop_rate,drugs_m_dim,drugs_b_dim,b_dim,m_dim, submodel):
         super().__init__()
-
+        self.submodel = submodel
         self.depth = depth
         self.dim = dim
         self.mlp_ratio = mlp_ratio
@@ -107,20 +107,22 @@ class Generator2(nn.Module):
 
         self.pos_enc_dim = 5
         
-        #self.pos_enc = nn.Linear(self.pos_enc_dim, self.dim)
-
-        self.prot_n = torch.nn.Linear(3822, 45)   ## exact dimension of protein features
-        self.prot_e = torch.nn.Linear(298116, 2025) ## exact dimension of protein features
+     
+        if self.submodel == "Prot":
+            self.prot_n = torch.nn.Linear(3822, 45)   ## exact dimension of protein features
+            self.prot_e = torch.nn.Linear(298116, 2025) ## exact dimension of protein features
         
-        self.protn_dim = torch.nn.Linear(1,dec_dim)
-        self.prote_dim = torch.nn.Linear(1,dec_dim)
+            self.protn_dim = torch.nn.Linear(1,dec_dim)
+            self.prote_dim = torch.nn.Linear(1,dec_dim)
+            
+            
         self.mol_nodes = nn.Linear(dim, dec_dim)
         self.mol_edges = nn.Linear(dim, dec_dim)
         
-        #self.drug_nodes =  nn.Linear(self.drugs_m_dim, dec_dim)
-        #self.drug_edges =  nn.Linear(self.drugs_b_dim, dec_dim)
+        self.drug_nodes =  nn.Linear(self.drugs_m_dim, dec_dim)
+        self.drug_edges =  nn.Linear(self.drugs_b_dim, dec_dim)
         
-        self.TransformerDecoder = TransformerDecoder(dec_dim, depth, heads, mlp_ratio=4, drop_rate=0.)
+        self.TransformerDecoder = TransformerDecoder(dec_dim, depth, heads, mlp_ratio, drop_rate=0.)
 
         self.nodes_output_layer = nn.Linear(dec_dim, self.drugs_m_dim)
         self.edges_output_layer = nn.Linear(dec_dim, self.drugs_b_dim)
@@ -146,13 +148,15 @@ class Generator2(nn.Module):
         
         edges_logits = self.mol_edges(edges_logits)
         nodes_logits = self.mol_nodes(nodes_logits)
-
-        akt1_adj = self.prote_dim(self.prot_e(akt1_adj).view(1,45,45,1))
-        akt1_annot = self.protn_dim(self.prot_n(akt1_annot).view(1,45,1))
         
-                
-        #drug_n = self.drug_nodes(drugs_n)
-        #drug_e = self.drug_edges(drugs_e)
+        if self.submodel != "Prot":
+            akt1_annot = self.drug_nodes(akt1_annot)
+            akt1_adj = self.drug_edges(akt1_adj)
+         
+        else:
+            akt1_adj = self.prote_dim(self.prot_e(akt1_adj).view(1,45,45,1))
+            akt1_annot = self.protn_dim(self.prot_n(akt1_annot).view(1,45,1))       
+
 
         #lap = [self.laplacian_positional_enc(torch.max(x,-1)[1]) for x in drug_e]
         #lap = torch.stack(lap).to(drug_e.device)

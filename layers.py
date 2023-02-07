@@ -164,6 +164,8 @@ class enc_dec_attention(nn.Module):
         
         
         
+        #attn = torch.einsum('bnchd,bmahd->bnahd', query_mol_annot, key_prot_annot)
+        
         attn = query_mol_annot * key_prot_annot
         
         attn = attn/ math.sqrt(self.dim)
