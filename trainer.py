@@ -32,6 +32,7 @@ class Trainer(object):
         self.device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
         """Initialize configurations."""
         self.submodel = config.submodel
+        self.inference_model = config.inference_model
         # Data loader.
         self.raw_file = config.raw_file  # SMILES containing text file for first dataset. 
                                          # Write the full path to file.
@@ -694,16 +695,21 @@ class Trainer(object):
                       
   
     def inference(self):
+        
         # Load the trained generator.
         self.G.to(self.device)
         #self.D.to(self.device)
         self.G2.to(self.device)
         #self.D2.to(self.device)        
-        self.restore_model(50, 11080, "/home/atabey/DrugGEN/experiments/models/Prot_glr1e-05_dlr1e-05_g2lr1e-05_d2lr1e-05_dim128_depth1_heads8_decdepth1_decheads8_ncritic1_batch128_epoch50_warmup0_datasetchembl45_train_dropout0.0")
         
-        full_smiles = [line for line in open("DrugGEN/data/chembl_test.smi", 'r').read().splitlines()]
+        G_path = os.path.join(self.inference_model, '{}-G.ckpt'.format(self.submodel))
+        self.G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
+        G2_path = os.path.join(self.inference_model, '{}-G2.ckpt'.format(self.submodel))
+        self.G2.load_state_dict(torch.load(G2_path, map_location=lambda storage, loc: storage))        
+        
+        
         drug_smiles = [line for line in open("DrugGEN/data/drugs_smiles.smi", 'r').read().splitlines()]
-        used_mols = []
+        
         drug_mols = [Chem.MolFromSmiles(smi) for smi in drug_smiles]
         drug_scaf = [MurckoScaffold.GetScaffoldForMol(x) for x in drug_mols]
         fps_r = [Chem.RDKFingerprint(x) for x in drug_scaf]
@@ -750,7 +756,8 @@ class Trainer(object):
         #metric_calc_mol = []
         metric_calc_dr = []
         date = time.time()
-
+        if not os.path.exists("DrugGEN/experiments/inference/{}".format(self.submodel)):
+            os.makedirs("DrugGEN/experiments/inference/{}".format(self.submodel))
         with torch.inference_mode():
             
             dataloader_iterator = iter(self.drugs_loader)
@@ -796,8 +803,8 @@ class Trainer(object):
                     GAN2_disc_e = drugs_a_tensor
                     GAN2_disc_x = drugs_x_tensor            
                 elif self.submodel == "Prot":        
-                    GAN1_input_e = z_edge 
-                    GAN1_input_x = z_node
+                    GAN1_input_e = a_tensor 
+                    GAN1_input_x = x_tensor
                     GAN1_disc_e = a_tensor
                     GAN1_disc_x = x_tensor
                     GAN2_input_e = akt1_human_adj
@@ -862,8 +869,8 @@ class Trainer(object):
                 
 
                 print("molecule batch {} inferred, {} % Valid".format(i, (len(inference_drugs)/self.batch_size)*100))  
-                
-                with open("DrugGEN/experiments/inference/inference_drugs.txt", "a") as f:
+
+                with open("DrugGEN/experiments/inference/{}/inference_drugs.txt".format(self.submodel), "a") as f:
                     for molecules in inference_drugs:
                         
                         f.write(molecules)
