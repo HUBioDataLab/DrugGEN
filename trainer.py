@@ -881,6 +881,8 @@ class Trainer(object):
         
         print("Metrics calculation started using MOSES.")
                    
-        print(get_all_metrics(metric_calc_dr, test = full_smiles, train = drug_smiles))
+        print("Validity: ", fraction_valid(inference_drugs), "\n")
+        print("Uniqueness: ", fraction_unique(inference_drugs), "\n")
+        print("Validity: ", novelty(inference_drugs, drug_smiles), "\n")
 
         print("Metrics are calculated.")

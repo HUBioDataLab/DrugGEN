@@ -12,16 +12,12 @@ from rdkit import RDLogger
 import torch 
 from rdkit.Chem.Scaffolds import MurckoScaffold
 import math
-from moses.metrics.metrics import (get_all_metrics, average_agg_tanimoto,
-                                   fraction_valid, fraction_unique,
-                                   fraction_passes_filters,
-                                   novelty, internal_diversity,
-                                   logP, SA , QED)
 import time
 import datetime
 import re
 RDLogger.DisableLog('rdApp.*')   
-
+import warnings
+from multiprocessing import Pool
 class Metrics(object):
 
     @staticmethod
@@ -244,7 +240,8 @@ def logging(log_path, start_time, mols, train_smiles, i,idx, loss,model_num, sav
         
         log += ", {}: {:.4f}".format(tag, value)
     with open(log_path, "a") as f:
-        f.write(log)                                 
+        f.write(log)  
+        f.write("\n")                               
     print(log) 
     print("\n") 
 
@@ -331,3 +328,135 @@ def _genDegree():
         
     return deg        
 """    
+def get_mol(smiles_or_mol):
+    '''
+    Loads SMILES/molecule into RDKit's object
+    '''
+    if isinstance(smiles_or_mol, str):
+        if len(smiles_or_mol) == 0:
+            return None
+        mol = Chem.MolFromSmiles(smiles_or_mol)
+        if mol is None:
+            return None
+        try:
+            Chem.SanitizeMol(mol)
+        except ValueError:
+            return None
+        return mol
+    return smiles_or_mol
+
+def mapper(n_jobs):
+    '''
+    Returns function for map call.
+    If n_jobs == 1, will use standard map
+    If n_jobs > 1, will use multiprocessing pool
+    If n_jobs is a pool object, will return its map function
+    '''
+    if n_jobs == 1:
+        def _mapper(*args, **kwargs):
+            return list(map(*args, **kwargs))
+
+        return _mapper
+    if isinstance(n_jobs, int):
+        pool = Pool(n_jobs)
+
+        def _mapper(*args, **kwargs):
+            try:
+                result = pool.map(*args, **kwargs)
+            finally:
+                pool.terminate()
+            return result
+
+        return _mapper
+    return n_jobs.map
+def remove_invalid(gen, canonize=True, n_jobs=1):
+    """
+    Removes invalid molecules from the dataset
+    """
+    if not canonize:
+        mols = mapper(n_jobs)(get_mol, gen)
+        return [gen_ for gen_, mol in zip(gen, mols) if mol is not None]
+    return [x for x in mapper(n_jobs)(canonic_smiles, gen) if
+            x is not None]
+def fraction_valid(gen, n_jobs=1):
+    """
+    Computes a number of valid molecules
+    Parameters:
+        gen: list of SMILES
+        n_jobs: number of threads for calculation
+    """
+    gen = mapper(n_jobs)(get_mol, gen)
+    return 1 - gen.count(None) / len(gen)
+def canonic_smiles(smiles_or_mol):
+    mol = get_mol(smiles_or_mol)
+    if mol is None:
+        return None
+    return Chem.MolToSmiles(mol)
+def fraction_unique(gen, k=None, n_jobs=1, check_validity=True):
+    """
+    Computes a number of unique molecules
+    Parameters:
+        gen: list of SMILES
+        k: compute unique@k
+        n_jobs: number of threads for calculation
+        check_validity: raises ValueError if invalid molecules are present
+    """
+    if k is not None:
+        if len(gen) < k:
+            warnings.warn(
+                "Can't compute unique@{}.".format(k) +
+                "gen contains only {} molecules".format(len(gen))
+            )
+        gen = gen[:k]
+    canonic = set(mapper(n_jobs)(canonic_smiles, gen))
+    if None in canonic and check_validity:
+        raise ValueError("Invalid molecule passed to unique@k")
+    return 0 if len(gen) == 0 else len(canonic) / len(gen)
+
+def novelty(gen, train, n_jobs=1):
+    gen_smiles = mapper(n_jobs)(canonic_smiles, gen)
+    gen_smiles_set = set(gen_smiles) - {None}
+    train_set = set(train)
+    return 0 if len(gen_smiles_set) == 0 else len(gen_smiles_set - train_set) / len(gen_smiles_set)
+
+
+
+def average_agg_tanimoto(stock_vecs, gen_vecs,
+                         batch_size=5000, agg='max',
+                         device='cpu', p=1):
+    """
+    For each molecule in gen_vecs finds closest molecule in stock_vecs.
+    Returns average tanimoto score for between these molecules
+
+    Parameters:
+        stock_vecs: numpy array <n_vectors x dim>
+        gen_vecs: numpy array <n_vectors' x dim>
+        agg: max or mean
+        p: power for averaging: (mean x^p)^(1/p)
+    """
+    assert agg in ['max', 'mean'], "Can aggregate only max or mean"
+    agg_tanimoto = np.zeros(len(gen_vecs))
+    total = np.zeros(len(gen_vecs))
+    for j in range(0, stock_vecs.shape[0], batch_size):
+        x_stock = torch.tensor(stock_vecs[j:j + batch_size]).to(device).float()
+        for i in range(0, gen_vecs.shape[0], batch_size):
+            
+            y_gen = torch.tensor(gen_vecs[i:i + batch_size]).to(device).float()
+            y_gen = y_gen.transpose(0, 1)
+            tp = torch.mm(x_stock, y_gen)
+            jac = (tp / (x_stock.sum(1, keepdim=True) +
+                         y_gen.sum(0, keepdim=True) - tp)).cpu().numpy()
+            jac[np.isnan(jac)] = 1
+            if p != 1:
+                jac = jac**p
+            if agg == 'max':
+                agg_tanimoto[i:i + y_gen.shape[1]] = np.maximum(
+                    agg_tanimoto[i:i + y_gen.shape[1]], jac.max(0))
+            elif agg == 'mean':
+                agg_tanimoto[i:i + y_gen.shape[1]] += jac.sum(0)
+                total[i:i + y_gen.shape[1]] += jac.shape[0]
+    if agg == 'mean':
+        agg_tanimoto /= total
+    if p != 1:
+        agg_tanimoto = (agg_tanimoto)**(1/p)
+    return np.mean(agg_tanimoto)
