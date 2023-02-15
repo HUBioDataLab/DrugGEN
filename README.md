@@ -121,6 +121,11 @@ It enables cost-free project execution in the cloud. You can use the provided no
 ## Training
 
 ```bash
+# set up the environment
+
+conda env create -f dependencies.yml
+
+
 conda activate druggen
 
 # Download the raw files
@@ -177,6 +182,18 @@ Dataset arguments:
 - Finally, de novo molecules to effectively target AKT1 protein are selected via expert curation from the dataset of molecules with binding free energies lower than -9 kcal/mol. The structural representations of the selected molecules are shown in the figure below ([SMILES notations of the expert selected de novo AKT1 inhibitor molecules](results/docking/Selected_denovo_AKT1_inhibitors.smi)).
 
 ![structures](assets/Selected_denovo_AKT1_inhibitors.png)
+
+## Inference Mode for Trained DrugGEN Models
+
+- To try trained DrugGEN models, first you need to download the from the given link and place it in DrugGEN/experiment/models/ folder.
+- After that running the below code should suffice.
+
+```bash
+
+python DrugGEN/main.py --mode="inference" --inference_model="DrugGEN/experiments/models/{Chosen submodel name}"
+```
+
+- SMILES representation of the molecules are saved to "DrugGEN/experiments/inference/{Chosen submodel name}/inference_drugs.txt" file.
 
 ## Updates
 
