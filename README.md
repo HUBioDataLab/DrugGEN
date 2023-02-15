@@ -174,7 +174,8 @@ Dataset arguments:
 
 ## Updates
 
-- 01/01/2023: Five different DrugGEN models were released.
+- 15/02/2023: Our pre-print is shared [here](https://github.com/HUBioDataLab/DrugGEN/files/10746530/DrugGEN_Arxiv_formatted_submitted_15.02.2023.pdf) together with its supplementary material document [link](https://github.com/HUBioDataLab/DrugGEN/files/10746548/Druggen_Arxiv_submitted_Supplementary_Materials_15.02.2023.pdf).
+- 01/01/2023: Five different DrugGEN models are released.
 
 ## Citation
 <!--ADD BIBTEX AFTER THE PUBLISHING-->
