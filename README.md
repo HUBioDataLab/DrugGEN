@@ -125,6 +125,7 @@ It enables cost-free project execution in the cloud. You can use the provided no
 
 conda env create -f dependencies.yml
 
+# activate the environment
 
 conda activate druggen
 
