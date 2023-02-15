@@ -19,6 +19,9 @@ torch.set_num_threads(5)
 RDLogger.DisableLog('rdApp.*') 
 from loss import discriminator_loss, generator_loss, discriminator2_loss, generator2_loss
 from training_data import load_data
+import random
+torch.manual_seed(1337)
+random.seed(1337)
 
 class Trainer(object):
     
@@ -43,6 +46,19 @@ class Trainer(object):
         self.drugs_dataset_file = config.drug_dataset_file  # Drug dataset file name for the second GAN. 
                                                             # Contains drug molecules only. (In this case AKT1 inhibitors.)
         
+        self.inf_raw_file = config.inf_raw_file  # SMILES containing text file for first dataset. 
+                                         # Write the full path to file.
+        
+        self.inf_drug_raw_file = config.inf_drug_raw_file  # SMILES containing text file for second dataset. 
+                                                   # Write the full path to file.       
+                                                   
+                                                    
+        self.inf_dataset_file = config.inf_dataset_file    # Dataset file name for the first GAN. 
+                                                   # Contains large number of molecules.
+        
+        self.inf_drugs_dataset_file = config.inf_drug_dataset_file  # Drug dataset file name for the second GAN. 
+                                                            # Contains drug molecules only. (In this case AKT1 inhibitors.)
+
         self.mol_data_dir = config.mol_data_dir  # Directory where the dataset files are stored.
         
         self.drug_data_dir = config.drug_data_dir  # Directory where the drug dataset files are stored.
@@ -408,35 +424,38 @@ class Trainer(object):
         print("The number of parameters: {}".format(num_params))
 
 
-    def restore_model(self, resume_iters, model_directory):
+    def restore_model(self, epoch, iteration, model_directory):
         
         """Restore the trained generator and discriminator."""
         
-        print('Loading the trained models from step {}...'.format(resume_iters))
+        print('Loading the trained models from epoch / iteration {}-{}...'.format(epoch, iteration))
         
-        G_path = os.path.join(model_directory, '{}-G.ckpt'.format(resume_iters))
-        D_path = os.path.join(model_directory, '{}-D.ckpt'.format(resume_iters))
+        G_path = os.path.join(model_directory, '{}-{}-G.ckpt'.format(epoch, iteration))
+        #D_path = os.path.join(model_directory, '{}-{}-D.ckpt'.format(epoch, iteration))
         
         self.G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
-        self.D.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
+        #self.D.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
       
         
-        G2_path = os.path.join(model_directory, '{}-G2.ckpt'.format(resume_iters))
-        D2_path = os.path.join(model_directory, '{}-D2.ckpt'.format(resume_iters))
+        G2_path = os.path.join(model_directory, '{}-{}-G2.ckpt'.format(epoch, iteration))
+        #D2_path = os.path.join(model_directory, '{}-{}-D2.ckpt'.format(epoch, iteration))
         
         self.G2.load_state_dict(torch.load(G2_path, map_location=lambda storage, loc: storage))
-        self.D2.load_state_dict(torch.load(D2_path, map_location=lambda storage, loc: storage))
+        #self.D2.load_state_dict(torch.load(D2_path, map_location=lambda storage, loc: storage))
 
    
     def save_model(self, model_directory, idx,i):
         G_path = os.path.join(model_directory, '{}-{}-G.ckpt'.format(idx+1,i+1))
         D_path = os.path.join(model_directory, '{}-{}-D.ckpt'.format(idx+1,i+1))
-        G2_path = os.path.join(model_directory, '{}-{}-G2.ckpt'.format(idx+1,i+1))
-        D2_path = os.path.join(model_directory, '{}-{}-D2.ckpt'.format(idx+1,i+1))
         torch.save(self.G.state_dict(), G_path)     
-        torch.save(self.D.state_dict(), D_path)     
-        torch.save(self.G2.state_dict(), G2_path)         
-        torch.save(self.D2.state_dict(), D2_path)  
+        torch.save(self.D.state_dict(), D_path) 
+        
+        if self.submodel != "NoTarget" and self.submodel != "CrossLoss":
+            G2_path = os.path.join(model_directory, '{}-{}-G2.ckpt'.format(idx+1,i+1))
+            D2_path = os.path.join(model_directory, '{}-{}-D2.ckpt'.format(idx+1,i+1))
+    
+            torch.save(self.G2.state_dict(), G2_path)         
+            torch.save(self.D2.state_dict(), D2_path)  
         
     def reset_grad(self):
         
@@ -537,14 +556,10 @@ class Trainer(object):
                 drug_graphs, real_graphs, a_tensor, x_tensor, drugs_a_tensor, drugs_x_tensor, z, z_edge, z_node = bulk_data
                 
                 if self.submodel == "CrossLoss":
-                    GAN1_input_e = a_tensor
-                    GAN1_input_x = x_tensor
-                    GAN1_disc_e = drugs_a_tensor
-                    GAN1_disc_x = drugs_x_tensor
-                    GAN2_input_e = drugs_a_tensor
-                    GAN2_input_x = drugs_x_tensor
-                    GAN2_disc_e = a_tensor
-                    GAN2_disc_x = x_tensor
+                    GAN1_input_e = drugs_a_tensor
+                    GAN1_input_x = drugs_x_tensor
+                    GAN1_disc_e = a_tensor
+                    GAN1_disc_x = x_tensor
                 elif self.submodel == "Ligand":
                     GAN1_input_e = a_tensor
                     GAN1_input_x = x_tensor
@@ -555,8 +570,8 @@ class Trainer(object):
                     GAN2_disc_e = drugs_a_tensor
                     GAN2_disc_x = drugs_x_tensor            
                 elif self.submodel == "Prot":        
-                    GAN1_input_e = a_tensor
-                    GAN1_input_x = x_tensor
+                    GAN1_input_e = z_edge + a_tensor
+                    GAN1_input_x = z_node + x_tensor
                     GAN1_disc_e = a_tensor
                     GAN1_disc_x = x_tensor
                     GAN2_input_e = akt1_human_adj
@@ -573,11 +588,11 @@ class Trainer(object):
                     GAN2_disc_e = drugs_a_tensor
                     GAN2_disc_x = drugs_x_tensor    
                 elif self.submodel == "NoTarget":
-                    GAN1_input_e = z_edge
-                    GAN1_input_x = z_node
+                    GAN1_input_e = z_edge 
+                    GAN1_input_x = z_node 
                     GAN1_disc_e = a_tensor
                     GAN1_disc_x = x_tensor                                                  
-                         
+                    
                 # =================================================================================== #
                 #                             2. Train the discriminator                              #
                 # =================================================================================== #
@@ -594,10 +609,12 @@ class Trainer(object):
                                             self.batch_size, 
                                             self.device, 
                                             self.gradient_penalty, 
-                                            self.lambda_gp)
+                                            self.lambda_gp,
+                                            GAN1_input_e,
+                                            GAN1_input_x)
         
                 d_total = d_loss
-                if self.submodel != "NoTarget":
+                if self.submodel != "NoTarget" and self.submodel != "CrossLoss":
                     d2_loss = discriminator2_loss(self.G2, 
                                                     self.D2, 
                                                     drug_graphs,
@@ -614,7 +631,7 @@ class Trainer(object):
                 loss["d_total"] = d_total.item()
                 d_total.backward()
                 self.d_optimizer.step()
-                if self.submodel != "NoTarget":
+                if self.submodel != "NoTarget" and self.submodel != "CrossLoss":
                     self.d2_optimizer.step()
                 self.reset_grad()
                 generator_output = generator_loss(self.G,
@@ -632,7 +649,7 @@ class Trainer(object):
             
                 self.reset_grad()
                 g_total = g_loss
-                if self.submodel != "NoTarget":
+                if self.submodel != "NoTarget" and self.submodel != "CrossLoss":
                     output = generator2_loss(self.G2,
                                                 self.D2,
                                                 self.V2,
@@ -653,7 +670,7 @@ class Trainer(object):
                 loss["g_total"] = g_total.item()
                 g_total.backward()
                 self.g_optimizer.step()
-                if self.submodel != "NoTarget":
+                if self.submodel != "NoTarget" and self.submodel != "CrossLoss":
                     self.g2_optimizer.step()
                 
                 if self.submodel == "RL":
@@ -665,7 +682,7 @@ class Trainer(object):
               
                     logging(self.log_path, self.start_time, fake_mol, full_smiles, i, idx, loss, 1,self.sample_directory) 
                     mol_sample(self.sample_directory,"GAN1",fake_mol, g_edges_hat_sample.detach(), g_nodes_hat_sample.detach(), idx, i)
-                    if self.submodel != "NoTarget":
+                    if self.submodel != "NoTarget" and self.submodel != "CrossLoss":
                         logging(self.log_path, self.start_time, fake_mol_g, drug_smiles, i, idx, loss, 2,self.sample_directory)     
                         mol_sample(self.sample_directory,"GAN2",fake_mol_g, dr_g_edges_hat_sample.detach(), dr_g_nodes_hat_sample.detach(), idx, i)
                                   
@@ -682,9 +699,18 @@ class Trainer(object):
         #self.D.to(self.device)
         self.G2.to(self.device)
         #self.D2.to(self.device)        
-        self.restore_model(6195,"DrugGEN/experiments/models/glr1e-05_dlr1e-05_g2lr1e-05_d2lr1e-05_dim128_depth4_heads8_decdepth4_decheads8_ncritic5_batch256_epoch20_warmup0_datasetchembl45_disc-conv_la0.5_dropout0.1")
+        self.restore_model(50, 11080, "/home/atabey/DrugGEN/experiments/models/Prot_glr1e-05_dlr1e-05_g2lr1e-05_d2lr1e-05_dim128_depth1_heads8_decdepth1_decheads8_ncritic1_batch128_epoch50_warmup0_datasetchembl45_train_dropout0.0")
         
+        full_smiles = [line for line in open("DrugGEN/data/chembl_test.smi", 'r').read().splitlines()]
+        drug_smiles = [line for line in open("DrugGEN/data/drugs_smiles.smi", 'r').read().splitlines()]
+        used_mols = []
+        drug_mols = [Chem.MolFromSmiles(smi) for smi in drug_smiles]
+        drug_scaf = [MurckoScaffold.GetScaffoldForMol(x) for x in drug_mols]
+        fps_r = [Chem.RDKFingerprint(x) for x in drug_scaf]
 
+        akt1_human_adj = torch.load("DrugGEN/akt/AKT1_human_adj.pt").reshape(1,-1).to(self.device).float() 
+        akt1_human_annot = torch.load("DrugGEN/akt/AKT1_human_annot.pt").reshape(1,-1).to(self.device).float() 
+        
         self.G.eval()
         #self.D.eval()
         self.G2.eval()
@@ -692,8 +718,8 @@ class Trainer(object):
         
         self.inf_batch_size =256
         self.inf_dataset = DruggenDataset(self.mol_data_dir,
-                                      self.dataset_file, 
-                                      self.raw_file, 
+                                      self.inf_dataset_file, 
+                                      self.inf_raw_file, 
                                       self.max_atom, 
                                       self.features) # Dataset for the first GAN. Custom dataset class from PyG parent class. 
                                                      # Can create any molecular graph dataset given smiles string. 
@@ -707,8 +733,8 @@ class Trainer(object):
                                  drop_last=True)  # PyG dataloader for the first GAN.
 
         self.inf_drugs = DruggenDataset(self.drug_data_dir, 
-                                    self.drugs_dataset_file, 
-                                    self.drug_raw_file, 
+                                    self.inf_drugs_dataset_file, 
+                                    self.inf_drug_raw_file, 
                                     self.max_atom, 
                                     self.features)   # Dataset for the second GAN. Custom dataset class from PyG parent class. 
                                                      # Can create any molecular graph dataset given smiles string. 
@@ -721,148 +747,140 @@ class Trainer(object):
                                        batch_size=self.inf_batch_size, 
                                        drop_last=True)  # PyG dataloader for the second GAN.        
         start_time = time.time()
-        metric_calc_mol = []
+        #metric_calc_mol = []
         metric_calc_dr = []
         date = time.time()
-        drug_x = torch.ones((self.inf_batch_size, self.max_atom,  self.drugs_m_dim)).to(self.device)
-        drug_a = torch.ones((self.inf_batch_size, self.max_atom, self.max_atom, self.drugs_b_dim)).to(self.device)
+
         with torch.inference_mode():
-
-
-        # =================================================================================== #
-        #                             1. Preprocess input data                                #
-        # =================================================================================== #
-        
-        # Load the data 
-        
+            
             dataloader_iterator = iter(self.drugs_loader)
-        
+            
             for i, data in enumerate(self.loader):   
                 try:
                     drugs = next(dataloader_iterator)
                 except StopIteration:
                     dataloader_iterator = iter(self.drugs_loader)
                     drugs = next(dataloader_iterator)
-                    
-                data = data.to(self.device)
-                        
-                drugs = drugs.to(self.device)                                               
-                z_e = self.sample_z_edge(self.inf_batch_size)                                                   # (batch,max_len,max_len)    
-                z_n = self.sample_z_node(self.inf_batch_size)                                                   # (batch,max_len)          
-                z_edge = torch.from_numpy(z_e).to(self.device).float()                                      # Edge noise.(batch,max_len,max_len)
-                z_node = torch.from_numpy(z_n).to(self.device).float()                                      # Node noise.(batch,max_len)       
-                a = geoutils.to_dense_adj(edge_index = data.edge_index,batch=data.batch,edge_attr=data.edge_attr, max_num_nodes=int(data.batch.shape[0]/self.inf_batch_size))
-                x = data.x.view(-1,int(data.batch.shape[0]/self.inf_batch_size))
-            
-                a_tensor = self.label2onehot(a, self.b_dim)
-                #x_tensor = self.label2onehot(x, self.m_dim)
+
+                # Preprocess both dataset 
                 
-                drugs_a = geoutils.to_dense_adj(edge_index = drugs.edge_index,batch=drugs.batch,edge_attr=drugs.edge_attr, max_num_nodes=int(drugs.batch.shape[0]/self.inf_batch_size))
-                drugs_x = drugs.x.view(self.batch_size,int(drugs.batch.shape[0]/self.batch_size),-1)
+                bulk_data = load_data(data,
+                                     drugs,
+                                     self.batch_size, 
+                                     self.device,
+                                     self.b_dim,
+                                     self.m_dim,
+                                     self.drugs_b_dim,
+                                     self.drugs_m_dim,
+                                     self.z_dim,
+                                     self.vertexes)   
                 
-                drugs_a = drugs_a.to(self.device).long()
-                drugs_x = drugs_x.to(self.device).float() 
-                drugs_a_tensor = self.label2onehot(drugs_a, self.drugs_b_dim).float()
-                drugs_x_tensor = drugs_x
-                            
-        
+                drug_graphs, real_graphs, a_tensor, x_tensor, drugs_a_tensor, drugs_x_tensor, z, z_edge, z_node = bulk_data
+                
+                if self.submodel == "CrossLoss":
+                    GAN1_input_e = a_tensor
+                    GAN1_input_x = x_tensor
+                    GAN1_disc_e = drugs_a_tensor
+                    GAN1_disc_x = drugs_x_tensor
+                    GAN2_input_e = drugs_a_tensor
+                    GAN2_input_x = drugs_x_tensor
+                    GAN2_disc_e = a_tensor
+                    GAN2_disc_x = x_tensor
+                elif self.submodel == "Ligand":
+                    GAN1_input_e = a_tensor
+                    GAN1_input_x = x_tensor
+                    GAN1_disc_e = a_tensor
+                    GAN1_disc_x = x_tensor
+                    GAN2_input_e = drugs_a_tensor
+                    GAN2_input_x = drugs_x_tensor
+                    GAN2_disc_e = drugs_a_tensor
+                    GAN2_disc_x = drugs_x_tensor            
+                elif self.submodel == "Prot":        
+                    GAN1_input_e = z_edge 
+                    GAN1_input_x = z_node
+                    GAN1_disc_e = a_tensor
+                    GAN1_disc_x = x_tensor
+                    GAN2_input_e = akt1_human_adj
+                    GAN2_input_x = akt1_human_annot
+                    GAN2_disc_e = drugs_a_tensor
+                    GAN2_disc_x = drugs_x_tensor        
+                elif self.submodel == "RL":
+                    GAN1_input_e = z_edge
+                    GAN1_input_x = z_node
+                    GAN1_disc_e = a_tensor
+                    GAN1_disc_x = x_tensor
+                    GAN2_input_e = drugs_a_tensor
+                    GAN2_input_x = drugs_x_tensor
+                    GAN2_disc_e = drugs_a_tensor
+                    GAN2_disc_x = drugs_x_tensor    
+                elif self.submodel == "NoTarget":
+                    GAN1_input_e = z_edge
+                    GAN1_input_x = z_node
+                    GAN1_disc_e = a_tensor
+                    GAN1_disc_x = x_tensor      
                 # =================================================================================== #
                 #                             2. GAN1 Inference                                       #
                 # =================================================================================== #            
-                node, edge = self.G(z_edge, z_node)
+                generator_output = generator_loss(self.G,
+                                                    self.D,
+                                                    self.V,
+                                                    GAN1_input_e,
+                                                    GAN1_input_x,
+                                                    self.batch_size,
+                                                    sim_reward,
+                                                    self.dataset.matrices2mol_drugs,
+                                                    fps_r,
+                                                    self.submodel)   
                 
-        
-                edges_hat = self.softmax(edge)
-                
-                nodes_hat= self.softmax(node)                     
-             
-                g_edges_hard, g_nodes_hard = torch.max(edges_hat, -1)[1], torch.max(nodes_hat, -1)[1] 
+                _, fake_mol, _, _, node, edge = generator_output  
 
-        
                 # =================================================================================== #
                 #                             3. GAN2 Inference                                       #
-                # =================================================================================== #           
-                #edges_logits_forGAN2, nodes_logits_forGAN2 = edge.detach().clone(), node.detach().clone()
-             
-                dr_edges, dr_nodes = self.G2(edges_hat, 
-                                            nodes_hat, 
-                                            drug_x,
-                                            drugs_a_tensor)
-
-           
-                
-                #dr_edges_hat = self.softmax(dr_edges).view(self.inf_batch_size, -1)
-                
-                #dr_nodes_hat = self.softmax(dr_nodes).view(self.inf_batch_size, -1)
-
-                #graph = torch.cat((dr_nodes_hat, dr_edges_hat), dim=-1)      
-                
-                dr_edges_hat = self.softmax(dr_edges)
-                
-                dr_nodes_hat= self.softmax(dr_nodes) 
-
-                dr_edges_hat, dr_nodes_hat = torch.max(dr_edges_hat, -1)[1], torch.max(dr_nodes_hat, -1)[1]
+                # =================================================================================== #   
+                        
+                output = generator2_loss(self.G2,
+                                            self.D2,
+                                            self.V2,
+                                            edge,
+                                            node,
+                                            self.batch_size,
+                                            sim_reward,
+                                            self.dataset.matrices2mol_drugs,
+                                            fps_r,
+                                            GAN2_input_e,
+                                            GAN2_input_x,
+                                            self.submodel)
             
+                _, fake_mol_g, _, _ = output     
 
-                                        
-                # Log update
-                inferece_mols = [self.dataset.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=False) 
-                        for e_, n_ in zip(g_edges_hard, g_nodes_hard)] 
-                inference_drugs = [self.dataset.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=False) 
-                                for e_, n_ in zip(dr_edges_hat, dr_nodes_hat)]
-                
-                inference_drugs = [Chem.MolToSmiles(line) for line in inference_drugs]   
-                inference_drugs = [re.sub('\*', '', line)  for line in inference_drugs]
-                inference_drugs = [re.sub('\.', '', line)  for line in inference_drugs] 
-                
-                inference_smiles = [Chem.MolToSmiles(line) for line in inferece_mols]   
-                inference_smiles = [re.sub('\*', '', line)  for line in inference_smiles]
-                #inference_smiles = [re.sub('\.', '', line)  for line in inference_smiles] 
+                inference_drugs = [Chem.MolToSmiles(line) for line in fake_mol_g if line is not None]   
 
-                print("molecule batch {} inferred".format(i))  
+
+                
+                #inference_smiles = [Chem.MolToSmiles(line) for line in fake_mol]  
+                 
+                
+
+                print("molecule batch {} inferred, {} % Valid".format(i, (len(inference_drugs)/self.batch_size)*100))  
                 
                 with open("DrugGEN/experiments/inference/inference_drugs.txt", "a") as f:
-                    for idxs in range(g_nodes_hard.shape[0]):
+                    for molecules in inference_drugs:
                         
-                        f.write(inference_drugs[idxs])
+                        f.write(molecules)
                         f.write("\n")
-                        metric_calc_dr.append(inference_drugs[idxs])
-             
-
-                """with open("DrugGEN/experiments/inference/inference_mols.txt", "a") as f:
-                    for idxs in range(g_nodes_hard.shape[0]):
-                        
-                        f.write(inference_smiles[idxs])
-                        f.write("\n")
-                        metric_calc_mol.append(inference_smiles[idxs])"""
+                        metric_calc_dr.append(molecules)
+            
                  
                                             
                 if i == 120:
                     break
         
         et = time.time() - start_time
+        
         print("Inference mode is lasted for {:.2f} seconds".format(et))
         
         print("Metrics calculation started using MOSES.")
-        #full_smiles = [line for line in open("DrugGEN/data/chembl_nonisomeric.txt", "r").readlines()]               
-        full_drugs = [line for line in open('DrugGEN/data/akt1_nonisomeric.smi', 'r').readlines()] 
-        print(get_all_metrics(metric_calc_dr, test = full_drugs, train = full_drugs))
-        et = time.time() - start_time
-        print("Metrics for generated drugs are calculated and lasted for {:.2f} seconds".format(et))
-        #print(get_all_metrics(metric_calc_mol, test = full_smiles, train = full_smiles))
-        et = time.time() - start_time
-        print("Metrics for generated molecules are calculated and lasted for {:.2f} seconds".format(et))
+                   
+        print(get_all_metrics(metric_calc_dr, test = full_smiles, train = drug_smiles))
 
-
-# Compute loss for gradient penalty. 
-        
-        #    eps_node = torch.rand(nodes.size(0)).to(self.device)
-        #    eps_attr = torch.rand(logits_real.size(0),1,1,).to(self.device)
-        #    eps_idx = torch.rand(logits_real.size(0),1,1,).to(self.device)
-        #    x_int0 = (eps * edge_attr + (1. - eps) * fake_edge_attr).requires_grad_(True)
-        #    x_int1 = (eps.squeeze(-1) * nodes + (1. - eps.squeeze(-1)) * nodes_fake).requires_grad_(True)
-        #    x_int2 = ((eps.squeeze(-1) * edge_index + (1. - eps.squeeze(-1)) * fake_edge_index).requires_grad_(True)) 
-        #
-        #    grad0= self.D(x_int1, x_int0, x_int2,node_index)
-        #    d_loss_gp = self.gradient_penalty(grad0, x_int0) + self.gradient_penalty(grad1, x_int1) 
-        
+        print("Metrics are calculated.")
