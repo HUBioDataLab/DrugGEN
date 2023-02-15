@@ -186,7 +186,7 @@ Dataset arguments:
 
 ## Inference Mode for Trained DrugGEN Models
 
-- To generated molecules with trained DrugGEN models, first you need to download the model weights from the given link and place it in DrugGEN/experiment/models/ folder.
+- To generate molecules with trained DrugGEN models, first you need to download the model weights from the given link and place it in DrugGEN/experiment/models/ folder.
 - After that running the below code should suffice.
 
 ```bash
