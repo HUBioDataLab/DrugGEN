@@ -34,12 +34,12 @@ def main(config):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--submodel', type=str, default="CrossLoss", help="Chose model subtype: Prot, CrossLoss, Ligand, RL, NoTarget ")
+    parser.add_argument('--submodel', type=str, default="NoTarget", help="Chose model subtype: Prot, CrossLoss, Ligand, RL, NoTarget ")
 
     # Model configuration.
     parser.add_argument('--act', type=str, default="relu", help="Activation function for the model.")
     
-    parser.add_argument('--z_dim', type=int, default=8, help='Prior noise for the first GAN')
+    parser.add_argument('--z_dim', type=int, default=16, help='Prior noise for the first GAN')
     
     parser.add_argument('--max_atom', type=int, default=45, help='Max atom number for molecules must be specified.')    
     
@@ -61,7 +61,7 @@ if __name__ == '__main__':
     
     parser.add_argument('--warm_up_steps', type=float, default=0, help=' Warm up steps for the first GAN.')
     
-    parser.add_argument('--dis_select', type=str, default="conv", help="Select the discriminator for the first and second GAN.")
+    parser.add_argument('--dis_select', type=str, default="mlp", help="Select the discriminator for the first and second GAN.")
     
     parser.add_argument('--init_type', type=str, default="normal", help="Initialization type for the model.")
     
@@ -75,9 +75,9 @@ if __name__ == '__main__':
     
     parser.add_argument('--batch_size', type=int, default=128, help='Batch size for the training.')
     
-    parser.add_argument('--epoch', type=int, default=50, help='Epoch number for Training.')
+    parser.add_argument('--epoch', type=int, default=51, help='Epoch number for Training.')
     
-    parser.add_argument('--g_lr', type=float, default=0.00001, help='learning rate for G')
+    parser.add_argument('--g_lr', type=float, default=0.001, help='learning rate for G')
     
     parser.add_argument('--d_lr', type=float, default=0.00001, help='learning rate for D')
     
@@ -85,7 +85,7 @@ if __name__ == '__main__':
     
     parser.add_argument('--d2_lr', type=float, default=0.00001, help='learning rate for D2')
     
-    parser.add_argument('--dropout', type=float, default=0.4, help='dropout rate')
+    parser.add_argument('--dropout', type=float, default=0., help='dropout rate')
     
     parser.add_argument('--dec_dropout', type=float, default=0.4, help='dropout rate')
     
@@ -135,9 +135,18 @@ if __name__ == '__main__':
     
     parser.add_argument('--drug_dataset_file', type=str, default='drugs_train.pt')        
     
-    parser.add_argument('--raw_file', type=str, default='DrugGEN/data/chembl_train.smi')     
+    parser.add_argument('--raw_file', type=str, default='DrugGEN/data/chembl_test.smi')     
       
     parser.add_argument('--drug_raw_file', type=str, default='DrugGEN/data/drugs_train.smi')   
+    
+    parser.add_argument('--inf_dataset_file', type=str, default='chembl45_test.pt')    
+    
+    parser.add_argument('--inf_drug_dataset_file', type=str, default='drugs_test.pt')        
+    
+    parser.add_argument('--inf_raw_file', type=str, default='DrugGEN/data/chembl_test.smi')     
+      
+    parser.add_argument('--inf_drug_raw_file', type=str, default='DrugGEN/data/drugs_test.smi')       
+    
        
     # Step size.
     parser.add_argument('--log_sample_step', type=int, default=100)
