@@ -4,8 +4,8 @@
 
 <p align="center">
   <a href="Give a link here"><img src="https://img.shields.io/badge/paper-report-red"/></a>
-  <a href="Give a link here"><img src="https://img.shields.io/github/license/thudm/cogdl"/></a>
-  <a href="Give a link here" alt="license"><img src="https://colab.research.google.com/assets/colab-badge.svg"/></a>
+  <a href="Give a link here"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg"/></a>
+  
 </p>
 
 <!--PUT HERE SOME QUALITATIVE RESULTS IN THE ASSETS FOLDER-->
@@ -15,9 +15,15 @@
   <img src="assets/sample2.png" width="49%" />
 </p>-->
 
+## Pre-print
+
+**Please see our most up-to-date document (pre-print) from 15.02.2023 here:** [link](https://github.com/HUBioDataLab/DrugGEN/files/10746530/DrugGEN_Arxiv_formatted_submitted_15.02.2023.pdf)
+
 ## Abstract
 
-Discovering novel drug candidate molecules is one of the most fundamental and critical steps in drug development. Generative deep learning models, which create synthetic data given a probability distribution, have been developed with the purpose of picking completely new samples from a partially known space. Generative models offer high potential for designing de novo molecules; however, in order for them to be useful in real-life drug development pipelines, these models should be able to design target-specific molecules, which is the next step in this field. In this study, we propose a novel generative system, DrugGEN, for de novo design of drug candidate molecules that interact with selected target proteins. The proposed system represents compounds and protein structures as graphs and processes them via serially connected two generative adversarial networks comprising graph transformers. DrugGEN is implemented with five independent models, each with a unique sample generation routine. The system is trained using a large dataset of compounds from ChEMBL and target-specific bioactive molecules, to design effective and specific inhibitory molecules against the AKT1 protein, effective targeting of which has critical importance for developing treatments against various types of cancer. DrugGEN has a competitive or better performance against other methods on fundamental benchmarks. To assess the target-specific generation performance, we conducted further in silico analysis with molecular docking and deep learning-based bioactivity prediction. Their results indicate that de novo molecules have high potential for interacting with the AKT1 protein structure in the level of its native ligand. DrugGEN can be used to design completely novel and effective target-specific drug candidate molecules for any druggable protein, given the target features and a dataset of experimental bioactivities.
+Discovering novel drug candidate molecules is one of the most fundamental and critical steps in drug development. Generative deep learning models, which create synthetic data given a probability distribution, have been developed with the purpose of picking completely new samples from a partially known space. Generative models offer high potential for designing de novo molecules; however, in order for them to be useful in real-life drug development pipelines, these models should be able to design target-specific molecules, which is the next step in this field. In this study, we propose DrugGEN, for the de novo design of drug candidate molecules that interact with selected target proteins. The proposed system represents compounds and protein structures as graphs and processes them via serially connected two generative adversarial networks comprising graph transformers. DrugGEN is trained using a large dataset of compounds from ChEMBL and target-specific bioactive molecules, to design effective and specific inhibitory molecules against the AKT1 protein, which has critical importance for developing treatments against various types of cancer. On fundamental benchmarks, DrugGEN models have either competitive or better performance against other methods. To assess the target-specific generation performance, we conducted further in silico analysis with molecular docking and deep learning-based bioactivity prediction. Results indicate that de novo molecules have high potential for interacting with the AKT1 protein structure in the level of its native ligand. DrugGEN can be used to design completely novel and effective target-specific drug candidate molecules for any druggable protein, given target features and a dataset of experimental bioactivities. Code base, datasets, results and trained models of DrugGEN are available in this repository.
+
+Our up-to-date pre-print is shared [here](https://github.com/HUBioDataLab/DrugGEN/files/10746530/DrugGEN_Arxiv_formatted_submitted_15.02.2023.pdf) together with its supplementary material document [link](https://github.com/HUBioDataLab/DrugGEN/files/10746548/Druggen_Arxiv_submitted_Supplementary_Materials_15.02.2023.pdf)
 
 <!--Check out our paper below for more details
 
@@ -28,18 +34,20 @@ Discovering novel drug candidate molecules is one of the most fundamental and cr
 
 <!--PUT THE ANIMATED GIF VERSION OF THE DRUGGEN MODEL (Figure 1)-->
 <p float="center">
-  <img src="assets/DrugGEN_Figure1_2.gif" width="90%" />
+  <img src="assets/fig1_2.gif" width="100%" />
 </p>
 
+**Fig. 1.** **(A)** Generator (*G1*) of the GAN1 consists of an MLP and graph transformer encoder module. The generator encodes the given noise input into a new representation; **(B)** the MLP-based discriminator (*D1*) of GAN1 compares the generated de novo molecules to the real ones in the training dataset, scoring them for their assignment to the classes of “real” and “fake” molecules; **(C)** Generator (*G2*) of GAN2 makes use of the transformer decoder architecture to process target protein features and GAN1 generated de novo molecules together. The output of the generator two (*G2*) is the modified molecules, based on the given protein features; **(D)** the second discriminator (*D2*) takes the modified de novo molecules and known inhibitors of the given target protein and scores them for their assignment to the classes of “real” and “fake” inhibitors.
 
+## Transformer Modules
+Given a random noise *z*, **the first generator** *G1* (below, on the left side) creates annotation and adjacency tensors of a supposed molecule and the tensors are fed to the Discriminator network *D1* together with the real molecules *x*. *G1* processes the input by passing it through a multi-layer perceptron (MLP). After the MLP layer, the input is fed to the transformer encoder module [Vaswani et al., (2017)](https://arxiv.org/abs/1706.03762). Transformer encoder module has a depth of 8 encoder layers with 8 multi-head attention heads for each. In the graph transformer setting, *Q*, *K* and *V* are the variables representing the annotation matrix of the molecule. After the final products are created in the attention mechanism, both the annotation and adjacency matrices are forwarded to layer normalization. Normalized matrices are summed with the initial matrices to create a residual connection. Finally, these matrices are fed to separate feedforward layers, which concludes the processing of the annotation and adjacency matrices.
 
-## Features
+**The second generator** *G2* (below, on the right side) modifies molecules that were previously generated by *G1*, with the aim of generating binders for the given target protein. *G2* module utilizes the transformer decoder architecture. This module has a depth of 8 decoder layers and uses 8 multi-head attention heads for each. *G2* takes both *G1(z)*, which is data generated by *G1*, and the protein features as input. Interactions between molecules and proteins are processed inside the multi-head attention module of the transformer decoder. Here, molecules and protein features are multiplied via taking their scaled dot product, and thus new molecular matrices are created. Apart from the attention mechanism, further processing of the molecular matrices follows the same workflow as the transformer encoder. The output molecules of this module are the final product of the DrugGEN model and are forwarded to *D2*.
+
 
 <!--PUT HERE 1-2 SENTECE FOR METHOD WHICH SHOULD BE SHORT Pleaser refer to our [arXiv report](link here) for further details.--> 
 
-This implementation:
 
-- has the training code for DrugGEN implemented in PyTorch,
 <!-- - supports both CPU and GPU inference (though GPU is way faster), -->
 <!-- ADD HERE SOME FEATURES FOR DRUGGEN & SUMMARIES & BULLET POINTS -->
 
@@ -47,14 +55,19 @@ This implementation:
 <!-- ADD THE ANIMATED GIF VERSION OF THE GAN1 AND GAN2 -->
 | First Generator                                                                                                | Second Generator                                                                                               |
 |------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
-| ![FirstGAN](assets/generator_1_mod.gif) | ![SecondGAN](assets/generator_2_mod.gif) |
+ | ![FirstGAN](assets/DrugGEN_G1_4.gif)  | ![SecondGAN](assets/DrugGEN_G2_3.gif) |
 
 
-## Preliminary results (generated molecules)
+## Model Variations
+- **DrugGEN-Prot** (the default model) is composed of two GANs. It incorporates protein features to the transformer decoder module of GAN2 (together with the de novo molecules generated by GAN1) to direct the target centric molecule design. The information provided above belongs to this model.
+- **DrugGEN-CrossLoss** is composed of only one GAN. The input of the GAN1 generator is the real molecules (ChEMBL) dataset (to ease the learning process) and the GAN1 discriminator compares the generated molecules with the real inhibitors of the given target protein.
+- **DrugGEN-Ligand** is composed of two GANs. It incorporates AKT1 inhibitor molecule features as the input of the GAN2-generator’s transformer decoder instead of the protein features in the default model.
+- **DrugGEN-RL** utilizes the same architecture as the DrugGEN-Ligand model. It uses reinforcement learning (RL) to avoid using molecular scaffolds that are already presented in the training set.
+- **DrugGEN-NoTarget** is composed of only one GAN. This model only focuses on learning the chemical properties from the ChEMBL training dataset, as a result, there is no target-specific generation.
 
-| ChEMBL-25                                                                                                | ChEMBL-45                                                                                               |
-|------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
-| ![ChEMBL_25](assets/molecule_1.png) | ![ChEMBL_45](assets/molecule_2.png) |
+
+
+
 
 ## Overview
 We provide the implementation of the DrugGEN, along with scripts from PyTorch Geometric framework to generate and run. The repository is organised as follows:
@@ -71,7 +84,7 @@ We provide the implementation of the DrugGEN, along with scripts from PyTorch Ge
 
 **Python scripts are:**
 
-- ```layers.py``` file contains **Transformer Encoder**, **Transformer Decoder**, **PNA** (Corso et al., 2020), and **Graph Convolution Network** implementations.  
+- ```layers.py``` file contains **Transformer Encoder** and **Transformer Decoder** implementations.  
 - ```main.py``` contains arguments and this file is used to run the model.   
 - ```models.py``` has the implementation of the **Generators** and **Discriminators** which are used in GAN1 and GAN2.  
 - ```new_dataloader.py``` constructs the graph dataset from given raw data. Uses PyG based data classes.  
@@ -80,21 +93,19 @@ We provide the implementation of the DrugGEN, along with scripts from PyTorch Ge
 
 ## Datasets
 Three different data types (i.e., compound, protein, and bioactivity) were retrieved from various data sources to train our deep generative models. GAN1 module requires only compound data while GAN2 requires all of three data types including compound, protein, and bioactivity.
-- **Compound data** includes atomic, physicochemical, and structural properties of real drug and drug candidate molecules. Small-scale QM9 compound dataset was used for the first version of GAN1 module for easy and fast processing. It consists of 133,885 stable organic molecules with a maximum of 9 atoms and containing only C, O, N, F heavy atoms. Then, GAN1 was retrained on large-scale ChEMBL compound dataset to improve model performance. Two versions of ChEMBL dataset were created considering heavy atom distribution of the dataset. Each is limited to a maximum atomic number of 25 and 45, and referred as ChEMBL-m25 and ChEMBL-m45, respectively. 12 heavy atom types were selected for both datasets considering the atom frequency, which are C, O, N, F, Ca, K, Br, B, S, P, Cl, and As. The number of molecules in ChEMBL-m25 and ChEMBL-m45 datasets is  651,509 and 1,588,865, respectively.
+- **Compound data** includes atomic, physicochemical, and structural properties of real drug and drug candidate molecules. [ChEMBL v29 compound dataset](data/dataset_download.sh) was used for the GAN1 module. It consists of 1,588,865 stable organic molecules with a maximum of 45 atoms and containing  C, O, N, F, Ca, K, Br, B, S, P, Cl, and As heavy atoms. 
 - **Protein data** was retrieved from Protein Data Bank (PDB) in biological assembly format, and the coordinates of protein-ligand complexes were used to construct the binding sites of proteins from the bioassembly data. The atoms of protein residues within a maximum distance of 9 A from all ligand atoms were recorded as binding sites. GAN2 was trained for generating compounds specific to the target protein AKT1, which is a member of serine/threonine-protein kinases and involved in many cancer-associated cellular processes including metabolism, proliferation, cell survival, growth and angiogenesis. Binding site of human AKT1 protein was generated from the kinase domain (PDB: 4GV1). 
-- **Bioactivity data** of AKT target protein was retrieved from large-scale ChEMBL bioactivity database. It contains ligand interactions of human AKT1 (CHEMBL4282) protein with a pChEMBL value equal to or greater than 6 (IC50 <= 1 µM) as well as SMILES information of these ligands. The dataset was extended by including drug molecules from DrugBank database known to interact with human AKT proteins. Thus, a total of 3,251 bioactivity data points were obtained for training the AKT-specific generative model. To enhance the size of the bioactivity dataset, we also obtained two alternative versions by incorporating ligand interactions of protein members in non-specific serine/threonine kinase (STK) and kinase families.
+- **Bioactivity data** of AKT target protein was retrieved from large-scale ChEMBL bioactivity database. It contains ligand interactions of human AKT1 (CHEMBL4282) protein with a pChEMBL value equal to or greater than 6 (IC50 <= 1 µM) as well as SMILES information of these ligands. The dataset was extended by including drug molecules from DrugBank database known to interact with human AKT proteins. Thus, a total of [1,600 bioactivity data](data/filtered_akt_inhibitors.smi) points were obtained for training the AKT-specific generative model. 
+<!-- To enhance the size of the bioactivity dataset, we also obtained two alternative versions by incorporating ligand interactions of protein members in non-specific serine/threonine kinase (STK) and kinase families. -->
 
 More details on the construction of datasets can be found in our paper referenced above.
 
 <!-- ADD SOME INFO HERE -->
 
-## Updates
 
-- 00/00/2022: First version script of DrugGEN is released.
 
 ## Getting Started
 DrugGEN has been implemented and tested on Ubuntu 18.04 with python >= 3.9. It supports both GPU and CPU inference.
-If you don't have a suitable device, try running our Colab demo. 
 
 Clone the repo:
 ```bash
@@ -102,10 +113,10 @@ git clone https://github.com/HUBioDataLab/DrugGEN.git
 ```
 ** Please check the requirements.txt file to see dependencies. **
 
-## Running the Demo
+<!--## Running the Demo
 You could try Google Colab if you don't already have a suitable environment for running this project.
 It enables cost-free project execution in the cloud. You can use the provided notebook to try out our Colab demo:
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](Give a link here)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](Give a link here)-->
 
 ## Training
 
@@ -158,6 +169,20 @@ Dataset arguments:
 
 <!--ADD HERE TRAINING COMMANDS WITH EXPLAINATIONS-->
 
+## De Novo Generated Molecules and its AKT1 inhibitor subset
+- SMILES notations of 50,000 de novo generated molecules from DrugGEN models (10,000 from each) can be downloaded from [here](results/generated_molecules). 
+- We first filtered the 50,000 de novo generated molecules by applying Lipinski, Veber and PAINS filters; and 43,000 of them remained in our dataset after this operation ([SMILES notations of filtered de novo molecules](results/generated_molecules/filtered_all_generated_molecules.smi)).
+- We run our deep learning-based drug/compound-target protein interaction prediction system [DEEPScreen](https://pubs.rsc.org/en/content/articlehtml/2020/sc/c9sc03414e) on 43,000 filtered molecules. DEEPScreen predicted 18,000 of them as active against AKT1, 301 of which received high confidence scores (> 80%) ([SMILES notations of DeepScreen predicted actives](results/deepscreen)).
+- At the same time, we performed a molecular docking analysis on these 43,000 filtered de novo molecules against the crystal structure of [AKT1](https://www.rcsb.org/structure/4gv1), and found that 118 of them had sufficiently low binding free energies (< -9 kcal/mol) ([SMILES notations of de novo molecules with low binding free energies](results/docking/Molecules_th9_docking.smi)).
+- Finally, de novo molecules to effectively target AKT1 protein are selected via expert curation from the dataset of molecules with binding free energies lower than -9 kcal/mol. The structural representations of the selected molecules are shown in the figure below ([SMILES notations of the expert selected de novo AKT1 inhibitor molecules](results/docking/Selected_denovo_AKT1_inhibitors.smi)).
+
+![structures](assets/Selected_denovo_AKT1_inhibitors.png)
+
+## Updates
+
+- 15/02/2023: Our pre-print is shared [here](https://github.com/HUBioDataLab/DrugGEN/files/10746530/DrugGEN_Arxiv_formatted_submitted_15.02.2023.pdf) together with its supplementary material document [link](https://github.com/HUBioDataLab/DrugGEN/files/10746548/Druggen_Arxiv_submitted_Supplementary_Materials_15.02.2023.pdf).
+- 01/01/2023: Five different DrugGEN models are released.
+
 ## Citation
 <!--ADD BIBTEX AFTER THE PUBLISHING-->
 
@@ -174,6 +199,8 @@ You should have received a copy of the GNU General Public License along with thi
 
 In each file, we indicate whether a function or script is imported from another source. Here are some excellent sources from which we benefit: 
 <!--ADD THE REFERENCES THAT WE USED DURING THE IMPLEMENTATION-->
-- First GAN is inspired from [MolGAN](https://github.com/yongqyu/MolGAN-pytorch).
-- [MOSES](https://github.com/molecularsets/moses) was used for performance calculation.
+- Molecule generation GAN schematic was insprired from [MolGAN](https://github.com/yongqyu/MolGAN-pytorch).
+- [MOSES](https://github.com/molecularsets/moses) was used for performance calculation (MOSES Script are directly embedded to our code due to current installation issues related to the MOSES repo).
 - [PyG](https://github.com/pyg-team/pytorch_geometric) was used to construct the custom dataset.
+- Transformer architecture was taken from [Vaswani et al. (2017)](https://arxiv.org/abs/1706.03762).
+- Graph Transformer Encoder architecture was taken from [Dwivedi & Bresson (2021)](https://arxiv.org/abs/2012.09699) and [Vignac et al. (2022)](https://github.com/cvignac/DiGress) and modified. 
