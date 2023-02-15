@@ -1,7 +1,7 @@
 
 import torch
-import time
-def discriminator_loss(generator, discriminator, mol_graph, adj, annot, batch_size, device, grad_pen, lambda_gp):
+
+def discriminator_loss(generator, discriminator, mol_graph, adj, annot, batch_size, device, grad_pen, lambda_gp,z_edge,z_node):
     
     # Compute loss with real molecules.
     
@@ -11,7 +11,7 @@ def discriminator_loss(generator, discriminator, mol_graph, adj, annot, batch_si
 
     # Compute loss with fake molecules.
 
-    node, edge, node_sample, edge_sample  = generator(adj,  annot)
+    node, edge, node_sample, edge_sample  = generator(z_edge,  z_node)
 
     graph = torch.cat((node_sample.view(batch_size, -1), edge_sample.view(batch_size, -1)), dim=-1)
     
