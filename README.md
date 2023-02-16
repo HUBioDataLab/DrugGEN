@@ -175,7 +175,22 @@ Dataset arguments:
 
 <!--ADD HERE TRAINING COMMANDS WITH EXPLAINATIONS-->
 
-## De Novo Generated Molecules and its AKT1 inhibitor subset
+
+## Inference Mode for Trained DrugGEN Models
+
+- First, please download the model weights from the given link and place it in the folder: "DrugGEN/experiment/models/".
+- After that, please run the code below.
+
+```bash
+
+python DrugGEN/main.py --mode="inference" --inference_model="DrugGEN/experiments/models/{Chosen submodel name}"
+```
+
+- SMILES representation of the generated molecules will be saved into the file: "DrugGEN/experiments/inference/{Chosen submodel name}/inference_drugs.txt".
+
+
+## De Novo Generated Molecules
+
 - SMILES notations of 50,000 de novo generated molecules from DrugGEN models (10,000 from each) can be downloaded from [here](results/generated_molecules). 
 - We first filtered the 50,000 de novo generated molecules by applying Lipinski, Veber and PAINS filters; and 43,000 of them remained in our dataset after this operation ([SMILES notations of filtered de novo molecules](results/generated_molecules/filtered_all_generated_molecules.smi)).
 - We run our deep learning-based drug/compound-target protein interaction prediction system [DEEPScreen](https://pubs.rsc.org/en/content/articlehtml/2020/sc/c9sc03414e) on 43,000 filtered molecules. DEEPScreen predicted 18,000 of them as active against AKT1, 301 of which received high confidence scores (> 80%) ([SMILES notations of DeepScreen predicted actives](results/deepscreen)).
@@ -184,34 +199,16 @@ Dataset arguments:
 
 ![structures](assets/Selected_denovo_AKT1_inhibitors.png)
 
-## Inference Mode for Trained DrugGEN Models
-
-- To generate molecules with trained DrugGEN models, first you need to download the model weights from the given link and place it in DrugGEN/experiment/models/ folder.
-- After that running the below code should suffice.
-
-```bash
-
-python DrugGEN/main.py --mode="inference" --inference_model="DrugGEN/experiments/models/{Chosen submodel name}"
-```
-
-- SMILES representation of the molecules are saved to "DrugGEN/experiments/inference/{Chosen submodel name}/inference_drugs.txt" file.
 
 ## Updates
 
 - 15/02/2023: Our pre-print is shared [here](https://github.com/HUBioDataLab/DrugGEN/files/10746530/DrugGEN_Arxiv_formatted_submitted_15.02.2023.pdf) together with its supplementary material document [link](https://github.com/HUBioDataLab/DrugGEN/files/10746548/Druggen_Arxiv_submitted_Supplementary_Materials_15.02.2023.pdf).
 - 01/01/2023: Five different DrugGEN models are released.
 
+
 ## Citation
 <!--ADD BIBTEX AFTER THE PUBLISHING-->
 
-## License
-Copyright (C) 2023 HUBioDataLab
-
-This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along with this program. If not, see http://www.gnu.org/licenses/.
 
 ## References
 
@@ -222,3 +219,13 @@ In each file, we indicate whether a function or script is imported from another 
 - [PyG](https://github.com/pyg-team/pytorch_geometric) was used to construct the custom dataset.
 - Transformer architecture was taken from [Vaswani et al. (2017)](https://arxiv.org/abs/1706.03762).
 - Graph Transformer Encoder architecture was taken from [Dwivedi & Bresson (2021)](https://arxiv.org/abs/2012.09699) and [Vignac et al. (2022)](https://github.com/cvignac/DiGress) and modified. 
+
+
+## License
+Copyright (C) 2023 HUBioDataLab
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program. If not, see http://www.gnu.org/licenses/.
