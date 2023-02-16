@@ -59,7 +59,7 @@ Given a random noise *z*, **the first generator** *G1* (below, on the left side)
 <!-- ADD THE ANIMATED GIF VERSION OF THE GAN1 AND GAN2 -->
 | First Generator                                                                                                | Second Generator                                                                                               |
 |------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
- | ![FirstGAN](assets/DrugGEN_G1_4.gif)  | ![SecondGAN](assets/DrugGEN_G2_3.gif) |
+ | ![FirstGAN](assets/DrugGEN_G1_final2.gif)  | ![SecondGAN](assets/DrugGEN_G2_final2.gif) |
 
 
 ## Model Variations
