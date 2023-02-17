@@ -713,8 +713,8 @@ class Trainer(object):
         drug_scaf = [MurckoScaffold.GetScaffoldForMol(x) for x in drug_mols]
         fps_r = [Chem.RDKFingerprint(x) for x in drug_scaf]
 
-        akt1_human_adj = torch.load("DrugGEN/akt/AKT1_human_adj.pt").reshape(1,-1).to(self.device).float() 
-        akt1_human_annot = torch.load("DrugGEN/akt/AKT1_human_annot.pt").reshape(1,-1).to(self.device).float() 
+        akt1_human_adj = torch.load("DrugGEN/data/akt/AKT1_human_adj.pt").reshape(1,-1).to(self.device).float() 
+        akt1_human_annot = torch.load("DrugGEN/data/akt/AKT1_human_annot.pt").reshape(1,-1).to(self.device).float() 
         
         self.G.eval()
         #self.D.eval()
