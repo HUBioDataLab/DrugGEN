@@ -19,8 +19,7 @@ RDLogger.DisableLog('rdApp.*')
 from loss import discriminator_loss, generator_loss, discriminator2_loss, generator2_loss
 from training_data import load_data
 import random
-torch.manual_seed(1337)
-random.seed(1337)
+
 
 class Trainer(object):
     
