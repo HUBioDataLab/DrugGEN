@@ -46,6 +46,8 @@ Our up-to-date pre-print is shared [here](https://github.com/HUBioDataLab/DrugGE
 
 **Fig. 1.** **(A)** Generator (*G1*) of the GAN1 consists of an MLP and graph transformer encoder module. The generator encodes the given noise input into a new representation; **(B)** the MLP-based discriminator (*D1*) of GAN1 compares the generated de novo molecules to the real ones in the training dataset, scoring them for their assignment to the classes of “real” and “fake” molecules; **(C)** Generator (*G2*) of GAN2 makes use of the transformer decoder architecture to process target protein features and GAN1 generated de novo molecules together. The output of the generator two (*G2*) is the modified molecules, based on the given protein features; **(D)** the second discriminator (*D2*) takes the modified de novo molecules and known inhibitors of the given target protein and scores them for their assignment to the classes of “real” and “fake” inhibitors.
 
+&nbsp;
+&nbsp;
 
 ## Transformer Modules
 
@@ -66,6 +68,8 @@ Given a random noise *z*, **the first generator** *G1* (below, on the left side)
 |------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
  | ![FirstGAN](assets/DrugGEN_G1_final2.gif)  | ![SecondGAN](assets/DrugGEN_G2_final2.gif) |
 
+&nbsp;
+&nbsp;
 
 ## Model Variations
 
@@ -75,6 +79,8 @@ Given a random noise *z*, **the first generator** *G1* (below, on the left side)
 - **DrugGEN-RL** utilizes the same architecture as the DrugGEN-Ligand model. It uses reinforcement learning (RL) to avoid using molecular scaffolds that are already presented in the training set.
 - **DrugGEN-NoTarget** is composed of only one GAN. This model only focuses on learning the chemical properties from the ChEMBL training dataset, as a result, there is no target-specific generation.
 
+&nbsp;
+&nbsp;
 
 ## Files & Folders
 
@@ -100,6 +106,8 @@ We provide the implementation of the DrugGEN, along with scripts from PyTorch Ge
 - ```trainer.py``` is the training and testing file for the model. Workflow is constructed in this file.   
 - ```utils.py``` contains performance metrics from several other papers and some unique implementations. (De Cao et al, 2018; Polykovskiy et al., 2020)
 
+&nbsp;
+&nbsp;
 
 ## Datasets
 
@@ -113,6 +121,8 @@ More details on the construction of datasets can be found in our paper reference
 
 <!-- ADD SOME INFO HERE -->
 
+&nbsp;
+&nbsp;
 
 ## Getting Started
 DrugGEN has been implemented and tested on Ubuntu 18.04 with python >= 3.9. It supports both GPU and CPU inference.
@@ -128,6 +138,8 @@ You could try Google Colab if you don't already have a suitable environment for 
 It enables cost-free project execution in the cloud. You can use the provided notebook to try out our Colab demo:
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](Give a link here)-->
 
+&nbsp;
+&nbsp;
 
 ## Training
 
@@ -186,6 +198,8 @@ Dataset arguments:
 
 <!--ADD HERE TRAINING COMMANDS WITH EXPLAINATIONS-->
 
+&nbsp;
+&nbsp;
 
 ## Molecule Generation Using Trained DrugGEN Models in the Inference Mode
 
@@ -199,6 +213,8 @@ python DrugGEN/main.py --mode="inference" --inference_model="DrugGEN/experiments
 
 - SMILES representation of the generated molecules will be saved into the file: "DrugGEN/experiments/inference/{Chosen submodel name}/denovo_molecules.txt".
 
+&nbsp;
+&nbsp;
 
 ## Results (De Novo Generated Molecules of DrugGEN Models)
 
@@ -210,16 +226,22 @@ python DrugGEN/main.py --mode="inference" --inference_model="DrugGEN/experiments
 
 ![structures](assets/Selected_denovo_AKT1_inhibitors.png)
 
+&nbsp;
+&nbsp;
 
 ## Updates
 
 - 15/02/2023: Our pre-print is shared [here](https://github.com/HUBioDataLab/DrugGEN/files/10746530/DrugGEN_Arxiv_formatted_submitted_15.02.2023.pdf) together with its supplementary material document [link](https://github.com/HUBioDataLab/DrugGEN/files/10746548/Druggen_Arxiv_submitted_Supplementary_Materials_15.02.2023.pdf).
 - 01/01/2023: Five different DrugGEN models are released.
 
+&nbsp;
+&nbsp;
 
 ## Citation
 <!--ADD BIBTEX AFTER THE PUBLISHING-->
 
+&nbsp;
+&nbsp;
 
 ## References
 
@@ -231,6 +253,8 @@ In each file, we indicate whether a function or script is imported from another 
 - Transformer architecture was taken from [Vaswani et al. (2017)](https://arxiv.org/abs/1706.03762).
 - Graph Transformer Encoder architecture was taken from [Dwivedi & Bresson (2021)](https://arxiv.org/abs/2012.09699) and [Vignac et al. (2022)](https://github.com/cvignac/DiGress) and modified. 
 
+&nbsp;
+&nbsp;
 
 ## License
 Copyright (C) 2023 HUBioDataLab
