@@ -1,3 +1,4 @@
+name: druggen
 channels:
   - pytorch
   - pyg
