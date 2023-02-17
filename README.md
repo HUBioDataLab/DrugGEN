@@ -131,7 +131,6 @@ Clone the repo:
 ```bash
 git clone https://github.com/HUBioDataLab/DrugGEN.git
 ```
-** Please check the requirements.txt file to see dependencies. **
 
 <!--## Running the Demo
 You could try Google Colab if you don't already have a suitable environment for running this project.
