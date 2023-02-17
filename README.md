@@ -99,7 +99,7 @@ We provide the implementation of the DrugGEN, along with scripts from PyTorch Ge
 
 **Python scripts:**
 
-- ```layers.py``` file contains **Transformer Encoder** and **Transformer Decoder** implementations.  
+- ```layers.py``` contains **transformer encoder** and **transformer decoder** implementations.  
 - ```main.py``` contains arguments and this file is used to run the model.   
 - ```models.py``` has the implementation of the **Generators** and **Discriminators** which are used in GAN1 and GAN2.  
 - ```new_dataloader.py``` constructs the graph dataset from given raw data. Uses PyG based data classes.  
