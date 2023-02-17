@@ -81,9 +81,10 @@ We provide the implementation of the DrugGEN, along with scripts from PyTorch Ge
 
 ```experiments``` contains: 
 - ```logs``` folder. Model loss and performance metrics will be saved in this directory in seperate files for each model. 
-- ```results``` folder. Tensorboard files will be saved here if TensorBoard is used.
+- ```tboard_output``` folder. Tensorboard files will be saved here if TensorBoard is used.
 - ```models``` folder. Models will be saved in this directory at last or preferred steps. 
 - ```samples``` folder. Molecule samples will be saved in this folder.
+- ```inference``` folder. Molecules generated in inference mode will be saved in this folder.
 
 **Python scripts:**
 
