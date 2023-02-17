@@ -20,6 +20,8 @@
 
 **Please see our most up-to-date document (pre-print) from 15.02.2023 here:** [link](https://github.com/HUBioDataLab/DrugGEN/files/10746530/DrugGEN_Arxiv_formatted_submitted_15.02.2023.pdf)
 
+&nbsp;
+&nbsp;
 
 ## Abstract
 
@@ -33,6 +35,9 @@ Our up-to-date pre-print is shared [here](https://github.com/HUBioDataLab/DrugGE
 **](link here),            
 > [Atabey Ünlü](https://tr.linkedin.com/in/atabeyunlu), [Elif Çevrim](https://www.linkedin.com/in/elifcevrim/?locale=en_US), [Ahmet Sarıgün](https://asarigun.github.io/), [Heval Ataş](https://www.linkedin.com/in/heval-atas/), [Altay Koyaş](https://www.linkedin.com/in/altay-koya%C5%9F-8a6118a1/?originalSubdomain=tr), [Hayriye Çelikbilek](https://www.linkedin.com/in/hayriye-celikbilek/?originalSubdomain=tr), [Deniz Cansen Kahraman](https://www.linkedin.com/in/deniz-cansen-kahraman-6153894b/?originalSubdomain=tr), [Abdurrahman Olğaç](https://www.linkedin.com/in/aolgac/?originalSubdomain=tr), [Ahmet S. Rifaioğlu](https://saezlab.org/person/ahmet-sureyya-rifaioglu/), [Tunca Doğan](https://yunus.hacettepe.edu.tr/~tuncadogan/)     
 > *Arxiv, 2020* -->
+
+&nbsp;
+&nbsp;
 
 <!--PUT THE ANIMATED GIF VERSION OF THE DRUGGEN MODEL (Figure 1)-->
 <p float="center">
@@ -93,7 +98,6 @@ We provide the implementation of the DrugGEN, along with scripts from PyTorch Ge
 - ```models.py``` has the implementation of the **Generators** and **Discriminators** which are used in GAN1 and GAN2.  
 - ```new_dataloader.py``` constructs the graph dataset from given raw data. Uses PyG based data classes.  
 - ```trainer.py``` is the training and testing file for the model. Workflow is constructed in this file.   
-- ```training_data.py``` is the data loader for the training phase. 
 - ```utils.py``` contains performance metrics from several other papers and some unique implementations. (De Cao et al, 2018; Polykovskiy et al., 2020)
 
 
