@@ -707,7 +707,7 @@ class Trainer(object):
         self.G2.load_state_dict(torch.load(G2_path, map_location=lambda storage, loc: storage))        
         
         
-        drug_smiles = [line for line in open("DrugGEN/data/drugs_smiles.smi", 'r').read().splitlines()]
+        drug_smiles = [line for line in open("DrugGEN/data/akt_test.smi", 'r').read().splitlines()]
         
         drug_mols = [Chem.MolFromSmiles(smi) for smi in drug_smiles]
         drug_scaf = [MurckoScaffold.GetScaffoldForMol(x) for x in drug_mols]
