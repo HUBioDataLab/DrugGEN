@@ -215,6 +215,9 @@ Dataset arguments:
 
 
 ```bash
+cd DrugGEN/experiments/models
+
+gdown --folder {Model Link}
 
 python DrugGEN/main.py --mode="inference" --inference_model="DrugGEN/experiments/models/{Chosen model name}"
 ```
