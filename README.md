@@ -157,9 +157,7 @@ cd DrugGEN/data
 
 bash dataset_download.sh
 
-cd ..
-
-cd ..
+cd
 
 # DrugGEN can be trained with the one-liner:
 
@@ -214,13 +212,6 @@ Dataset arguments:
 
 
 ```bash
-cd DrugGEN/experiments/models
-
-gdown --folder {Model Link}
-
-cd ..
-cd ..
-cd ..
 
 python DrugGEN/main.py --submodel="Prot" --mode="inference" --inference_model="DrugGEN/experiments/models/{Chosen model name}"
 ```
