@@ -34,7 +34,7 @@ def main(config):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--submodel', type=str, default="NoTarget", help="Chose model subtype: Prot, CrossLoss, Ligand, RL, NoTarget ")
+    parser.add_argument('--submodel', type=str, default="CrossLoss", help="Chose model subtype: Prot, CrossLoss, Ligand, RL, NoTarget ")
 
     # Model configuration.
     parser.add_argument('--act', type=str, default="relu", help="Activation function for the model.")
@@ -75,9 +75,9 @@ if __name__ == '__main__':
     
     parser.add_argument('--batch_size', type=int, default=128, help='Batch size for the training.')
     
-    parser.add_argument('--epoch', type=int, default=51, help='Epoch number for Training.')
+    parser.add_argument('--epoch', type=int, default=50, help='Epoch number for Training.')
     
-    parser.add_argument('--g_lr', type=float, default=0.001, help='learning rate for G')
+    parser.add_argument('--g_lr', type=float, default=0.00001, help='learning rate for G')
     
     parser.add_argument('--d_lr', type=float, default=0.00001, help='learning rate for D')
     
@@ -87,7 +87,7 @@ if __name__ == '__main__':
     
     parser.add_argument('--dropout', type=float, default=0., help='dropout rate')
     
-    parser.add_argument('--dec_dropout', type=float, default=0.4, help='dropout rate')
+    parser.add_argument('--dec_dropout', type=float, default=0., help='dropout rate')
     
     parser.add_argument('--n_critic', type=int, default=1, help='number of D updates per each G update')
     
@@ -114,6 +114,8 @@ if __name__ == '__main__':
     
     parser.add_argument('--mode', type=str, default='train', choices=['train', 'inference'])
     
+    parser.add_argument('--inference_iterations', type=int, default=100, help='Number of iterations for inference')
+    
     # Directories.
     parser.add_argument('--protein_data_dir', type=str, default='DrugGEN/data/akt')      
     
@@ -127,29 +129,31 @@ if __name__ == '__main__':
     
     parser.add_argument('--model_save_dir', type=str, default='DrugGEN/experiments/models')
     
+    parser.add_argument('--inference_model', type=str, default='')
+    
     parser.add_argument('--sample_dir', type=str, default='DrugGEN/experiments/samples')
     
-    parser.add_argument('--result_dir', type=str, default='DrugGEN/experiments/results')
+    parser.add_argument('--result_dir', type=str, default='DrugGEN/experiments/tboard_output')
     
     parser.add_argument('--dataset_file', type=str, default='chembl45_train.pt')    
     
-    parser.add_argument('--drug_dataset_file', type=str, default='drugs_train.pt')        
+    parser.add_argument('--drug_dataset_file', type=str, default='akt_train.pt')        
     
-    parser.add_argument('--raw_file', type=str, default='DrugGEN/data/chembl_test.smi')     
+    parser.add_argument('--raw_file', type=str, default='DrugGEN/data/chembl_train.smi')     
       
-    parser.add_argument('--drug_raw_file', type=str, default='DrugGEN/data/drugs_train.smi')   
+    parser.add_argument('--drug_raw_file', type=str, default='DrugGEN/data/akt_train.smi')   
     
     parser.add_argument('--inf_dataset_file', type=str, default='chembl45_test.pt')    
     
-    parser.add_argument('--inf_drug_dataset_file', type=str, default='drugs_test.pt')        
+    parser.add_argument('--inf_drug_dataset_file', type=str, default='akt_test.pt')        
     
     parser.add_argument('--inf_raw_file', type=str, default='DrugGEN/data/chembl_test.smi')     
       
-    parser.add_argument('--inf_drug_raw_file', type=str, default='DrugGEN/data/drugs_test.smi')       
+    parser.add_argument('--inf_drug_raw_file', type=str, default='DrugGEN/data/akt_test.smi')       
     
        
     # Step size.
-    parser.add_argument('--log_sample_step', type=int, default=100)
+    parser.add_argument('--log_sample_step', type=int, default=1000)
 
     """# PNA configurations
     parser.add_argument('--aggregators', type=str, default="max,mean,min,std", help='aggregator identifiers - "min","max","std","var","mean","sum"')
