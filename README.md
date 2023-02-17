@@ -146,7 +146,7 @@ bash dataset_download.sh
 
 # DrugGEN can be trained with the one-liner:
 
-python DrugGEN/main.py --submodel --mode="train" --device="cuda" --raw_file="DrugGEN/data/chembl_smiles.smi" --dataset_file="chembl45.pt" -- drug_raw_file="drug_smies.smi" --drug_dataset_file="drugs.pt" --max_atom=45
+python DrugGEN/main.py --submodel --mode="train" --device="cuda" --raw_file="DrugGEN/data/chembl_smiles.smi" --dataset_file="chembl45_train.pt" -- drug_raw_file="akt_train.smi" --drug_dataset_file="drugs_train.pt" --max_atom=45
 ```
 
 ** Explanations of arguments can be found below:
