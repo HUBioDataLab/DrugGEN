@@ -11,7 +11,6 @@ import re
 from torch_geometric.loader import DataLoader
 from new_dataloader import DruggenDataset
 import torch.utils.data
-from moses.metrics.metrics import get_all_metrics
 from rdkit import RDLogger  
 import pickle
 from rdkit.Chem.Scaffolds import MurckoScaffold
