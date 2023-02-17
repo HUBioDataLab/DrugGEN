@@ -154,6 +154,8 @@ conda activate druggen
 
 # Download input files:
 
+cd DrugGEN/data
+
 bash dataset_download.sh
 
 # DrugGEN can be trained with the one-liner:
