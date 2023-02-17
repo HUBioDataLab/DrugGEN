@@ -146,7 +146,7 @@ It enables cost-free project execution in the cloud. You can use the provided no
 ```bash
 # set up the environment:
 
-conda env create -f dependencies.yml
+conda env create -f DrugGEN/dependencies.yml
 
 # activate the environment:
 
