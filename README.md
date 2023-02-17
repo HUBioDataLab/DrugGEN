@@ -143,7 +143,7 @@ It enables cost-free project execution in the cloud. You can use the provided no
 ## Training
 
 ```bash
-# set up the environment:
+# set up the environment (installs the requirements):
 
 conda env create -f DrugGEN/dependencies.yml
 
