@@ -158,6 +158,10 @@ cd DrugGEN/data
 
 bash dataset_download.sh
 
+cd ..
+
+cd ..
+
 # DrugGEN can be trained with the one-liner:
 
 python DrugGEN/main.py --submodel="CrossLoss" --mode="train" --device="cuda" --raw_file="DrugGEN/data/chembl_train.smi" --dataset_file="chembl45_train.pt" -- drug_raw_file="akt_train.smi" --drug_dataset_file="drugs_train.pt" --max_atom=45
