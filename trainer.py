@@ -866,7 +866,7 @@ class Trainer(object):
                  
                 
 
-                print("molecule batch {} inferred".format(i)  
+                print("molecule batch {} inferred".format(i))
 
                 with open("DrugGEN/experiments/inference/{}/inference_drugs.txt".format(self.submodel), "a") as f:
                     for molecules in inference_drugs:
