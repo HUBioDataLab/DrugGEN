@@ -223,7 +223,7 @@ cd ..
 cd ..
 cd ..
 
-python DrugGEN/main.py --mode="inference" --inference_model="DrugGEN/experiments/models/{Chosen model name}"
+python DrugGEN/main.py --submodel="Prot" --mode="inference" --inference_model="DrugGEN/experiments/models/{Chosen model name}"
 ```
 
 - SMILES representation of the generated molecules will be saved into the file: "DrugGEN/experiments/inference/{Chosen submodel name}/denovo_molecules.txt".
