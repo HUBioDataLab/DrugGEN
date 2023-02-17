@@ -867,7 +867,7 @@ class Trainer(object):
                  
                 
 
-                print("molecule batch {} inferred, {} % Valid".format(i, (len(inference_drugs)/self.batch_size)*100))  
+                print("molecule batch {} inferred".format(i)  
 
                 with open("DrugGEN/experiments/inference/{}/inference_drugs.txt".format(self.submodel), "a") as f:
                     for molecules in inference_drugs:
