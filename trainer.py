@@ -509,8 +509,8 @@ class Trainer(object):
 
 
         # protein data
-        full_smiles = [line for line in open("DrugGEN/data/chembl_smiles.smi", 'r').read().splitlines()]
-        drug_smiles = [line for line in open("DrugGEN/data/drugs_smiles.smi", 'r').read().splitlines()]
+        full_smiles = [line for line in open("DrugGEN/data/chembl_train.smi", 'r').read().splitlines()]
+        drug_smiles = [line for line in open("DrugGEN/data/akt_train.smi", 'r').read().splitlines()]
         
         drug_mols = [Chem.MolFromSmiles(smi) for smi in drug_smiles]
         drug_scaf = [MurckoScaffold.GetScaffoldForMol(x) for x in drug_mols]
