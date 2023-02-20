@@ -259,15 +259,17 @@ Fig. 2. Promising de novo molecules to effectively target AKT1 protein (generate
 &nbsp;
 &nbsp;
 
-## References
+## References/Resources
 
-In each file, we indicate whether a function or script is imported from another source. Here are some excellent sources from which we benefit: 
+In each file, we indicate whether a function or script is imported from another source. Here are some excellent sources from which we benefit from: 
 <!--ADD THE REFERENCES THAT WE USED DURING THE IMPLEMENTATION-->
 - Molecule generation GAN schematic was inspired from [MolGAN](https://github.com/yongqyu/MolGAN-pytorch).
 - [MOSES](https://github.com/molecularsets/moses) was used for performance calculation (MOSES Script are directly embedded to our code due to current installation issues related to the MOSES repo).
 - [PyG](https://github.com/pyg-team/pytorch_geometric) was used to construct the custom dataset.
 - Transformer architecture was taken from [Vaswani et al. (2017)](https://arxiv.org/abs/1706.03762).
 - Graph Transformer Encoder architecture was taken from [Dwivedi & Bresson (2021)](https://arxiv.org/abs/2012.09699) and [Vignac et al. (2022)](https://github.com/cvignac/DiGress) and modified. 
+
+Our initial project repository was [this one](https://github.com/asarigun/DrugGEN).
 
 &nbsp;
 &nbsp;
