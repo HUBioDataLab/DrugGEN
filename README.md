@@ -237,7 +237,7 @@ Fig. 2. Promising de novo molecules to effectively target AKT1 protein (generate
 
 ## Updates
 
-- 15/02/2023: Our pre-print is shared [here](https://github.com/HUBioDataLab/DrugGEN/files/10828402/2302.07868.pdf)(https://github.com/HUBioDataLab/DrugGEN/files/10746548/Druggen_Arxiv_submitted_Supplementary_Materials_15.02.2023.pdf).
+- 15/02/2023: Our pre-print is shared [here](https://github.com/HUBioDataLab/DrugGEN/files/10828402/2302.07868.pdf).
 - 01/01/2023: Five different DrugGEN models are released.
 
 &nbsp;
