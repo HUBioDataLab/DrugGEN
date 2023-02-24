@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/HUBioDataLab/DrugGEN/files/10828402/2302.07868.pdf"><img src="https://img.shields.io/badge/paper-report-red"/></a>
-  <a href="Give a link here"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg"/></a>
+  <a href="http://www.gnu.org/licenses/"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg"/></a>
   
 </p>
 
