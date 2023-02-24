@@ -256,7 +256,7 @@ Fig. 2. Promising de novo molecules to effectively target AKT1 protein (generate
 }
 ```
 
-Ünlü, A., Çevrim, E., Sarıgün, A., Çelikbilek, H., Güvenilir, H.A., Koyaş, A., Kahraman, D.C., Olğaç, A., Rifaioğlu, A., Doğan, T. (2023). Target Specific De Novo Design of Drug Candidate Molecules with Graph Transformer-based Generative Adversarial Networks. *arXiv preprint* arXiv:2302.07868
+Ünlü, A., Çevrim, E., Sarıgün, A., Çelikbilek, H., Güvenilir, H.A., Koyaş, A., Kahraman, D.C., Olğaç, A., Rifaioğlu, A., Doğan, T. (2023). Target Specific De Novo Design of Drug Candidate Molecules with Graph Transformer-based Generative Adversarial Networks. *arXiv preprint* arXiv:2302.07868.
 
 
 &nbsp;
