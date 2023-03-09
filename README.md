@@ -181,7 +181,8 @@ Model arguments:
   --mlp_ratio MLP_RATIO     MLP ratio for the Transformers
   --dis_select DIS_SELECT   Select the discriminator for the first and second GAN
   --init_type INIT_TYPE     Initialization type for the model
-  --dropout DROPOUT         Dropout rate for the model
+  --dropout DROPOUT         Dropout rate for the encoder
+  --dec_dropout DEC_DROPOUT Dropout rate for the decoder
 Training arguments:
   --batch_size BATCH_SIZE   Batch size for the training
   --epoch EPOCH             Epoch number for Training
