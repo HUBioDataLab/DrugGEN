@@ -569,8 +569,8 @@ class Trainer(object):
                     GAN2_disc_e = drugs_a_tensor
                     GAN2_disc_x = drugs_x_tensor            
                 elif self.submodel == "Prot":        
-                    GAN1_input_e = z_edge + a_tensor
-                    GAN1_input_x = z_node + x_tensor
+                    GAN1_input_e =  a_tensor
+                    GAN1_input_x = x_tensor
                     GAN1_disc_e = a_tensor
                     GAN1_disc_x = x_tensor
                     GAN2_input_e = akt1_human_adj
