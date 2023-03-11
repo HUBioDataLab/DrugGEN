@@ -41,7 +41,7 @@ Our up-to-date pre-print is shared [here](https://github.com/HUBioDataLab/DrugGE
 
 <!--PUT THE ANIMATED GIF VERSION OF THE DRUGGEN MODEL (Figure 1)-->
 <p float="center">
-  <img src="assets/DrugGEN_Figure1_final3.gif" width="100%" />
+  <img src="assets/DrugGEN_Figure1_final_v1.gif" width="100%" />
 </p>
 
 **Fig. 1.** **(A)** Generator (*G1*) of the GAN1 consists of an MLP and graph transformer encoder module. The generator encodes the given input into a new representation; **(B)** the MLP-based discriminator (*D1*) of GAN1 compares the generated de novo molecules to the real ones in the training dataset, scoring them for their assignment to the classes of “real” and “fake” molecules; **(C)** Generator (*G2*) of GAN2 makes use of the transformer decoder architecture to process target protein features and GAN1 generated de novo molecules together. The output of the generator two (*G2*) is the modified molecules, based on the given protein features; **(D)** the second discriminator (*D2*) takes the modified de novo molecules and known inhibitors of the given target protein and scores them for their assignment to the classes of “real” and “fake” inhibitors.
