@@ -32,26 +32,13 @@ class Generator(nn.Module):
         self.transformer_dim = vertexes * vertexes * dim + vertexes * dim
         self.pos_enc_dim = 5
         #self.pos_enc = nn.Linear(self.pos_enc_dim, self.dim)
-        if self.submodel == "NoTarget" or self.submodel == "Prot":
         
-            
-            self.node_layers = nn.Sequential(nn.Linear(self.z_dim, 64), act, 
-                                            nn.Linear(64,128), act,
-                                            nn.Linear(128,256), act, nn.Linear(256, vertexes*dim), act, nn.Dropout(self.dropout))
-            self.edge_layers = nn.Sequential(nn.Linear(self.z_dim, 64), act, 
-                                            nn.Linear(64,128), act,
-                                            nn.Linear(128,256), act, nn.Linear(256,vertexes*vertexes*dim), act, nn.Dropout(self.dropout))
-        else:
-            
-            self.node_layers = nn.Sequential(nn.Linear(nodes, 64), act, nn.Linear(64,dim), act, nn.Dropout(self.dropout))
-            self.edge_layers = nn.Sequential(nn.Linear(edges, 64), act, nn.Linear(64,dim), act, nn.Dropout(self.dropout))
+        self.node_layers = nn.Sequential(nn.Linear(nodes, 64), act, nn.Linear(64,dim), act, nn.Dropout(self.dropout))
+        self.edge_layers = nn.Sequential(nn.Linear(edges, 64), act, nn.Linear(64,dim), act, nn.Dropout(self.dropout))
         
         self.TransformerEncoder = TransformerEncoder(dim=self.dim, depth=self.depth, heads=self.heads, act = act,
                                                                     mlp_ratio=self.mlp_ratio, drop_rate=self.dropout)         
-     
 
-    
-        
         self.readout_e = nn.Linear(self.dim, edges)
         self.readout_n = nn.Linear(self.dim, nodes)
         self.softmax = nn.Softmax(dim = -1) 
@@ -84,15 +71,9 @@ class Generator(nn.Module):
 
         #mask = self._generate_square_subsequent_mask(self.vertexes).to(z_e.device)
         
-        if self.submodel == "NoTarget" or self.submodel == "Prot":
-            
-            node = self.node_layers(z_n).view(-1,self.vertexes,self.dim)
+        node = self.node_layers(z_n)
         
-            edge = self.edge_layers(z_e).view(-1,self.vertexes,self.vertexes,self.dim)
-        else:
-            node = self.node_layers(z_n)
-        
-            edge = self.edge_layers(z_e)
+        edge = self.edge_layers(z_e)
         
         edge = (edge + edge.permute(0,2,1,3))/2
         
