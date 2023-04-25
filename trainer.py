@@ -258,7 +258,7 @@ class Trainer(object):
                            dim=self.dim, 
                            depth=self.depth, 
                            heads=self.heads, 
-                           mlp_ratio=self.mlp_ratio
+                           mlp_ratio=self.mlp_ratio,
                            submodel = self.submodel)
          
         self.G2 = Generator2(self.dim,
