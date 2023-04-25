@@ -5,10 +5,10 @@ from layers import TransformerEncoder, TransformerDecoder
 
 class Generator(nn.Module):
     """Generator network."""
-    def __init__(self,z_dim, act, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio):
+    def __init__(self,z_dim, act, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio, submodel):
         super(Generator, self).__init__()
         
-
+        self.submodel = submodel
         self.vertexes = vertexes
         self.edges = edges
         self.nodes = nodes
