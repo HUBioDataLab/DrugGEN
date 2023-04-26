@@ -151,7 +151,7 @@ class DruggenDataset(InMemoryDataset):
         
         ''' Loading the atom and bond decoders '''
         
-        with open("DrugGEN/data/decoders/" + dictionary_name +"_" + "drugs_train" +'.pkl', 'rb') as f:
+        with open("DrugGEN/data/decoders/" + dictionary_name +"_" + "akt_train" +'.pkl', 'rb') as f:
             
             return pickle.load(f) 
     def matrices2mol_drugs(self, node_labels, edge_labels, strict=True):
