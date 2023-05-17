@@ -5,7 +5,7 @@ from layers import TransformerEncoder, TransformerDecoder
 
 class Generator(nn.Module):
     """Generator network."""
-    def __init__(self,z_dim, act, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio, submodel):
+    def __init__(self, z_dim, act, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio, submodel):
         super(Generator, self).__init__()
         
         self.submodel = submodel
@@ -114,8 +114,8 @@ class Generator2(nn.Module):
             self.prot_n = torch.nn.Linear(3822, 45)   ## exact dimension of protein features
             self.prot_e = torch.nn.Linear(298116, 2025) ## exact dimension of protein features
         
-            self.protn_dim = torch.nn.Linear(1,dec_dim)
-            self.prote_dim = torch.nn.Linear(1,dec_dim)
+            self.protn_dim = torch.nn.Linear(1, dec_dim)
+            self.prote_dim = torch.nn.Linear(1, dec_dim)
             
             
         self.mol_nodes = nn.Linear(dim, dec_dim)
@@ -128,7 +128,7 @@ class Generator2(nn.Module):
 
         self.nodes_output_layer = nn.Linear(dec_dim, self.drugs_m_dim)
         self.edges_output_layer = nn.Linear(dec_dim, self.drugs_b_dim)
-        self.softmax = nn.Softmax(dim = -1) 
+        self.softmax = nn.Softmax(dim=-1) 
     def laplacian_positional_enc(self, adj):
         
         A = adj
@@ -177,7 +177,7 @@ class Generator2(nn.Module):
 
 
 class simple_disc(nn.Module):
-    def __init__(self, act,m_dim,vertexes,b_dim):
+    def __init__(self, act, m_dim, vertexes, b_dim):
         super().__init__()
         act = "tanh"
         if act == "relu":
