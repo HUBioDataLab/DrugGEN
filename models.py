@@ -124,7 +124,7 @@ class Generator2(nn.Module):
         self.drug_nodes =  nn.Linear(self.drugs_m_dim, dec_dim)
         self.drug_edges =  nn.Linear(self.drugs_b_dim, dec_dim)
         
-        self.TransformerDecoder = TransformerDecoder(dec_dim, depth, heads, mlp_ratio, drop_rate=0.)
+        self.TransformerDecoder = TransformerDecoder(dec_dim, depth, heads, mlp_ratio, drop_rate=self.dropout_rate)
 
         self.nodes_output_layer = nn.Linear(dec_dim, self.drugs_m_dim)
         self.edges_output_layer = nn.Linear(dec_dim, self.drugs_b_dim)
