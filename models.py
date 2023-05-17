@@ -41,7 +41,8 @@ class Generator(nn.Module):
 
         self.readout_e = nn.Linear(self.dim, edges)
         self.readout_n = nn.Linear(self.dim, nodes)
-        self.softmax = nn.Softmax(dim = -1) 
+        self.softmax = nn.Softmax(dim = -1)
+        
     def _generate_square_subsequent_mask(self, sz):
         mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
         mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
@@ -128,7 +129,8 @@ class Generator2(nn.Module):
 
         self.nodes_output_layer = nn.Linear(dec_dim, self.drugs_m_dim)
         self.edges_output_layer = nn.Linear(dec_dim, self.drugs_b_dim)
-        self.softmax = nn.Softmax(dim=-1) 
+        self.softmax = nn.Softmax(dim=-1)
+        
     def laplacian_positional_enc(self, adj):
         
         A = adj
@@ -142,10 +144,12 @@ class Generator2(nn.Module):
         pos_enc = EigVec[:,1:self.pos_enc_dim + 1]
         
         return pos_enc
+    
     def _generate_square_subsequent_mask(self, sz):
         mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
         mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
         return mask
+    
     def forward(self, edges_logits, nodes_logits ,akt1_adj,akt1_annot):
         
         edges_logits = self.mol_edges(edges_logits)
@@ -179,7 +183,6 @@ class Generator2(nn.Module):
 class simple_disc(nn.Module):
     def __init__(self, act, m_dim, vertexes, b_dim):
         super().__init__()
-        act = "tanh"
         if act == "relu":
             act = nn.ReLU()
         elif act == "leaky":
