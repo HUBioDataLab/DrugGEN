@@ -96,7 +96,7 @@ class Generator(nn.Module):
      
      
 class Generator2(nn.Module):
-    def __init__(self, dim, dec_dim, depth, heads, mlp_ratio, drop_rate,drugs_m_dim,drugs_b_dim,b_dim,m_dim, submodel):
+    def __init__(self, dim, dec_dim, depth, heads, mlp_ratio, drop_rate, drugs_m_dim, drugs_b_dim, submodel):
         super().__init__()
         self.submodel = submodel
         self.depth = depth
