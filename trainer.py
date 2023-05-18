@@ -263,14 +263,12 @@ class Trainer(object):
          
         self.G2 = Generator2(self.dim,
                            self.dec_dim,
-                           self.depth,
-                           self.heads,
+                           self.dec_depth,
+                           self.dec_heads,
                            self.mlp_ratio,
                            self.dec_dropout,
                            self.drugs_m_dim,
                            self.drugs_b_dim,
-                           self.b_dim, 
-                           self.m_dim,
                            self.submodel)
         
         

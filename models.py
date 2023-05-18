@@ -5,7 +5,7 @@ from layers import TransformerEncoder, TransformerDecoder
 
 class Generator(nn.Module):
     """Generator network."""
-    def __init__(self,z_dim, act, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio, submodel):
+    def __init__(self, z_dim, act, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio, submodel):
         super(Generator, self).__init__()
         
         self.submodel = submodel
@@ -41,7 +41,8 @@ class Generator(nn.Module):
 
         self.readout_e = nn.Linear(self.dim, edges)
         self.readout_n = nn.Linear(self.dim, nodes)
-        self.softmax = nn.Softmax(dim = -1) 
+        self.softmax = nn.Softmax(dim = -1)
+        
     def _generate_square_subsequent_mask(self, sz):
         mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
         mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
@@ -96,7 +97,7 @@ class Generator(nn.Module):
      
      
 class Generator2(nn.Module):
-    def __init__(self, dim, dec_dim, depth, heads, mlp_ratio, drop_rate,drugs_m_dim,drugs_b_dim,b_dim,m_dim, submodel):
+    def __init__(self, dim, dec_dim, depth, heads, mlp_ratio, drop_rate, drugs_m_dim, drugs_b_dim, submodel):
         super().__init__()
         self.submodel = submodel
         self.depth = depth
@@ -114,8 +115,8 @@ class Generator2(nn.Module):
             self.prot_n = torch.nn.Linear(3822, 45)   ## exact dimension of protein features
             self.prot_e = torch.nn.Linear(298116, 2025) ## exact dimension of protein features
         
-            self.protn_dim = torch.nn.Linear(1,dec_dim)
-            self.prote_dim = torch.nn.Linear(1,dec_dim)
+            self.protn_dim = torch.nn.Linear(1, dec_dim)
+            self.prote_dim = torch.nn.Linear(1, dec_dim)
             
             
         self.mol_nodes = nn.Linear(dim, dec_dim)
@@ -124,11 +125,12 @@ class Generator2(nn.Module):
         self.drug_nodes =  nn.Linear(self.drugs_m_dim, dec_dim)
         self.drug_edges =  nn.Linear(self.drugs_b_dim, dec_dim)
         
-        self.TransformerDecoder = TransformerDecoder(dec_dim, depth, heads, mlp_ratio, drop_rate=0.)
+        self.TransformerDecoder = TransformerDecoder(dec_dim, depth, heads, mlp_ratio, drop_rate=self.dropout_rate)
 
         self.nodes_output_layer = nn.Linear(dec_dim, self.drugs_m_dim)
         self.edges_output_layer = nn.Linear(dec_dim, self.drugs_b_dim)
-        self.softmax = nn.Softmax(dim = -1) 
+        self.softmax = nn.Softmax(dim=-1)
+        
     def laplacian_positional_enc(self, adj):
         
         A = adj
@@ -142,10 +144,12 @@ class Generator2(nn.Module):
         pos_enc = EigVec[:,1:self.pos_enc_dim + 1]
         
         return pos_enc
+    
     def _generate_square_subsequent_mask(self, sz):
         mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
         mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
         return mask
+    
     def forward(self, edges_logits, nodes_logits ,akt1_adj,akt1_annot):
         
         edges_logits = self.mol_edges(edges_logits)
@@ -177,9 +181,8 @@ class Generator2(nn.Module):
 
 
 class simple_disc(nn.Module):
-    def __init__(self, act,m_dim,vertexes,b_dim):
+    def __init__(self, act, m_dim, vertexes, b_dim):
         super().__init__()
-        act = "tanh"
         if act == "relu":
             act = nn.ReLU()
         elif act == "leaky":

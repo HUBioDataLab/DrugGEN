@@ -34,10 +34,10 @@ def main(config):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--submodel', type=str, default="CrossLoss", help="Chose model subtype: Prot, CrossLoss, Ligand, RL, NoTarget ")
+    parser.add_argument('--submodel', type=str, default="CrossLoss", help="Chose model subtype: Prot, CrossLoss, Ligand, RL, NoTarget", choices=['Prot', 'CrossLoss', 'Ligand', 'RL', 'NoTarget'])
 
     # Model configuration.
-    parser.add_argument('--act', type=str, default="relu", help="Activation function for the model.")
+    parser.add_argument('--act', type=str, default="relu", help="Activation function for the model.", choices=['relu', 'tanh', 'leaky', 'sigmoid'])
     
     parser.add_argument('--z_dim', type=int, default=16, help='Prior noise for the first GAN')
     
@@ -87,7 +87,7 @@ if __name__ == '__main__':
     
     parser.add_argument('--dropout', type=float, default=0., help='dropout rate')
     
-    parser.add_argument('--dec_dropout', type=float, default=0., help='dropout rate')
+    parser.add_argument('--dec_dropout', type=float, default=0., help='dropout rate for decoder')
     
     parser.add_argument('--n_critic', type=int, default=1, help='number of D updates per each G update')
     
