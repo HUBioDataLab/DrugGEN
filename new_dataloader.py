@@ -137,7 +137,7 @@ class DruggenDataset(InMemoryDataset):
         for start, end in zip(*np.nonzero(edge_labels)):
             if start > end:
                 mol.AddBond(int(start), int(end), bond_decoders[edge_labels[start, end]])
-        #mol = self.correct_mol(mol)
+        mol = self.correct_mol(mol)
         if strict:
             try:
                 
@@ -167,7 +167,7 @@ class DruggenDataset(InMemoryDataset):
         for start, end in zip(*np.nonzero(edge_labels)):
             if start > end:
                 mol.AddBond(int(start), int(end), bond_decoders[edge_labels[start, end]])
-        #mol = self.correct_mol(mol)
+        mol = self.correct_mol(mol)
         if strict:
             try:
                 Chem.SanitizeMol(mol)
