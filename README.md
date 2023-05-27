@@ -142,6 +142,12 @@ It enables cost-free project execution in the cloud. You can use the provided no
 
 ## Training
 
+### Setting up environment
+
+You can set up the environment using either conda or pip.
+
+Here is with conda:
+
 ```bash
 # set up the environment (installs the requirements):
 
@@ -150,7 +156,20 @@ conda env create -f DrugGEN/dependencies.yml
 # activate the environment:
 
 conda activate druggen
+```
 
+Here is with pip using virtual environment:
+
+```bash
+python -m venv DrugGEN/.venv
+./Druggen/.venv/bin/activate
+pip install -r DrugGEN/requirements.txt
+```
+
+
+### Starting the training
+
+```
 # Download input files:
 
 cd DrugGEN/data
