@@ -173,9 +173,9 @@ class enc_dec_attention(nn.Module):
         
         attn = attn * (prot_e + 1) * mol_e      
       
-        prot_e = attn.flatten(3)
+        mol_e_new = attn.flatten(3)
         
-        mol_adj = self.out_ed(prot_e)
+        mol_adj = self.out_ed(mol_e_new)
         
         attn = F.softmax(attn, dim=2)
         
@@ -234,20 +234,20 @@ class Decoder_Block(nn.Module):
         
         mx1, prot_annot, ma1, prot_adj  = self.dec_attn(mol_annot,prot_annot,mol_adj,prot_adj)
         
-        ma1 = prot_adj + ma1
-        px1 = prot_annot + px1
+        ma1 = mol_adj + ma1
+        mx1 = mol_annot + mx1
         
-        pa1 = self.ln3_ma(pa1)
-        px1 = self.ln3_mx(px1)
+        ma2 = self.ln3_ma(ma1)
+        mx2 = self.ln3_mx(mx1)
         
-        pa2 = self.mlp_ma(pa1)
-        px2 = self.mlp_mx(px1)
+        ma3 = self.mlp_ma(ma2)
+        mx3 = self.mlp_mx(mx2)
         
-        pa2 = pa2 + pa1
-        px2 = px2 + px1
+        ma = ma3 + ma2
+        mx = mx3 + mx2
         
-        prot_adj = self.ln4_ma(pa2)
-        prot_annot = self.ln4_mx(px2)        
+        mol_adj = self.ln4_ma(ma)
+        mol_annot = self.ln4_mx(mx)           
     
         return mol_annot, prot_annot, mol_adj, prot_adj
     
