@@ -169,7 +169,11 @@ class Generator2(nn.Module):
         #pos_enc = self.pos_enc(lap)
         #drug_n = drug_n + pos_enc
                 
-        nodes_logits,akt1_annot, edges_logits, akt1_adj = self.TransformerDecoder(nodes_logits,akt1_annot,edges_logits,akt1_adj)
+        if self.submodel == "Ligand" or self.submodel == "RL" :
+            nodes_logits,akt1_annot, edges_logits, akt1_adj = self.TransformerDecoder(akt1_annot,nodes_logits,akt1_adj,edges_logits)   
+
+        else: 
+            nodes_logits,akt1_annot, edges_logits, akt1_adj = self.TransformerDecoder(nodes_logits,akt1_annot,edges_logits,akt1_adj)
      
         edges_logits = self.edges_output_layer(edges_logits)
         nodes_logits = self.nodes_output_layer(nodes_logits)
