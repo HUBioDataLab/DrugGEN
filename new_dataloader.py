@@ -117,19 +117,19 @@ class DruggenDataset(InMemoryDataset):
 
         return np.vstack((features, np.zeros((max_length - features.shape[0], features.shape[1]))))
 
-    def decoder_load(self, dictionary_name):
-        with open("DrugGEN/data/decoders/" + dictionary_name + "_" + self.dataset_name + '.pkl', 'rb') as f:
+    def decoder_load(self, dictionary_name, file):
+        with open("DrugGEN/data/decoders/" + dictionary_name + "_" + file + '.pkl', 'rb') as f:
             return pickle.load(f)    
         
     def drugs_decoder_load(self, dictionary_name):
         with open("DrugGEN/data/decoders/" + dictionary_name +'.pkl', 'rb') as f:
             return pickle.load(f)      
         
-    def matrices2mol(self, node_labels, edge_labels, strict=True):
+    def matrices2mol(self, node_labels, edge_labels, strict=True, file_name=None):
         mol = Chem.RWMol()
         RDLogger.DisableLog('rdApp.*') 
-        atom_decoders = self.decoder_load("atom")
-        bond_decoders = self.decoder_load("bond")
+        atom_decoders = self.decoder_load("atom", file_name)
+        bond_decoders = self.decoder_load("bond", file_name)
         
         for node_label in node_labels:
             mol.AddAtom(Chem.Atom(atom_decoders[node_label]))
@@ -137,7 +137,7 @@ class DruggenDataset(InMemoryDataset):
         for start, end in zip(*np.nonzero(edge_labels)):
             if start > end:
                 mol.AddBond(int(start), int(end), bond_decoders[edge_labels[start, end]])
-        mol = self.correct_mol(mol)
+        #mol = self.correct_mol(mol)
         if strict:
             try:
                 
@@ -147,18 +147,18 @@ class DruggenDataset(InMemoryDataset):
 
         return mol
     
-    def drug_decoder_load(self, dictionary_name):
+    def drug_decoder_load(self, dictionary_name, file):
         
         ''' Loading the atom and bond decoders '''
         
-        with open("DrugGEN/data/decoders/" + dictionary_name +"_" + "akt_train" +'.pkl', 'rb') as f:
+        with open("DrugGEN/data/decoders/" + dictionary_name +"_" + file +'.pkl', 'rb') as f:
             
             return pickle.load(f) 
-    def matrices2mol_drugs(self, node_labels, edge_labels, strict=True):
+    def matrices2mol_drugs(self, node_labels, edge_labels, strict=True, file_name=None):
         mol = Chem.RWMol()
         RDLogger.DisableLog('rdApp.*') 
-        atom_decoders = self.drug_decoder_load("atom")
-        bond_decoders = self.drug_decoder_load("bond")
+        atom_decoders = self.drug_decoder_load("atom", file_name)
+        bond_decoders = self.drug_decoder_load("bond", file_name)
         
         for node_label in node_labels:
             
