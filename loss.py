@@ -34,7 +34,7 @@ def discriminator_loss(generator, discriminator, mol_graph, adj, annot, batch_si
     return node, edge,d_loss
 
     
-def generator_loss(generator, discriminator, v, adj, annot, batch_size, penalty, matrices2mol, fps_r,submodel):
+def generator_loss(generator, discriminator, v, adj, annot, batch_size, penalty, matrices2mol, fps_r,submodel, dataset_name):
     
     # Compute loss with fake molecules.
    
@@ -53,7 +53,7 @@ def generator_loss(generator, discriminator, v, adj, annot, batch_size, penalty,
     g_edges_hat_sample = torch.max(edge_sample, -1)[1] 
     g_nodes_hat_sample = torch.max(node_sample , -1)[1]   
                 
-    fake_mol = [matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True) 
+    fake_mol = [matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True, file_name=dataset_name) 
             for e_, n_ in zip(g_edges_hat_sample, g_nodes_hat_sample)]        
     g_loss = prediction_fake
     # Compute penalty loss.
@@ -116,7 +116,7 @@ def discriminator2_loss(generator, discriminator, mol_graph, adj, annot, batch_s
     
     return d2_loss
 
-def generator2_loss(generator, discriminator, v, adj, annot, batch_size, penalty, matrices2mol, fps_r,ak1_adj,akt1_annot, submodel):
+def generator2_loss(generator, discriminator, v, adj, annot, batch_size, penalty, matrices2mol, fps_r,ak1_adj,akt1_annot, submodel, drugs_name):
     
     # Generate molecules.
     
@@ -140,7 +140,7 @@ def generator2_loss(generator, discriminator, v, adj, annot, batch_size, penalty
     g2_loss_fake = - torch.mean(g_tra_logits_fake2)                                                            
 
     # Reward
-    fake_mol_g = [matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True) 
+    fake_mol_g = [matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True, file_name=drugs_name) 
                 for e_, n_ in zip(dr_g_edges_hat_sample, dr_g_nodes_hat_sample)]       
     g2_loss =  g2_loss_fake    
     if submodel == "RL":
