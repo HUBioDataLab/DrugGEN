@@ -19,7 +19,7 @@ RDLogger.DisableLog('rdApp.*')
 from loss import discriminator_loss, generator_loss, discriminator2_loss, generator2_loss
 from training_data import load_data
 import random
-
+from tqdm import tqdm
 
 class Trainer(object):
     
@@ -774,7 +774,7 @@ class Trainer(object):
                 
                 bulk_data = load_data(data,
                                      drugs,
-                                     self.batch_size, 
+                                     self.inf_batch_size, 
                                      self.device,
                                      self.b_dim,
                                      self.m_dim,
@@ -834,7 +834,7 @@ class Trainer(object):
                                                     self.V,
                                                     GAN1_input_e,
                                                     GAN1_input_x,
-                                                    self.batch_size,
+                                                    self.inf_batch_size,
                                                     sim_reward,
                                                     self.dataset.matrices2mol,
                                                     fps_r,
