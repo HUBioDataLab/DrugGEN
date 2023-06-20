@@ -639,9 +639,10 @@ class Trainer(object):
                                                     GAN1_input_x,
                                                     self.batch_size,
                                                     sim_reward,
-                                                    self.dataset.matrices2mol_drugs,
+                                                    self.dataset.matrices2mol,
                                                     fps_r,
-                                                    self.submodel)        
+                                                    self.submodel,
+                                                    self.dataset_name)        
                 
                 g_loss, fake_mol, g_edges_hat_sample, g_nodes_hat_sample, node, edge = generator_output    
             
@@ -659,7 +660,8 @@ class Trainer(object):
                                                 fps_r,
                                                 GAN2_input_e,
                                                 GAN2_input_x,
-                                                self.submodel)
+                                                self.submodel,
+                                                self.drugs_name)
                 
                     g2_loss, fake_mol_g, dr_g_edges_hat_sample, dr_g_nodes_hat_sample = output     
                 
@@ -834,9 +836,10 @@ class Trainer(object):
                                                     GAN1_input_x,
                                                     self.batch_size,
                                                     sim_reward,
-                                                    self.dataset.matrices2mol_drugs,
+                                                    self.dataset.matrices2mol,
                                                     fps_r,
-                                                    self.submodel)   
+                                                    self.submodel,
+                                                    self.dataset_name)   
                 
                 _, fake_mol_g, _, _, node, edge = generator_output  
 
@@ -857,7 +860,7 @@ class Trainer(object):
                                                 GAN2_input_e,
                                                 GAN2_input_x,
                                                 self.submodel,
-                                                self.mode)
+                                                self.drugs_name)
             
                     _, fake_mol_g, edges, nodes = output      
 
