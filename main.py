@@ -116,6 +116,8 @@ if __name__ == '__main__':
     
     parser.add_argument('--inference_iterations', type=int, default=100, help='Number of iterations for inference')
     
+    parser.add_argument('--inf_batch_size', type=int, default=1, help='Batch size for inference')
+    
     # Directories.
     parser.add_argument('--protein_data_dir', type=str, default='DrugGEN/data/akt')      
     
