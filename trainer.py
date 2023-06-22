@@ -885,8 +885,8 @@ class Trainer(object):
         
         print("Metrics calculation started using MOSES.")
                    
-        print("Validity: ", fraction_valid(inference_drugs), "\n")
-        print("Uniqueness: ", fraction_unique(inference_drugs), "\n")
-        print("Validity: ", novelty(inference_drugs, drug_smiles), "\n")
+        print("Validity: ", fraction_valid(metric_calc_dr), "\n")
+        print("Uniqueness: ", fraction_unique(metric_calc_dr), "\n")
+        print("Validity: ", novelty(metric_calc_dr, drug_smiles), "\n")
 
         print("Metrics are calculated.")
