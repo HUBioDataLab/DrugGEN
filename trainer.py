@@ -57,7 +57,10 @@ class Trainer(object):
         
         self.inf_drugs_dataset_file = config.inf_drug_dataset_file  # Drug dataset file name for the second GAN. 
                                                             # Contains drug molecules only. (In this case AKT1 inhibitors.)
-
+        self.inference_iterations = config.inference_iterations
+        
+        self.inf_batch_size = config.inf_batch_size
+        
         self.mol_data_dir = config.mol_data_dir  # Directory where the dataset files are stored.
         
         self.drug_data_dir = config.drug_data_dir  # Directory where the drug dataset files are stored.
@@ -721,8 +724,9 @@ class Trainer(object):
         #self.D.eval()
         self.G2.eval()
         #self.D2.eval()
-        self.inf_batch_size = 1
-        step = 1000
+
+        step = self.inference_iterations
+        
         self.inf_dataset = DruggenDataset(self.mol_data_dir,
                                       self.inf_dataset_file, 
                                       self.inf_raw_file, 
