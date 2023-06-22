@@ -107,7 +107,7 @@ if __name__ == '__main__':
     
     parser.add_argument('--num_test_epoch', type=int, default=30000, help='inference epoch')
     
-    parser.add_argument('--inference_sample_num', type=int, default=30000, help='inference samples')
+    parser.add_argument('--inference_sample_num', type=int, default=1000, help='inference samples')
     
     # Miscellaneous.
     parser.add_argument('--num_workers', type=int, default=1)
