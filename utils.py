@@ -410,7 +410,8 @@ def fraction_unique(gen, k=None, n_jobs=1, check_validity=True):
         gen = gen[:k]
     canonic = set(mapper(n_jobs)(canonic_smiles, gen))
     if None in canonic and check_validity:
-        raise ValueError("Invalid molecule passed to unique@k")
+        canonic = [i for i in canonic if i is not None]
+        #raise ValueError("Invalid molecule passed to unique@k")
     return 0 if len(gen) == 0 else len(canonic) / len(gen)
 
 def novelty(gen, train, n_jobs=1):
