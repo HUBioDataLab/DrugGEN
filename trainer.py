@@ -580,8 +580,8 @@ class Trainer(object):
                     GAN2_disc_e = drugs_a_tensor
                     GAN2_disc_x = drugs_x_tensor        
                 elif self.submodel == "RL":
-                    GAN1_input_e = z_edge
-                    GAN1_input_x = z_node
+                    GAN1_input_e = a_tensor
+                    GAN1_input_x = x_tensor
                     GAN1_disc_e = a_tensor
                     GAN1_disc_x = x_tensor
                     GAN2_input_e = drugs_a_tensor
@@ -589,8 +589,8 @@ class Trainer(object):
                     GAN2_disc_e = drugs_a_tensor
                     GAN2_disc_x = drugs_x_tensor    
                 elif self.submodel == "NoTarget":
-                    GAN1_input_e = z_edge 
-                    GAN1_input_x = z_node 
+                    GAN1_input_e = a_tensor 
+                    GAN1_input_x = x_tensor 
                     GAN1_disc_e = a_tensor
                     GAN1_disc_x = x_tensor                                                  
                     
@@ -765,7 +765,7 @@ class Trainer(object):
         with torch.inference_mode():
             
             dataloader_iterator = iter(self.inf_drugs_loader)
-            pbar = tqdm(range(step))
+            pbar = tqdm(range(self.inference_sample_num))
             pbar.set_description('Inference mode for {} model started'.format(self.submodel))
             for i, data in enumerate(self.inf_loader):   
                 try:
@@ -817,8 +817,8 @@ class Trainer(object):
                     GAN2_disc_e = drugs_a_tensor
                     GAN2_disc_x = drugs_x_tensor        
                 elif self.submodel == "RL":
-                    GAN1_input_e = z_edge
-                    GAN1_input_x = z_node
+                    GAN1_input_e = a_tensor
+                    GAN1_input_x = x_tensor
                     GAN1_disc_e = a_tensor
                     GAN1_disc_x = x_tensor
                     GAN2_input_e = drugs_a_tensor
@@ -826,8 +826,8 @@ class Trainer(object):
                     GAN2_disc_e = drugs_a_tensor
                     GAN2_disc_x = drugs_x_tensor    
                 elif self.submodel == "NoTarget":
-                    GAN1_input_e = z_edge
-                    GAN1_input_x = z_node
+                    GAN1_input_e = a_tensor
+                    GAN1_input_x = x_tensor
                     GAN1_disc_e = a_tensor
                     GAN1_disc_x = x_tensor      
                 # =================================================================================== #
@@ -878,9 +878,10 @@ class Trainer(object):
                         f.write("\n")
                         metric_calc_dr.append(molecules)
             
-                pbar.update(1)
-                                            
-                if i == step:
+                if len(inference_drugs) > 0:
+                    pbar.update(1)
+                              
+                if len(metric_calc_dr) == self.inference_sample_num:
                     break
         
         et = time.time() - start_time
