@@ -227,7 +227,7 @@ def logging(log_path, start_time, mols, train_smiles, i,idx, loss,model_num, sav
     #m0 = {k: np.array(v).mean() for k, v in m0.items()}
     #loss.update(m0)
     loss.update({'Valid': valid})
-    loss.update({'Unique@{}'.format(k): unique})
+    loss.update({'Unique' unique})
     loss.update({'Novel': novel}) 
     #loss.update({'QED': statistics.mean(qed)})
     #loss.update({'SA': statistics.mean(sa)})
