@@ -7,7 +7,7 @@ from torch_geometric.nn import  PNAConv, global_add_pool, Set2Set, GraphMultiset
 import math
 
 class MLP(nn.Module):
-    def __init__(self, act, in_feat, hid_feat=None, out_feat=None,
+    def __init__(self, in_feat, hid_feat=None, out_feat=None,
                  dropout=0.):
         super().__init__()
         if not hid_feat:
@@ -26,7 +26,7 @@ class MLP(nn.Module):
         return self.droprateout(x)
 
 class Attention_new(nn.Module):
-    def __init__(self, dim, heads, act, attention_dropout=0., proj_dropout=0.):
+    def __init__(self, dim, heads, attention_dropout=0.):
         super().__init__()
         assert dim % heads == 0
         self.heads = heads
@@ -79,15 +79,15 @@ class Attention_new(nn.Module):
         return node, edge
 
 class Encoder_Block(nn.Module):
-    def __init__(self, dim, heads,act, mlp_ratio=4, drop_rate=0., ):
+    def __init__(self, dim, heads,act, mlp_ratio=4, drop_rate=0.):
         super().__init__()
         self.ln1 = nn.LayerNorm(dim)
    
-        self.attn = Attention_new(dim, heads, act, drop_rate, drop_rate)
+        self.attn = Attention_new(dim, heads, drop_rate)
         self.ln3 = nn.LayerNorm(dim)
         self.ln4 = nn.LayerNorm(dim)
-        self.mlp = MLP(act,dim,dim*mlp_ratio, dim, dropout=drop_rate)
-        self.mlp2 = MLP(act,dim,dim*mlp_ratio, dim, dropout=drop_rate)
+        self.mlp = MLP(dim, dim*mlp_ratio, dim, dropout=drop_rate)
+        self.mlp2 = MLP(dim, dim*mlp_ratio, dim, dropout=drop_rate)
         self.ln5 = nn.LayerNorm(dim)
         self.ln6 = nn.LayerNorm(dim)
 
@@ -199,7 +199,7 @@ class Decoder_Block(nn.Module):
         self.ln1_mx = nn.LayerNorm(dim)
         self.ln1_px = nn.LayerNorm(dim)
         
-        self.attn2 = Attention_new(dim, heads, drop_rate, drop_rate)
+        self.attn2 = Attention_new(dim, heads, drop_rate)
         
         self.ln2_pa = nn.LayerNorm(dim)
         self.ln2_px = nn.LayerNorm(dim)
@@ -265,171 +265,4 @@ class TransformerDecoder(nn.Module):
             mol_annot, prot_annot, mol_adj, prot_adj  = Decoder_Block(mol_annot, prot_annot, mol_adj, prot_adj)
             
         return mol_annot, prot_annot,mol_adj, prot_adj
-
-
-
-"""class PNA(torch.nn.Module):
-    def __init__(self,deg,agg,sca,pna_in_ch,pna_out_ch,edge_dim,towers,pre_lay,post_lay,pna_layer_num, graph_add):
-        super(PNA,self).__init__()
-                                                                 
-        self.node_emb = Embedding(30, pna_in_ch)
-        self.edge_emb = Embedding(30, edge_dim)
-        degree = deg
-        aggregators =   agg.split(",") #["max"]    #   'sum', 'min', 'max' 'std', 'var' 'mean',                                    ## buraları değiştirerek bak.
-        scalers =  sca.split(",")   # ['amplification', 'attenuation']   #  'amplification', 'attenuation' , 'linear', 'inverse_linear, 'identity'
-        self.graph_add = graph_add
-        self.convs = ModuleList()
-        self.batch_norms = ModuleList()
-
-        for _ in range(pna_layer_num):                                               ##### layer sayısını hyperparameter olarak ayarla??   
-            conv = PNAConv(in_channels=pna_in_ch, out_channels=pna_out_ch,
-                           aggregators=aggregators, scalers=scalers, deg=degree,
-                           edge_dim=edge_dim, towers=towers, pre_layers=pre_lay, post_layers=post_lay,  ## tower sayısını değiştirerek dene, default - 1
-                           divide_input=True)
-            self.convs.append(conv)
-            self.batch_norms.append(nn.LayerNorm(pna_out_ch))
-        
-        #self.graph_multitrans = GraphMultisetTransformer(in_channels=pna_out_ch, hidden_channels= 200, 
-                                                         #out_channels= pna_out_ch, layer_norm = True)
-        if self.graph_add == "set2set":
-            self.s2s = Set2Set(in_channels=pna_out_ch, processing_steps=1, num_layers=1)
-
-        if self.graph_add == "set2set":
-            pna_out_ch = pna_out_ch*2
-        self.mlp = nn.Sequential(nn.Linear(pna_out_ch,pna_out_ch), nn.Tanh(), nn.Linear(pna_out_ch,25), nn.Tanh(),nn.Linear(25,1))
-        
-    def forward(self, x, edge_index, edge_attr, batch):
-
-        x = self.node_emb(x.squeeze())
-
-        edge_attr = self.edge_emb(edge_attr)
-        
-        for conv, batch_norm in zip(self.convs, self.batch_norms):
-            x = F.relu(batch_norm(conv(x, edge_index, edge_attr)))
- 
-        if self.graph_add == "global_add":
-            x = global_add_pool(x, batch.squeeze())
-   
-        elif self.graph_add == "set2set":
-
-            x = self.s2s(x, batch.squeeze())
-        #elif self.graph_add == "graph_multitrans":
-            #x = self.graph_multitrans(x,batch.squeeze(),edge_index)
-        x = self.mlp(x)
-
-        return  x"""
-
-
-
-
-"""class GraphConvolution(nn.Module):
-
-    def __init__(self, in_features, out_feature_list, b_dim, dropout,gcn_depth):
-        super(GraphConvolution, self).__init__()
-        self.in_features = in_features
-        
-        self.gcn_depth = gcn_depth
-        
-        self.out_feature_list = out_feature_list
-                
-        self.gcn_in = nn.Sequential(nn.Linear(in_features,out_feature_list[0]),nn.Tanh(),
-                                     nn.Linear(out_feature_list[0],out_feature_list[0]),nn.Tanh(), 
-                                     nn.Linear(out_feature_list[0], out_feature_list[0]), nn.Dropout(dropout))      
-        
-        self.gcn_convs = nn.ModuleList()
-  
-        for _ in range(gcn_depth):  
-                  
-                gcn_conv = nn.Sequential(nn.Linear(out_feature_list[0],out_feature_list[0]),nn.Tanh(),
-                                         nn.Linear(out_feature_list[0],out_feature_list[0]),nn.Tanh(),
-                                         nn.Linear(out_feature_list[0], out_feature_list[0]), nn.Dropout(dropout))
-                
-                self.gcn_convs.append(gcn_conv)
-                
-        self.gcn_out = nn.Sequential(nn.Linear(out_feature_list[0],out_feature_list[0]),nn.Tanh(),
-                                     nn.Linear(out_feature_list[0],out_feature_list[0]),nn.Tanh(), 
-                                     nn.Linear(out_feature_list[0], out_feature_list[1]), nn.Dropout(dropout))
-        
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(self, input, adj, activation=None):
-        # input : 16x9x9
-        # adj : 16x4x9x9
-        hidden = torch.stack([self.gcn_in(input) for _ in range(adj.size(1))], 1)
-        hidden = torch.einsum('bijk,bikl->bijl', (adj, hidden))
-    
-        hidden = torch.sum(hidden, 1) + self.gcn_in(input)
-        hidden = activation(hidden) if activation is not None else hidden             
-
-        for gcn_conv in self.gcn_convs:
-            hidden1 = torch.stack([gcn_conv(hidden) for _ in range(adj.size(1))], 1)
-            hidden1 = torch.einsum('bijk,bikl->bijl', (adj, hidden1))
-            hidden = torch.sum(hidden1, 1) + gcn_conv(hidden)
-            hidden = activation(hidden) if activation is not None else hidden
-      
-        output = torch.stack([self.gcn_out(hidden) for _ in range(adj.size(1))], 1)
-        output = torch.einsum('bijk,bikl->bijl', (adj, output))
-        output = torch.sum(output, 1) + self.gcn_out(hidden)
-        output = activation(output) if activation is not None else output
-        
-        
-        return output
-
-
-class GraphAggregation(Module):
-
-    def __init__(self, in_features, out_features, m_dim, dropout):
-        super(GraphAggregation, self).__init__()
-        self.sigmoid_linear = nn.Sequential(nn.Linear(in_features+m_dim, out_features), nn.Sigmoid())
-        self.tanh_linear = nn.Sequential(nn.Linear(in_features+m_dim, out_features), nn.Tanh())                                    
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(self, input, activation):
-        i = self.sigmoid_linear(input)
-        j = self.tanh_linear(input)
-        output = torch.sum(torch.mul(i,j), 1)
-        output = activation(output) if activation is not None\
-                 else output
-        output = self.dropout(output)
-
-        return output"""
-
-"""class Attention(nn.Module):
-    def __init__(self, dim, heads=4, attention_dropout=0., proj_dropout=0.):
-        super().__init__()
-        self.heads = heads
-        self.scale = 1./dim**0.5
-        #self.scale = torch.div(1, torch.pow(dim, 0.5)) #1./torch.pow(dim, 0.5) #dim**0.5 torch.div(x, 0.5)
-
-        self.qkv = nn.Linear(dim, dim*3, bias=False)
-
-        self.attention_dropout = nn.Dropout(attention_dropout)
-        self.out = nn.Sequential(
-            nn.Linear(dim, dim),
-            nn.Dropout(proj_dropout)
-        )
-        #self.noise_strength_1 = torch.nn.Parameter(torch.zeros([]))
-    
-    def forward(self, x):
-        b, n, c = x.shape
-
-        #x = x + torch.randn([x.size(0), x.size(1), 1], device=x.device) * self.noise_strength_1
-        
-        qkv = self.qkv(x).reshape(b, n, 3, self.heads, c//self.heads)
-
-        q, k, v = qkv.permute(2, 0, 3, 1, 4)
-
-        dot = (q @ k.transpose(-2, -1)) * self.scale
-
-        attn = dot.softmax(dim=-1)
-        attn = self.attention_dropout(attn)
-      
-
-        x = (attn @ v).transpose(1, 2).reshape(b, n, c)
-
-        x = self.out(x)
-     
-        return x, attn"""
-    
-    
     
