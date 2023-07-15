@@ -5,7 +5,7 @@ from rdkit.Chem import AllChem
 from rdkit.Chem import Draw
 import os
 import numpy as np
-import seaborn as sns
+#import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from rdkit import RDLogger  
@@ -245,23 +245,23 @@ def logging(log_path, start_time, mols, train_smiles, i,idx, loss,model_num, sav
     print("\n") 
 
 
-def plot_attn(dataset_name, heads,attn_w, model, iter, epoch):
-    
-    cols = 4
-    rows = int(heads/cols)
-
-    fig, axes = plt.subplots( rows,cols, figsize = (30, 14))
-    axes = axes.flat
-    attentions_pos = attn_w[0]
-    attentions_pos = attentions_pos.cpu().detach().numpy()
-    for i,att in enumerate(attentions_pos):
-
-        #im = axes[i].imshow(att, cmap='gray')
-        sns.heatmap(att,vmin = 0, vmax = 1,ax = axes[i])
-        axes[i].set_title(f'head - {i} ')
-        axes[i].set_ylabel('layers')
-    pltsavedir = "/home/atabey/attn/second"
-    plt.savefig(os.path.join(pltsavedir, "attn" + model + "_" + dataset_name + "_"  + str(iter) + "_" + str(epoch) +  ".png"), dpi= 500,bbox_inches='tight')
+#def plot_attn(dataset_name, heads,attn_w, model, iter, epoch):
+#    
+#    cols = 4
+#    rows = int(heads/cols)
+#
+#    fig, axes = plt.subplots( rows,cols, figsize = (30, 14))
+#    axes = axes.flat
+#    attentions_pos = attn_w[0]
+#    attentions_pos = attentions_pos.cpu().detach().numpy()
+#    for i,att in enumerate(attentions_pos):
+#
+#        #im = axes[i].imshow(att, cmap='gray')
+#        sns.heatmap(att,vmin = 0, vmax = 1,ax = axes[i])
+#        axes[i].set_title(f'head - {i} ')
+#        axes[i].set_ylabel('layers')
+#    pltsavedir = "/home/atabey/attn/second"
+#    plt.savefig(os.path.join(pltsavedir, "attn" + model + "_" + dataset_name + "_"  + str(iter) + "_" + str(epoch) +  ".png"), dpi= 500,bbox_inches='tight')
 
 
 def plot_grad_flow(named_parameters, model, iter, epoch):
