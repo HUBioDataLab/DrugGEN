@@ -1,10 +1,7 @@
 import os
 import argparse
-from xmlrpc.client import boolean
 from trainer import Trainer
 from torch.backends import cudnn
-import torch
-
 
 def str2bool(v):
     return v.lower() in ('true')
@@ -27,7 +24,7 @@ def main(config):
     trainer = Trainer(config) 
 
     if config.mode == 'train':
-        trainer.train()
+        trainer.train(config)
     elif config.mode == 'inference':
         trainer.inference()
 
@@ -75,7 +72,7 @@ if __name__ == '__main__':
     
     parser.add_argument('--batch_size', type=int, default=128, help='Batch size for the training.')
     
-    parser.add_argument('--epoch', type=int, default=50, help='Epoch number for Training.')
+    parser.add_argument('--epoch', type=int, default=10, help='Epoch number for Training.')
     
     parser.add_argument('--g_lr', type=float, default=0.00001, help='learning rate for G')
     
@@ -107,7 +104,7 @@ if __name__ == '__main__':
     
     parser.add_argument('--num_test_epoch', type=int, default=30000, help='inference epoch')
     
-    parser.add_argument('--inference_sample_num', type=int, default=1000, help='inference samples')
+    parser.add_argument('--inference_sample_num', type=int, default=10000, help='inference samples')
     
     # Miscellaneous.
     parser.add_argument('--num_workers', type=int, default=1)
