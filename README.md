@@ -234,10 +234,10 @@ https://drive.google.com/drive/folders/1biJLQeXCKqw4MzAYwOuJU6Aw5GIQlJMY
 
 ```bash
 
-python DrugGEN/main.py --submodel="Prot" --mode="inference" --inference_model="DrugGEN/experiments/models/{Chosen model name}"
+python DrugGEN/main.py --submodel="{Chosen model name}" --mode="inference" --inference_model="DrugGEN/experiments/models/{Chosen model name}"
 ```
 
-- SMILES representation of the generated molecules will be saved into the file: "DrugGEN/experiments/inference/{Chosen submodel name}/denovo_molecules.txt".
+- SMILES representation of the generated molecules will be saved into the file: "DrugGEN/experiments/inference/{Chosen model name}/denovo_molecules.txt".
 
 &nbsp;
 &nbsp;
