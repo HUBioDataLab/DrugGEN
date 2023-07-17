@@ -4,8 +4,6 @@ import torch
 from rdkit import Chem
 from torch_geometric.data import (Data, InMemoryDataset)
 import os.path as osp
-import pickle
-import torch
 from tqdm import tqdm
 import re 
 from rdkit import RDLogger  

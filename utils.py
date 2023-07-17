@@ -5,7 +5,7 @@ from rdkit.Chem import AllChem
 from rdkit.Chem import Draw
 import os
 import numpy as np
-import seaborn as sns
+#import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from rdkit import RDLogger  
@@ -45,6 +45,7 @@ class Metrics(object):
     def max_component(data, max_len):
         
         return (np.array(list(map(Metrics.mol_length, data)), dtype=np.float32)/max_len).mean()       
+
 
 def sim_reward(mol_gen, fps_r):
     
@@ -152,6 +153,7 @@ def sample_z_edge(batch_size, vertexes, edges):
     
     return np.random.normal(0,1, size=(batch_size, vertexes, vertexes, edges)) # 128, 9, 9, 5
 
+
 def sample_z( batch_size, z_dim):
     
     ''' Random noise. '''
@@ -176,10 +178,7 @@ def mol_sample(sample_directory, model_name, mol, edges, nodes, idx, i):
     print("Valid matrices and smiles are saved")
 
 
-
-
-    
-def logging(log_path, start_time, mols, train_smiles, i,idx, loss,model_num, save_path):
+def logging(log_path, start_time, mols, train_smiles, i,idx, loss,model_num, save_path, get_maxlen=False):
     
     gen_smiles =  []    
     for line in mols:
@@ -222,20 +221,20 @@ def logging(log_path, start_time, mols, train_smiles, i,idx, loss,model_num, sav
     #m1 =all_scores_chem(fake_mol, mols, vert, norm=True)
     #m0.update(m1)
     
-    #maxlen = MolecularMetrics.max_component(mols, 45)
+    if get_maxlen:
+        maxlen = Metrics.max_component(mols, 45)
+        loss.update({"MaxLen": maxlen})
     
     #m0 = {k: np.array(v).mean() for k, v in m0.items()}
     #loss.update(m0)
     loss.update({'Valid': valid})
-    loss.update({'Unique' unique})
+    loss.update({'Unique': unique})
     loss.update({'Novel': novel}) 
     #loss.update({'QED': statistics.mean(qed)})
     #loss.update({'SA': statistics.mean(sa)})
     #loss.update({'LogP': statistics.mean(logp)})
     #loss.update({'IntDiv': IntDiv})
     
-    #wandb.log({"maxlen": maxlen})
-
     for tag, value in loss.items():
         
         log += ", {}: {:.4f}".format(tag, value)
@@ -246,24 +245,23 @@ def logging(log_path, start_time, mols, train_smiles, i,idx, loss,model_num, sav
     print("\n") 
 
 
-
-def plot_attn(dataset_name, heads,attn_w, model, iter, epoch):
-    
-    cols = 4
-    rows = int(heads/cols)
-
-    fig, axes = plt.subplots( rows,cols, figsize = (30, 14))
-    axes = axes.flat
-    attentions_pos = attn_w[0]
-    attentions_pos = attentions_pos.cpu().detach().numpy()
-    for i,att in enumerate(attentions_pos):
-
-        #im = axes[i].imshow(att, cmap='gray')
-        sns.heatmap(att,vmin = 0, vmax = 1,ax = axes[i])
-        axes[i].set_title(f'head - {i} ')
-        axes[i].set_ylabel('layers')
-    pltsavedir = "/home/atabey/attn/second"
-    plt.savefig(os.path.join(pltsavedir, "attn" + model + "_" + dataset_name + "_"  + str(iter) + "_" + str(epoch) +  ".png"), dpi= 500,bbox_inches='tight')
+#def plot_attn(dataset_name, heads,attn_w, model, iter, epoch):
+#    
+#    cols = 4
+#    rows = int(heads/cols)
+#
+#    fig, axes = plt.subplots( rows,cols, figsize = (30, 14))
+#    axes = axes.flat
+#    attentions_pos = attn_w[0]
+#    attentions_pos = attentions_pos.cpu().detach().numpy()
+#    for i,att in enumerate(attentions_pos):
+#
+#        #im = axes[i].imshow(att, cmap='gray')
+#        sns.heatmap(att,vmin = 0, vmax = 1,ax = axes[i])
+#        axes[i].set_title(f'head - {i} ')
+#        axes[i].set_ylabel('layers')
+#    pltsavedir = "/home/atabey/attn/second"
+#    plt.savefig(os.path.join(pltsavedir, "attn" + model + "_" + dataset_name + "_"  + str(iter) + "_" + str(epoch) +  ".png"), dpi= 500,bbox_inches='tight')
 
 
 def plot_grad_flow(named_parameters, model, iter, epoch):
@@ -298,36 +296,8 @@ def plot_grad_flow(named_parameters, model, iter, epoch):
                 Line2D([0], [0], color="k", lw=4)], ['max-gradient', 'mean-gradient', 'zero-gradient'])
     pltsavedir = "/home/atabey/gradients/tryout"
     plt.savefig(os.path.join(pltsavedir, "weights_" + model  + "_"  + str(iter) + "_" + str(epoch) +  ".png"), dpi= 500,bbox_inches='tight')
-
-"""
-def _genDegree():
     
-    ''' Generates the Degree distribution tensor for PNA, should be used everytime a different
-        dataset is used.
-        Can be called without arguments and saves the tensor for later use. If tensor was created
-        before, it just loads the degree tensor.
-        '''
-    
-    degree_path = os.path.join(self.degree_dir, self.dataset_name + '-degree.pt')
-    if not os.path.exists(degree_path):
-        
-        
-        max_degree = -1
-        for data in self.dataset:
-            d = geoutils.degree(data.edge_index[1], num_nodes=data.num_nodes, dtype=torch.long)
-            max_degree = max(max_degree, int(d.max()))
 
-        # Compute the in-degree histogram tensor
-        deg = torch.zeros(max_degree + 1, dtype=torch.long)
-        for data in self.dataset:
-            d = geoutils.degree(data.edge_index[1], num_nodes=data.num_nodes, dtype=torch.long)
-            deg += torch.bincount(d, minlength=deg.numel())
-        torch.save(deg, 'DrugGEN/data/' + self.dataset_name + '-degree.pt')            
-    else:    
-        deg = torch.load(degree_path, map_location=lambda storage, loc: storage)
-        
-    return deg        
-"""    
 def get_mol(smiles_or_mol):
     '''
     Loads SMILES/molecule into RDKit's object
@@ -344,6 +314,7 @@ def get_mol(smiles_or_mol):
             return None
         return mol
     return smiles_or_mol
+
 
 def mapper(n_jobs):
     '''
@@ -369,6 +340,8 @@ def mapper(n_jobs):
 
         return _mapper
     return n_jobs.map
+
+
 def remove_invalid(gen, canonize=True, n_jobs=1):
     """
     Removes invalid molecules from the dataset
@@ -378,6 +351,8 @@ def remove_invalid(gen, canonize=True, n_jobs=1):
         return [gen_ for gen_, mol in zip(gen, mols) if mol is not None]
     return [x for x in mapper(n_jobs)(canonic_smiles, gen) if
             x is not None]
+
+
 def fraction_valid(gen, n_jobs=1):
     """
     Computes a number of valid molecules
@@ -387,11 +362,15 @@ def fraction_valid(gen, n_jobs=1):
     """
     gen = mapper(n_jobs)(get_mol, gen)
     return 1 - gen.count(None) / len(gen)
+
+
 def canonic_smiles(smiles_or_mol):
     mol = get_mol(smiles_or_mol)
     if mol is None:
         return None
     return Chem.MolToSmiles(mol)
+
+
 def fraction_unique(gen, k=None, n_jobs=1, check_validity=True):
     """
     Computes a number of unique molecules
@@ -414,12 +393,12 @@ def fraction_unique(gen, k=None, n_jobs=1, check_validity=True):
         #raise ValueError("Invalid molecule passed to unique@k")
     return 0 if len(gen) == 0 else len(canonic) / len(gen)
 
+
 def novelty(gen, train, n_jobs=1):
     gen_smiles = mapper(n_jobs)(canonic_smiles, gen)
     gen_smiles_set = set(gen_smiles) - {None}
     train_set = set(train)
     return 0 if len(gen_smiles_set) == 0 else len(gen_smiles_set - train_set) / len(gen_smiles_set)
-
 
 
 def average_agg_tanimoto(stock_vecs, gen_vecs,

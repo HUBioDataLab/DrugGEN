@@ -1,10 +1,7 @@
 import os
 import argparse
-from xmlrpc.client import boolean
 from trainer import Trainer
 from torch.backends import cudnn
-import torch
-
 
 def str2bool(v):
     return v.lower() in ('true')
@@ -27,7 +24,7 @@ def main(config):
     trainer = Trainer(config) 
 
     if config.mode == 'train':
-        trainer.train()
+        trainer.train(config)
     elif config.mode == 'inference':
         trainer.inference()
 
@@ -75,7 +72,7 @@ if __name__ == '__main__':
     
     parser.add_argument('--batch_size', type=int, default=128, help='Batch size for the training.')
     
-    parser.add_argument('--epoch', type=int, default=50, help='Epoch number for Training.')
+    parser.add_argument('--epoch', type=int, default=10, help='Epoch number for Training.')
     
     parser.add_argument('--g_lr', type=float, default=0.00001, help='learning rate for G')
     
@@ -99,15 +96,15 @@ if __name__ == '__main__':
     
     parser.add_argument('--clipping_value', type=int, default=2, help='1,2, or 5 suggested but not strictly')
     
-    parser.add_argument('--features', type=str2bool, default=False, help='features dimension for nodes')  
-      
+    parser.add_argument('--features', type=str2bool, default=False, help='features dimension for nodes')
+
     
     # Test configuration.
     parser.add_argument('--test_iters', type=int, default=10000, help='test model from this step')
     
     parser.add_argument('--num_test_epoch', type=int, default=30000, help='inference epoch')
     
-    parser.add_argument('--inference_sample_num', type=int, default=1000, help='inference samples')
+    parser.add_argument('--inference_sample_num', type=int, default=10000, help='inference samples')
     
     # Miscellaneous.
     parser.add_argument('--num_workers', type=int, default=1)
@@ -151,23 +148,24 @@ if __name__ == '__main__':
     
     parser.add_argument('--inf_raw_file', type=str, default='DrugGEN/data/chembl_test.smi')     
       
-    parser.add_argument('--inf_drug_raw_file', type=str, default='DrugGEN/data/akt_test.smi')       
-    
-       
+    parser.add_argument('--inf_drug_raw_file', type=str, default='DrugGEN/data/akt_test.smi')
+           
     # Step size.
-    parser.add_argument('--log_sample_step', type=int, default=1000)
+    parser.add_argument('--log_sample_step', type=int, default=1000, help='step size for sampling during training')
 
-    """# PNA configurations
-    parser.add_argument('--aggregators', type=str, default="max,mean,min,std", help='aggregator identifiers - "min","max","std","var","mean","sum"')
-    parser.add_argument('--scalers', type=str, default="identity,attenuation,amplification", help='scaler identifiers - "attenuation","amplification","identity","linear", "inverse_linear')
-    parser.add_argument('--pna_in_ch',type = int, default=50, help='PNA in channel dimension')
-    parser.add_argument('--pna_out_ch', type=int, default=50, help='PNA out channel dimension')
-    parser.add_argument('--edge_dim', type=int, default=50, help='PNA edge dimension')
-    parser.add_argument('--towers', type=int, default=1, help='PNA towers')
-    parser.add_argument('--pre_lay', type=int, default=1, help='Pre-transformation layer number')
-    parser.add_argument('--post_lay', type=int, default=1, help='Post-transformation layer number')
-    parser.add_argument('--pna_layer_num', type=int, default=2, help='PNA layers')
-    parser.add_argument('--graph_add', type=str, default="global_add", help='global_add,set2set,graph_multitrans')"""
+    # Define the seed.
+    parser.add_argument('--set_seed', type=bool, default=False, help='set seed for reproducibility')
+
+    parser.add_argument('--seed', type=int, default=1, help='seed for reproducibility')
+
+    # Resume training.
+    parser.add_argument('--resume', type=bool, default=False, help='resume training')
+
+    parser.add_argument('--resume_epoch', type=int, default=None, help='resume training from this epoch')
+    
+    parser.add_argument('--resume_iter', type=int, default=None, help='resume training from this step')
+    
+    parser.add_argument('--resume_directory', type=str, default=None, help='load pretrained weights from this directory')
 
     config = parser.parse_args()
     print(config)

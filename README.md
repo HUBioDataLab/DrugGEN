@@ -226,17 +226,18 @@ Dataset arguments:
 
 ## Molecule Generation Using Trained DrugGEN Models in the Inference Mode
 
+https://drive.google.com/drive/folders/1biJLQeXCKqw4MzAYwOuJU6Aw5GIQlJMY
 
-- First, please download the model weights of trained model, e.g., [DrugGEN-Prot](https://drive.google.com/drive/folders/19knQAtpieSamaxB4L5ft8bFiCVikBFDS?usp=share_link) and place it in the folder: "DrugGEN/experiments/models/".
+- First, download the weights of the chosen trained model from [trained models](https://drive.google.com/drive/folders/1biJLQeXCKqw4MzAYwOuJU6Aw5GIQlJMY), and place it in the folder: "DrugGEN/experiments/models/".
 - After that, please run the code below:
 
 
 ```bash
 
-python DrugGEN/main.py --submodel="Prot" --mode="inference" --inference_model="DrugGEN/experiments/models/{Chosen model name}"
+python DrugGEN/main.py --submodel="{Chosen model name}" --mode="inference" --inference_model="DrugGEN/experiments/models/{Chosen model name}"
 ```
 
-- SMILES representation of the generated molecules will be saved into the file: "DrugGEN/experiments/inference/{Chosen submodel name}/denovo_molecules.txt".
+- SMILES representation of the generated molecules will be saved into the file: "DrugGEN/experiments/inference/{Chosen model name}/denovo_molecules.txt".
 
 &nbsp;
 &nbsp;

@@ -6,7 +6,7 @@ import torch
 from utils import *
 from models import Generator, Generator2, simple_disc
 import torch_geometric.utils as geoutils
-#import #wandb
+#import wandb
 import re
 from torch_geometric.loader import DataLoader
 from new_dataloader import DruggenDataset
@@ -27,6 +27,19 @@ class Trainer(object):
 
     def __init__(self, config):
         
+        if config.set_seed:
+            np.random.seed(config.seed)
+            random.seed(config.seed)
+            torch.manual_seed(config.seed)
+            torch.cuda.manual_seed(config.seed)
+
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+
+            os.environ["PYTHONHASHSEED"] = str(config.seed)
+
+            print(f'Using seed {config.seed}')
+
         self.device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
         """Initialize configurations."""
         self.submodel = config.submodel
@@ -222,6 +235,14 @@ class Trainer(object):
         self.clipping_value = config.clipping_value
         # Miscellaneous.
         
+        # resume training
+
+        self.resume = config.resume
+        self.resume_epoch = config.resume_epoch
+        self.resume_iter = config.resume_iter
+        self.resume_directory = config.resume_directory
+
+
         self.mode = config.mode
 
         self.noise_strength_0 = torch.nn.Parameter(torch.zeros([]))
@@ -432,17 +453,17 @@ class Trainer(object):
         print('Loading the trained models from epoch / iteration {}-{}...'.format(epoch, iteration))
         
         G_path = os.path.join(model_directory, '{}-{}-G.ckpt'.format(epoch, iteration))
-        #D_path = os.path.join(model_directory, '{}-{}-D.ckpt'.format(epoch, iteration))
+        D_path = os.path.join(model_directory, '{}-{}-D.ckpt'.format(epoch, iteration))
         
         self.G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
-        #self.D.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
+        self.D.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
       
         
         G2_path = os.path.join(model_directory, '{}-{}-G2.ckpt'.format(epoch, iteration))
-        #D2_path = os.path.join(model_directory, '{}-{}-D2.ckpt'.format(epoch, iteration))
+        D2_path = os.path.join(model_directory, '{}-{}-D2.ckpt'.format(epoch, iteration))
         
         self.G2.load_state_dict(torch.load(G2_path, map_location=lambda storage, loc: storage))
-        #self.D2.load_state_dict(torch.load(D2_path, map_location=lambda storage, loc: storage))
+        self.D2.load_state_dict(torch.load(D2_path, map_location=lambda storage, loc: storage))
 
    
     def save_model(self, model_directory, idx,i):
@@ -519,7 +540,10 @@ class Trainer(object):
 
         akt1_human_adj = torch.load("DrugGEN/data/akt/AKT1_human_adj.pt").reshape(1,-1).to(self.device).float() 
         akt1_human_annot = torch.load("DrugGEN/data/akt/AKT1_human_annot.pt").reshape(1,-1).to(self.device).float() 
-      
+
+        if self.resume:
+            self.restore_model(self.resume_epoch, self.resume_iter, self.resume_directory)
+
         # Start training.
         
         print('Start training...')
@@ -700,9 +724,7 @@ class Trainer(object):
         
         # Load the trained generator.
         self.G.to(self.device)
-        #self.D.to(self.device)
         self.G2.to(self.device)
-        #self.D2.to(self.device)        
         
         G_path = os.path.join(self.inference_model, '{}-G.ckpt'.format(self.submodel))
         self.G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
