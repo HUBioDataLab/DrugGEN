@@ -226,7 +226,6 @@ Dataset arguments:
 
 ## Molecule Generation Using Trained DrugGEN Models in the Inference Mode
 
-https://drive.google.com/drive/folders/1biJLQeXCKqw4MzAYwOuJU6Aw5GIQlJMY
 
 - First, download the weights of the chosen trained model from [trained models](https://drive.google.com/drive/folders/1biJLQeXCKqw4MzAYwOuJU6Aw5GIQlJMY), and place it in the folder: "DrugGEN/experiments/models/".
 - After that, please run the code below:
