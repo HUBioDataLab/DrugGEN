@@ -581,37 +581,31 @@ class Trainer(object):
                 drug_graphs, real_graphs, a_tensor, x_tensor, drugs_a_tensor, drugs_x_tensor, z, z_edge, z_node = bulk_data
                 
                 if self.submodel == "CrossLoss":
-                    GAN1_input_e = drugs_a_tensor
-                    GAN1_input_x = drugs_x_tensor
-                    GAN1_disc_e = a_tensor
-                    GAN1_disc_x = x_tensor
+                    GAN1_input_e = a_tensor
+                    GAN1_input_x = x_tensor
+                    GAN1_disc_e = drugs_a_tensor
+                    GAN1_disc_x = drugs_x_tensor
                 elif self.submodel == "Ligand":
                     GAN1_input_e = a_tensor
                     GAN1_input_x = x_tensor
                     GAN1_disc_e = a_tensor
                     GAN1_disc_x = x_tensor
                     GAN2_input_e = drugs_a_tensor
-                    GAN2_input_x = drugs_x_tensor
-                    GAN2_disc_e = drugs_a_tensor
-                    GAN2_disc_x = drugs_x_tensor            
+                    GAN2_input_x = drugs_x_tensor         
                 elif self.submodel == "Prot":        
                     GAN1_input_e =  a_tensor
                     GAN1_input_x = x_tensor
                     GAN1_disc_e = a_tensor
                     GAN1_disc_x = x_tensor
                     GAN2_input_e = akt1_human_adj
-                    GAN2_input_x = akt1_human_annot
-                    GAN2_disc_e = drugs_a_tensor
-                    GAN2_disc_x = drugs_x_tensor        
+                    GAN2_input_x = akt1_human_annot       
                 elif self.submodel == "RL":
                     GAN1_input_e = a_tensor
                     GAN1_input_x = x_tensor
                     GAN1_disc_e = a_tensor
                     GAN1_disc_x = x_tensor
                     GAN2_input_e = drugs_a_tensor
-                    GAN2_input_x = drugs_x_tensor
-                    GAN2_disc_e = drugs_a_tensor
-                    GAN2_disc_x = drugs_x_tensor    
+                    GAN2_input_x = drugs_x_tensor    
                 elif self.submodel == "NoTarget":
                     GAN1_input_e = a_tensor 
                     GAN1_input_x = x_tensor 
@@ -814,44 +808,24 @@ class Trainer(object):
                 if self.submodel == "CrossLoss":
                     GAN1_input_e = a_tensor
                     GAN1_input_x = x_tensor
-                    GAN1_disc_e = drugs_a_tensor
-                    GAN1_disc_x = drugs_x_tensor
-                    GAN2_input_e = drugs_a_tensor
-                    GAN2_input_x = drugs_x_tensor
-                    GAN2_disc_e = a_tensor
-                    GAN2_disc_x = x_tensor
                 elif self.submodel == "Ligand":
                     GAN1_input_e = a_tensor
                     GAN1_input_x = x_tensor
-                    GAN1_disc_e = a_tensor
-                    GAN1_disc_x = x_tensor
                     GAN2_input_e = drugs_a_tensor
-                    GAN2_input_x = drugs_x_tensor
-                    GAN2_disc_e = drugs_a_tensor
-                    GAN2_disc_x = drugs_x_tensor            
+                    GAN2_input_x = drugs_x_tensor      
                 elif self.submodel == "Prot":        
                     GAN1_input_e = a_tensor 
                     GAN1_input_x = x_tensor
-                    GAN1_disc_e = a_tensor
-                    GAN1_disc_x = x_tensor
                     GAN2_input_e = akt1_human_adj
-                    GAN2_input_x = akt1_human_annot
-                    GAN2_disc_e = drugs_a_tensor
-                    GAN2_disc_x = drugs_x_tensor        
+                    GAN2_input_x = akt1_human_annot       
                 elif self.submodel == "RL":
                     GAN1_input_e = a_tensor
                     GAN1_input_x = x_tensor
-                    GAN1_disc_e = a_tensor
-                    GAN1_disc_x = x_tensor
                     GAN2_input_e = drugs_a_tensor
-                    GAN2_input_x = drugs_x_tensor
-                    GAN2_disc_e = drugs_a_tensor
-                    GAN2_disc_x = drugs_x_tensor    
+                    GAN2_input_x = drugs_x_tensor    
                 elif self.submodel == "NoTarget":
                     GAN1_input_e = a_tensor
-                    GAN1_input_x = x_tensor
-                    GAN1_disc_e = a_tensor
-                    GAN1_disc_x = x_tensor      
+                    GAN1_input_x = x_tensor     
                 # =================================================================================== #
                 #                             2. GAN1 Inference                                       #
                 # =================================================================================== #            
