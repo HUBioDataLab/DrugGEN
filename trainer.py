@@ -727,8 +727,11 @@ class Trainer(object):
             self.G2.load_state_dict(torch.load(G2_path, map_location=lambda storage, loc: storage))           
         
         
-        drug_smiles = [line for line in open("DrugGEN/data/akt_test.smi", 'r').read().splitlines()]
-        
+        if self.submodel == "NoTarget":
+            drug_smiles = [line for line in open("DrugGEN/data/chembl_train.smi", 'r').read().splitlines()]
+        else:
+            drug_smiles = [line for line in open("DrugGEN/data/akt_train.smi", 'r').read().splitlines()]
+            
         drug_mols = [Chem.MolFromSmiles(smi) for smi in drug_smiles]
         drug_scaf = [MurckoScaffold.GetScaffoldForMol(x) for x in drug_mols]
         fps_r = [Chem.RDKFingerprint(x) for x in drug_scaf]
@@ -888,6 +891,6 @@ class Trainer(object):
                    
         print("Validity: ", fraction_valid(metric_calc_dr), "\n")
         print("Uniqueness: ", fraction_unique(metric_calc_dr), "\n")
-        print("Validity: ", novelty(metric_calc_dr, drug_smiles), "\n")
+        print("Novelty: ", novelty(metric_calc_dr, drug_smiles), "\n")
 
         print("Metrics are calculated.")
