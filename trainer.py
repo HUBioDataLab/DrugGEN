@@ -700,11 +700,13 @@ class Trainer(object):
                   
                 
                 if (i+1) % self.log_step == 0:
-              
-                    logging(self.log_path, self.start_time, fake_mol, full_smiles, i, idx, loss, 1,self.sample_directory) 
+                    if self.submodel == "CrossLoss":
+                        logging(self.log_path, self.start_time, fake_mol, drug_smiles, i, idx, loss, 1, self.sample_directory)
+                    else:
+                        logging(self.log_path, self.start_time, fake_mol, full_smiles, i, idx, loss, 1, self.sample_directory) 
                     mol_sample(self.sample_directory,"GAN1",fake_mol, g_edges_hat_sample.detach(), g_nodes_hat_sample.detach(), idx, i)
                     if self.submodel != "NoTarget" and self.submodel != "CrossLoss":
-                        logging(self.log_path, self.start_time, fake_mol_g, drug_smiles, i, idx, loss, 2,self.sample_directory)     
+                        logging(self.log_path, self.start_time, fake_mol_g, drug_smiles, i, idx, loss, 2, self.sample_directory)     
                         mol_sample(self.sample_directory,"GAN2",fake_mol_g, dr_g_edges_hat_sample.detach(), dr_g_nodes_hat_sample.detach(), idx, i)
                                   
 
