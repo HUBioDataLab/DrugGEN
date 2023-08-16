@@ -24,7 +24,7 @@ def main(config):
     trainer = Trainer(config) 
 
     if config.mode == 'train':
-        trainer.train(config)
+        trainer.train()
     elif config.mode == 'inference':
         trainer.inference()
 
