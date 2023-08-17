@@ -243,11 +243,6 @@ class Trainer(object):
         self.print_network(self.G2, 'G2')
         self.print_network(self.D2, 'D2')
 
-        self.G = nn.DataParallel(self.G)
-        self.D = nn.DataParallel(self.D)
-        self.G2 = nn.DataParallel(self.G2)
-        self.D2 = nn.DataParallel(self.D2)
-
         self.G.to(self.device)
         self.D.to(self.device)
 
