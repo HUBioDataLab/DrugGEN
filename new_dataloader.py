@@ -39,7 +39,17 @@ class DruggenDataset(InMemoryDataset):
         
         self.data = data
         print('Creating atoms encoder and decoder..')
-        atom_labels = sorted(set([atom.GetAtomicNum() for mol in self.data for atom in mol.GetAtoms()] + [0]))
+        
+        atom_labels = set()
+        # bond_labels = set()
+        for smile in tqdm(data):
+            mol = Chem.MolFromSmiles(smile)
+            atom_labels.update([atom.GetAtomicNum() for atom in mol.GetAtoms()])
+            # bond_labels.update([bond.GetBondType() for bond in mol.GetBonds()])
+        atom_labels.update([0]) # add PAD symbol (for unknown atoms)
+        atom_labels = sorted(atom_labels) # turn set into list and sort it
+
+        # atom_labels = sorted(set([atom.GetAtomicNum() for mol in self.data for atom in mol.GetAtoms()] + [0]))
         self.atom_encoder_m = {l: i for i, l in enumerate(atom_labels)}
         self.atom_decoder_m = {i: l for i, l in enumerate(atom_labels)}
         self.atom_num_types = len(atom_labels)
@@ -47,9 +57,17 @@ class DruggenDataset(InMemoryDataset):
             self.atom_num_types - 1))
         print("atom_labels", atom_labels)
         print('Creating bonds encoder and decoder..')
-        bond_labels = [Chem.rdchem.BondType.ZERO] + list(sorted(set(bond.GetBondType()
-                                                                    for mol in self.data
-                                                                    for bond in mol.GetBonds())))
+        # bond_labels = [Chem.rdchem.BondType.ZERO] + list(sorted(set(bond.GetBondType()
+        #                                                             for mol in self.data
+        #                                                             for bond in mol.GetBonds())))
+        bond_labels = [
+            Chem.rdchem.BondType.ZERO,
+            Chem.rdchem.BondType.SINGLE,
+            Chem.rdchem.BondType.DOUBLE,
+            Chem.rdchem.BondType.TRIPLE,
+            Chem.rdchem.BondType.AROMATIC,
+        ]
+
         print("bond labels", bond_labels)
         self.bond_encoder_m = {l: i for i, l in enumerate(bond_labels)}
         self.bond_decoder_m = {i: l for i, l in enumerate(bond_labels)}
