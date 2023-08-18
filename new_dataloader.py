@@ -45,14 +45,21 @@ class DruggenDataset(InMemoryDataset):
         atom_labels = set()
         bond_labels = set()
         max_length = 0
+        smiles = []
         for smile in tqdm(data):
             mol = Chem.MolFromSmiles(smile)
             molecule_size = mol.GetNumAtoms()
             if molecule_size > self.max_atom:
                 continue
+            smiles.append(smile)
             atom_labels.update([atom.GetAtomicNum() for atom in mol.GetAtoms()])
             max_length = max(max_length, molecule_size)
             bond_labels.update([bond.GetBondType() for bond in mol.GetBonds()])
+        # import time
+        # beginning = time.time()
+        # data = [smile for smile in data if smile not in smiles_to_remove]
+        # print("removing time:", time.time() - beginning)
+
         atom_labels.update([0]) # add PAD symbol (for unknown atoms)
         atom_labels = sorted(atom_labels) # turn set into list and sort it
 
@@ -66,7 +73,7 @@ class DruggenDataset(InMemoryDataset):
         print('Created atoms encoder and decoder with {} atom types and 1 PAD symbol!'.format(
             self.atom_num_types - 1))
         print("atom_labels", atom_labels)
-        print('Creating bonds encoder and decoder..')
+        # print('Creating bonds encoder and decoder..')
         # bond_labels = [Chem.rdchem.BondType.ZERO] + list(sorted(set(bond.GetBondType()
         #                                                             for mol in self.data
         #                                                             for bond in mol.GetBonds())))
@@ -100,7 +107,7 @@ class DruggenDataset(InMemoryDataset):
         with open("DrugGEN/data/decoders/" +"bond_" +  self.dataset_name + ".pkl","wb") as bond_decoders:
             pickle.dump(self.bond_decoder_m,bond_decoders)
          
-        return max_length
+        return max_length, smiles # data is filtered now
         
     def _genA(self, mol, connected=True, max_length=None):
 
@@ -270,8 +277,8 @@ class DruggenDataset(InMemoryDataset):
         # mols = mols[:size]
         # indices = range(len(mols))
         smiles = pd.read_csv(self.raw_files, header=None)[0].tolist()
-        max_length = self._generate_encoders_decoders(smiles)
-    
+        max_length, smiles = self._generate_encoders_decoders(smiles)
+
         # pbar = tqdm(total=len(indices))
         # pbar.set_description(f'Processing chembl dataset')
         # max_length = max(mol.GetNumAtoms() for mol in mols)
@@ -305,9 +312,9 @@ class DruggenDataset(InMemoryDataset):
                     data = self.pre_transform(data)
                     
                 data_list.append(data)
-                pbar.update(1)
+                # pbar.update(1)
 
-        pbar.close()
+        # pbar.close()
 
         torch.save(self.collate(data_list), osp.join(self.processed_dir, self.dataset_file))
 
