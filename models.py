@@ -89,8 +89,6 @@ class Generator2(nn.Module):
 
         self.mol_nodes = nn.Linear(dim, dec_dim)
         self.mol_edges = nn.Linear(dim, dec_dim)
-        self.drug_nodes =  nn.Linear(self.drugs_m_dim, dec_dim)
-        self.drug_edges =  nn.Linear(self.drugs_b_dim, dec_dim)
 
         self.TransformerDecoder = TransformerDecoder(dec_dim, depth, heads, mlp_ratio, drop_rate=self.dropout_rate)
 
@@ -117,7 +115,6 @@ class Generator2(nn.Module):
     def forward(self, edges_logits, nodes_logits, protein_embedding):
         edges_logits = self.mol_edges(edges_logits)
         nodes_logits = self.mol_nodes(nodes_logits)
-
         nodes_logits, edges_logits, = self.TransformerDecoder(nodes_logits, edges_logits, protein_embedding)
 
         edges_logits = self.edges_output_layer(edges_logits)
