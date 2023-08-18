@@ -55,10 +55,6 @@ class DruggenDataset(InMemoryDataset):
             atom_labels.update([atom.GetAtomicNum() for atom in mol.GetAtoms()])
             max_length = max(max_length, molecule_size)
             bond_labels.update([bond.GetBondType() for bond in mol.GetBonds()])
-        # import time
-        # beginning = time.time()
-        # data = [smile for smile in data if smile not in smiles_to_remove]
-        # print("removing time:", time.time() - beginning)
 
         atom_labels.update([0]) # add PAD symbol (for unknown atoms)
         atom_labels = sorted(atom_labels) # turn set into list and sort it
