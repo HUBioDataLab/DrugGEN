@@ -299,7 +299,7 @@ class DruggenDataset(InMemoryDataset):
                 edge_index = adjacency.nonzero(as_tuple=False).t().contiguous()
                 edge_attr = adjacency[edge_index[0], edge_index[1]].to(torch.long)
 
-                data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
+                data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, smile=smile)
 
                 if self.pre_filter is not None and not self.pre_filter(data):
                     continue
