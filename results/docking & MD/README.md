@@ -1,0 +1,2 @@
+# DrugGEN - Docking
+[Glide (Schrödinger Suite)](https://www.schrodinger.com/products/glide) is used to perform docking of AKT1 crystal structure [(4GV1)](https://www.rcsb.org/structure/4GV1) and [DrugGEN generated molecules](https://github.com/HUBioDataLab/DrugGEN/tree/main/results/generated_molecules).
