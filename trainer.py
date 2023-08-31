@@ -17,7 +17,7 @@ from rdkit.Chem.Scaffolds import MurckoScaffold
 torch.set_num_threads(5)
 RDLogger.DisableLog('rdApp.*') 
 from loss import discriminator_loss, generator_loss, discriminator2_loss, generator2_loss
-from training_data import load_data
+from training_data import generate_z_values, load_molecules
 import random
 from tqdm import tqdm
 
@@ -567,19 +567,42 @@ class Trainer(object):
 
                 # Preprocess both dataset 
                 
-                bulk_data = load_data(data,
-                                     drugs,
-                                     self.batch_size, 
-                                     self.device,
-                                     self.b_dim,
-                                     self.m_dim,
-                                     self.drugs_b_dim,
-                                     self.drugs_m_dim,
-                                     self.z_dim,
-                                     self.vertexes)   
+                # bulk_data = load_data(data,
+                #                      drugs,
+                #                      self.batch_size, 
+                #                      self.device,
+                #                      self.b_dim,
+                #                      self.m_dim,
+                #                      self.drugs_b_dim,
+                #                      self.drugs_m_dim,
+                #                      self.z_dim,
+                #                      self.vertexes)   
                 
-                drug_graphs, real_graphs, a_tensor, x_tensor, drugs_a_tensor, drugs_x_tensor, z, z_edge, z_node = bulk_data
+                # drug_graphs, real_graphs, a_tensor, x_tensor, drugs_a_tensor, drugs_x_tensor, z, z_edge, z_node = bulk_data
                 
+                z, z_edge, z_node = generate_z_values(
+                    batch_size=self.batch_size,
+                    z_dim=self.z_dim,
+                    vertexes=self.vertexes,
+                    device=self.device,
+                )
+
+                real_graphs, a_tensor, x_tensor = load_molecules(
+                    data=data, 
+                    batch_size=self.batch_size,
+                    device=self.device,
+                    b_dim=self.b_dim,
+                    m_dim=self.m_dim,
+                )
+
+                drug_graphs, drugs_a_tensor, drugs_x_tensor = load_molecules(
+                    data=drugs, 
+                    batch_size=self.batch_size,
+                    device=self.device,
+                    b_dim=self.drugs_b_dim,
+                    m_dim=self.drugs_m_dim,
+                )
+
                 if self.submodel == "CrossLoss":
                     GAN1_input_e = a_tensor
                     GAN1_input_x = x_tensor
@@ -797,19 +820,42 @@ class Trainer(object):
 
                 # Preprocess both dataset 
                 
-                bulk_data = load_data(data,
-                                     drugs,
-                                     self.inf_batch_size, 
-                                     self.device,
-                                     self.b_dim,
-                                     self.m_dim,
-                                     self.drugs_b_dim,
-                                     self.drugs_m_dim,
-                                     self.z_dim,
-                                     self.vertexes)   
+                # bulk_data = load_data(data,
+                #                      drugs,
+                #                      self.inf_batch_size, 
+                #                      self.device,
+                #                      self.b_dim,
+                #                      self.m_dim,
+                #                      self.drugs_b_dim,
+                #                      self.drugs_m_dim,
+                #                      self.z_dim,
+                #                      self.vertexes)   
                 
-                drug_graphs, real_graphs, a_tensor, x_tensor, drugs_a_tensor, drugs_x_tensor, z, z_edge, z_node = bulk_data
+                # drug_graphs, real_graphs, a_tensor, x_tensor, drugs_a_tensor, drugs_x_tensor, z, z_edge, z_node = bulk_data
                 
+                z, z_edge, z_node = generate_z_values(
+                    batch_size=self.batch_size,
+                    z_dim=self.z_dim,
+                    vertexes=self.vertexes,
+                    device=self.device,
+                )
+
+                real_graphs, a_tensor, x_tensor = load_molecules(
+                    data=data, 
+                    batch_size=self.batch_size,
+                    device=self.device,
+                    b_dim=self.b_dim,
+                    m_dim=self.m_dim,
+                )
+
+                drug_graphs, drugs_a_tensor, drugs_x_tensor = load_molecules(
+                    data=drugs, 
+                    batch_size=self.batch_size,
+                    device=self.device,
+                    b_dim=self.drugs_b_dim,
+                    m_dim=self.drugs_m_dim,
+                )
+
                 if self.submodel == "CrossLoss":
                     GAN1_input_e = a_tensor
                     GAN1_input_x = x_tensor

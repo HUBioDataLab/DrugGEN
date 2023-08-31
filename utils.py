@@ -140,27 +140,6 @@ def label2onehot(labels, dim, device):
     return out.float()
 
 
-def sample_z_node(batch_size, vertexes, nodes):
-    
-    ''' Random noise for nodes logits. '''
-    
-    return np.random.normal(0,1, size=(batch_size,vertexes, nodes))  #  128, 9, 5
-
-
-def sample_z_edge(batch_size, vertexes, edges):
-    
-    ''' Random noise for edges logits. '''
-    
-    return np.random.normal(0,1, size=(batch_size, vertexes, vertexes, edges)) # 128, 9, 9, 5
-
-
-def sample_z( batch_size, z_dim):
-    
-    ''' Random noise. '''
-    
-    return np.random.normal(0,1, size=(batch_size,z_dim))  #  128, 9, 5       
-
-
 def mol_sample(sample_directory, model_name, mol, edges, nodes, idx, i):
     sample_path = os.path.join(sample_directory,"{}-{}_{}-epoch_iteration".format(model_name,idx+1, i+1))
     
