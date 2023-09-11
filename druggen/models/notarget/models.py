@@ -23,14 +23,14 @@ class NoTargetGenerator(nn.Module):
         self.pos_enc_dim = 5
         #self.pos_enc = nn.Linear(self.pos_enc_dim, self.dim)
         
-        self.node_layers = nn.Sequential(nn.Linear(nodes, 64), act, nn.Linear(64,dim), act, nn.Dropout(self.dropout))
-        self.edge_layers = nn.Sequential(nn.Linear(edges, 64), act, nn.Linear(64,dim), act, nn.Dropout(self.dropout))
+        self.node_layers = nn.Sequential(nn.Linear(config.nodes, 64), act, nn.Linear(64,config.dim), act, nn.Dropout(config.dropout))
+        self.edge_layers = nn.Sequential(nn.Linear(config.edges, 64), act, nn.Linear(64,config.dim), act, nn.Dropout(config.dropout))
         
-        self.TransformerEncoder = TransformerEncoder(dim=self.dim, depth=self.depth, heads=self.heads, act = act,
-                                                                    mlp_ratio=self.mlp_ratio, drop_rate=self.dropout)         
+        self.TransformerEncoder = TransformerEncoder(dim=config.dim, depth=config.depth, heads=config.heads, act = act,
+                                                                    mlp_ratio=config.mlp_ratio, drop_rate=config.dropout)         
 
-        self.readout_e = nn.Linear(self.dim, edges)
-        self.readout_n = nn.Linear(self.dim, nodes)
+        self.readout_e = nn.Linear(config.dim, config.edges)
+        self.readout_n = nn.Linear(config.dim, config.nodes)
         self.softmax = nn.Softmax(dim = -1)
         
     def _generate_square_subsequent_mask(self, sz):
@@ -98,7 +98,7 @@ class NoTargetDiscriminator(nn.Module):
             act = nn.Sigmoid()
         elif config.act == "tanh":
             act = nn.Tanh()  
-        features = config.vertexes * config.m_dim + config.vertexes * config.vertexes * config.b_dim 
+        features = config.vertexes * config.nodes + config.vertexes * config.vertexes * config.edges 
         
         self.predictor = nn.Sequential(
             nn.Linear(features,256),
