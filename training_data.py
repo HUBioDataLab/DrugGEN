@@ -75,8 +75,9 @@ def generate_z_values(batch_size=32, z_dim=32, vertexes=32, b_dim=32, m_dim=32, 
 #     return drug_graphs, real_graphs, a_tensor, x_tensor, drugs_a_tensor, drugs_x_tensor
 
 
-def load_molecules(batch=None, b_dim=32, m_dim=32, device=None, batch_size=32):
+def load_molecules(data=None, b_dim=32, m_dim=32, device=None, batch_size=32):
     data = data.to(device)
+    
     a = geoutils.to_dense_adj(
         edge_index = data.edge_index,
         batch=data.batch,
