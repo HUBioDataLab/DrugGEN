@@ -72,58 +72,6 @@ class Generator(nn.Module):
         return node, edge, node_sample, edge_sample
 
 
-class Generator2(nn.Module):
-    """Generator 2 network."""
-
-    def __init__(self, dim, dec_dim, depth, heads, mlp_ratio, drop_rate, drugs_m_dim, drugs_b_dim, submodel):
-        super().__init__()
-        self.submodel = submodel
-        self.depth = depth
-        self.dim = dim
-        self.mlp_ratio = mlp_ratio
-        self.heads = heads
-        self.dropout_rate = drop_rate
-        self.drugs_m_dim = drugs_m_dim
-        self.drugs_b_dim = drugs_b_dim
-        self.pos_enc_dim = 5
-
-        self.mol_nodes = nn.Linear(dim, dec_dim)
-        self.mol_edges = nn.Linear(dim, dec_dim)
-
-        self.TransformerDecoder = TransformerDecoder(dec_dim, depth, heads, mlp_ratio, drop_rate=self.dropout_rate)
-
-        self.nodes_output_layer = nn.Linear(dec_dim, self.drugs_m_dim)
-        self.edges_output_layer = nn.Linear(dec_dim, self.drugs_b_dim)
-        self.softmax = nn.Softmax(dim=-1)
-
-    def laplacian_positional_enc(self, adj):
-        A = adj
-        D = torch.diag(torch.count_nonzero(A, dim=-1))
-        L = torch.eye(A.shape[0], device=A.device) - D * A * D
-
-        EigVal, EigVec = torch.linalg.eig(L)
-        idx = torch.argsort(torch.real(EigVal))
-        EigVal, EigVec = EigVal[idx], torch.real(EigVec[:,idx])
-        pos_enc = EigVec[:,1:self.pos_enc_dim + 1]
-        return pos_enc
-
-    def _generate_square_subsequent_mask(self, sz):
-        mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
-        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
-        return mask
-
-    def forward(self, edges_logits, nodes_logits, protein_embedding):
-        edges_logits = self.mol_edges(edges_logits)
-        nodes_logits = self.mol_nodes(nodes_logits)
-        nodes_logits, edges_logits, = self.TransformerDecoder(nodes_logits, edges_logits, protein_embedding)
-
-        edges_logits = self.edges_output_layer(edges_logits)
-        nodes_logits = self.nodes_output_layer(nodes_logits)
-        edges_logits = self.softmax(edges_logits)
-        nodes_logits = self.softmax(nodes_logits)
-        return edges_logits, nodes_logits
-
-
 class simple_disc(nn.Module):
     def __init__(self, act, m_dim, vertexes, b_dim):
         super().__init__()

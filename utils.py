@@ -140,132 +140,68 @@ def label2onehot(labels, dim, device):
     return out.float()
 
 
-def sample_z_node(batch_size, vertexes, nodes):
-    
-    ''' Random noise for nodes logits. '''
-    
-    return np.random.normal(0,1, size=(batch_size,vertexes, nodes))  #  128, 9, 5
-
-
-def sample_z_edge(batch_size, vertexes, edges):
-    
-    ''' Random noise for edges logits. '''
-    
-    return np.random.normal(0,1, size=(batch_size, vertexes, vertexes, edges)) # 128, 9, 9, 5
-
-
-def sample_z( batch_size, z_dim):
-    
-    ''' Random noise. '''
-    
-    return np.random.normal(0,1, size=(batch_size,z_dim))  #  128, 9, 5       
-
-
 def mol_sample(sample_directory, model_name, mol, edges, nodes, idx, i):
     sample_path = os.path.join(sample_directory,"{}-{}_{}-epoch_iteration".format(model_name,idx+1, i+1))
-    
     if not os.path.exists(sample_path):
         os.makedirs(sample_path)
-        
+
     mols2grid_image(mol,sample_path)
-    
     save_smiles_matrices(mol,edges.detach(), nodes.detach(), sample_path)
-    
+
     if len(os.listdir(sample_path)) == 0:
         os.rmdir(sample_path)
-                            
+
     print("Valid molecules are saved.")
     print("Valid matrices and smiles are saved")
 
 
 def logging(log_path, start_time, mols, train_smiles, i,idx, loss,model_num, save_path, get_maxlen=False):
-    
-    gen_smiles =  []    
+    gen_smiles = []
     for line in mols:
         if line is not None:
             gen_smiles.append(Chem.MolToSmiles(line))
         elif line is None:
             gen_smiles.append(None)
 
-    #gen_smiles_saves = [None if x is None else re.sub('\*', '', x) for x in gen_smiles]
-    #gen_smiles_saves = [None if x is None else re.sub('\.', '', x) for x in gen_smiles_saves]
     gen_smiles_saves = [None if x is None else max(x.split('.'), key=len) for x in gen_smiles]
+    gen_smiles_saves_filtered = [max(x.split('.'), key=len) for x in gen_smiles if x is not None]
 
     sample_save_dir = os.path.join(save_path, "samples-GAN{}.txt".format(model_num))
     with open(sample_save_dir, "a") as f:
         for idxs in range(len(gen_smiles_saves)):
             if gen_smiles_saves[idxs] is not None:
-                
                 f.write(gen_smiles_saves[idxs])
                 f.write("\n")
 
-    k = len(set(gen_smiles_saves) - {None})  
-                        
-                              
+    k = len(set(gen_smiles_saves) - {None})
+
     et = time.time() - start_time
     et = str(datetime.timedelta(seconds=et))[:-7]
     log = "Elapsed [{}], Epoch/Iteration [{}/{}] for GAN{}".format(et, idx,  i+1, model_num)
-    
-    # Log update
-    #m0 = get_all_metrics(gen = gen_smiles, train = train_smiles, batch_size=batch_size, k = valid_mol_num, device=self.device)
+
     valid = fraction_valid(gen_smiles_saves)
-    unique = fraction_unique(gen_smiles_saves, k, check_validity=False)
-    novel = novelty(gen_smiles_saves, train_smiles)
-    
-    #qed = [QED(mol) for mol in mols if mol is not None]
-    #sa = [SA(mol) for mol in mols if mol is not None]
-    #logp = [logP(mol) for mol in mols if mol is not None]
-    
-    #IntDiv = internal_diversity(gen_smiles) 
-    #m0= all_scores_val(fake_mol, mols, full_mols, full_smiles, vert, norm=True)     # 'mols' is output of Fake Reward
-    #m1 =all_scores_chem(fake_mol, mols, vert, norm=True)
-    #m0.update(m1)
-    
+    unique = fraction_unique(gen_smiles_saves_filtered, k, check_validity=False)
+    novel = novelty(gen_smiles_saves_filtered, train_smiles)
+
     if get_maxlen:
         maxlen = Metrics.max_component(mols, 45)
         loss.update({"MaxLen": maxlen})
-    
-    #m0 = {k: np.array(v).mean() for k, v in m0.items()}
-    #loss.update(m0)
+
     loss.update({'Valid': valid})
     loss.update({'Unique': unique})
     loss.update({'Novel': novel}) 
-    #loss.update({'QED': statistics.mean(qed)})
-    #loss.update({'SA': statistics.mean(sa)})
-    #loss.update({'LogP': statistics.mean(logp)})
-    #loss.update({'IntDiv': IntDiv})
-    
+
     for tag, value in loss.items():
-        
         log += ", {}: {:.4f}".format(tag, value)
+
     with open(log_path, "a") as f:
-        f.write(log)  
-        f.write("\n")                               
-    print(log) 
-    print("\n") 
-
-
-#def plot_attn(dataset_name, heads,attn_w, model, iter, epoch):
-#    
-#    cols = 4
-#    rows = int(heads/cols)
-#
-#    fig, axes = plt.subplots( rows,cols, figsize = (30, 14))
-#    axes = axes.flat
-#    attentions_pos = attn_w[0]
-#    attentions_pos = attentions_pos.cpu().detach().numpy()
-#    for i,att in enumerate(attentions_pos):
-#
-#        #im = axes[i].imshow(att, cmap='gray')
-#        sns.heatmap(att,vmin = 0, vmax = 1,ax = axes[i])
-#        axes[i].set_title(f'head - {i} ')
-#        axes[i].set_ylabel('layers')
-#    pltsavedir = "/home/atabey/attn/second"
-#    plt.savefig(os.path.join(pltsavedir, "attn" + model + "_" + dataset_name + "_"  + str(iter) + "_" + str(epoch) +  ".png"), dpi= 500,bbox_inches='tight')
+        f.write(log)
+        f.write("\n")
+    print(log)
+    print("\n")
 
 
 def plot_grad_flow(named_parameters, model, iter, epoch):
-    
     # Based on https://discuss.pytorch.org/t/check-gradient-flow-in-network/15063/10
     '''Plots the gradients flowing through different layers in the net during training.
     Can be used for checking for possible gradient vanishing / exploding problems.
@@ -296,7 +232,6 @@ def plot_grad_flow(named_parameters, model, iter, epoch):
                 Line2D([0], [0], color="k", lw=4)], ['max-gradient', 'mean-gradient', 'zero-gradient'])
     pltsavedir = "/home/atabey/gradients/tryout"
     plt.savefig(os.path.join(pltsavedir, "weights_" + model  + "_"  + str(iter) + "_" + str(epoch) +  ".png"), dpi= 500,bbox_inches='tight')
-    
 
 def get_mol(smiles_or_mol):
     '''
@@ -440,3 +375,6 @@ def average_agg_tanimoto(stock_vecs, gen_vecs,
     if p != 1:
         agg_tanimoto = (agg_tanimoto)**(1/p)
     return np.mean(agg_tanimoto)
+
+def str2bool(v):
+    return v.lower() in ('true')

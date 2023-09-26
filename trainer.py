@@ -148,7 +148,6 @@ class Trainer(object):
         # Test configurations.
         self.num_test_epoch = config.num_test_epoch
         self.test_iters = config.test_iters
-        self.inference_sample_num = config.inference_sample_num
         
         # Directories.
         self.log_dir = config.log_dir
