@@ -108,7 +108,6 @@ class Train(object):
 
         # Transformer and Convolution configurations.
         self.act = config.act
-        self.z_dim = config.z_dim
         self.lambda_gp = config.lambda_gp
         self.dim = config.dim
         self.depth = config.depth
@@ -157,9 +156,7 @@ class Train(object):
             @ drop_rate: depricated  
             @ tra_conv: Whether module creates output for TransformerConv discriminator
             '''
-            
-        self.G = Generator(self.z_dim,
-                           self.act,
+        self.G = Generator(self.act,
                            self.vertexes,
                            self.b_dim,
                            self.m_dim,
@@ -179,11 +176,9 @@ class Train(object):
             @ dropout: dropout possibility 
             @ vertexes: maximum length of generated molecules (molecule length)
             '''
-
         self.D = simple_disc("tanh", self.m_dim, self.vertexes, self.b_dim)
 
         self.g_optimizer = torch.optim.AdamW(self.G.parameters(), self.g_lr, [self.beta1, self.beta2])
-
         self.d_optimizer = torch.optim.AdamW(self.D.parameters(), self.d_lr, [self.beta1, self.beta2])
 
         self.print_network(self.G, 'G')
@@ -191,7 +186,6 @@ class Train(object):
 
         self.G.to(self.device)
         self.D.to(self.device)
-
 
 
     def decoder_load(self, dictionary_name):
@@ -266,10 +260,9 @@ class Train(object):
             os.makedirs(self.sample_directory)
 
         # molecular data
-        if self.submodel == "NoTarget":
-            smiles_data = [line for line in open("DrugGEN/data/chembl_train.smi", 'r').read().splitlines()]
-        elif self.submodel == "CrossLoss":
-            smiles_data = [line for line in open("DrugGEN/data/akt_train.smi", 'r').read().splitlines()]
+        drug_smiles = [line for line in open("DrugGEN/data/akt_train.smi", 'r').read().splitlines()]
+        drug_mols = [Chem.MolFromSmiles(smi) for smi in drug_smiles]
+        drug_vecs = [AllChem.GetMorganFingerprintAsBitVect(x, 2, nBits=1024) for x in drug_mols if x is not None]
 
 
         if self.resume:
@@ -279,11 +272,10 @@ class Train(object):
         print('Start training...')
         self.start_time = time.time()
         for idx in range(self.epoch):
-
             # =================================================================================== #
             #                             1. Preprocess input data                                #
             # =================================================================================== #
-            # Load the data 
+            # Load the data
             dataloader_iterator = iter(self.drugs_loader)
 
             for i, data in enumerate(self.loader):
@@ -320,7 +312,6 @@ class Train(object):
                 #                                     2. Train the GAN                                #
                 # =================================================================================== #
                 loss = {}
-
                 self.reset_grad()
 
                 # Compute discriminator loss.
@@ -349,22 +340,21 @@ class Train(object):
                                                     self.batch_size,
                                                     self.dataset.matrices2mol,
                                                     self.dataset_name)
-                g_loss, fake_mol, g_edges_hat_sample, g_nodes_hat_sample, _, _ = generator_output
+                g_loss, node, edge, node_sample, edge_sample = generator_output
                 g_total = g_loss
 
                 loss["g_total"] = g_total.item()
                 g_total.backward()
                 self.g_optimizer.step()
 
-
                 # Logging.
                 if (i+1) % self.log_step == 0:
-                    if self.submodel == "CrossLoss":
-                        logging(self.log_path, self.start_time, fake_mol, smiles_data, i, idx, loss, 1, self.sample_directory)
-                    else:
-                        logging(self.log_path, self.start_time, fake_mol, smiles_data, i, idx, loss, 1, self.sample_directory)
+                    logging(self.log_path, self.start_time, i, idx, loss, self.sample_directory,
+                            drug_smiles,edge_sample, node_sample, self.dataset.matrices2mol,
+                            self.dataset_name,a_tensor, x_tensor,drug_vecs)
 
-                    mol_sample(self.sample_directory, "GAN1", fake_mol, g_edges_hat_sample.detach(), g_nodes_hat_sample.detach(), idx, i)
+                    mol_sample(self.sample_directory, edge_sample.detach(), node_sample.detach(),
+                               idx, i, self.dataset.matrices2mol, self.dataset_name)
 
 
             # Save model checkpoints.
@@ -388,7 +378,6 @@ if __name__ == '__main__':
     # Model configuration.
     parser.add_argument('--submodel', type=str, default="CrossLoss", help="Chose model subtype: CrossLoss, NoTarget", choices=['CrossLoss', 'NoTarget'])
     parser.add_argument('--act', type=str, default="relu", help="Activation function for the model.", choices=['relu', 'tanh', 'leaky', 'sigmoid'])
-    parser.add_argument('--z_dim', type=int, default=16, help='Prior noise for the first GAN')
     parser.add_argument('--max_atom', type=int, default=45, help='Max atom number for molecules must be specified.')
     parser.add_argument('--dim', type=int, default=128, help='Dimension of the Transformer Encoder model for GAN1.')
     parser.add_argument('--depth', type=int, default=1, help='Depth of the Transformer model from the first GAN.')
