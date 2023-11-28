@@ -41,7 +41,7 @@ class Inference(object):
         # Initialize configurations
         self.submodel = config.submodel
         self.inference_model = config.inference_model
-        self.inference_sample_num = config.inference_sample_num
+        self.sample_num = config.sample_num
 
         # Data loader.
         self.inf_raw_file = config.inf_raw_file  # SMILES containing text file for first dataset. 
@@ -77,9 +77,9 @@ class Inference(object):
                                                         # eg. 0:0, 1:6 (C), 2:7 (N), 3:8 (O), 4:9 (F)
         self.bond_decoders = self.decoder_load("bond")  # Bond type decoders for first GAN.
                                                         # eg. 0: (no-bond), 1: (single), 2: (double), 3: (triple), 4: (aromatic)
-        self.m_dim = len(self.atom_decoders) if not self.features else int(self.loader.dataset[0].x.shape[1]) # Atom type dimension.
+        self.m_dim = len(self.atom_decoders) if not self.features else int(self.inf_loader.dataset[0].x.shape[1]) # Atom type dimension.
         self.b_dim = len(self.bond_decoders) # Bond type dimension.
-        self.vertexes = int(self.loader.dataset[0].x.shape[0]) # Number of nodes in the graph.
+        self.vertexes = int(self.inf_loader.dataset[0].x.shape[0]) # Number of nodes in the graph.
 
         # Transformer and Convolution configurations.
         self.act = config.act
@@ -139,8 +139,8 @@ class Inference(object):
 
         # smiles data for metrics calculation.
         chembl_smiles = [line for line in open("DrugGEN/data/chembl_train.smi", 'r').read().splitlines()]
-        chembl_test = [line for line in open("DrugGEN_prot/data/chembl_test.smi", 'r').read().splitlines()]
-        drug_smiles = [line for line in open("DrugGEN_/data/akt_inhibitors.smi", 'r').read().splitlines()]
+        chembl_test = [line for line in open("DrugGEN/data/chembl_test.smi", 'r').read().splitlines()]
+        drug_smiles = [line for line in open("DrugGEN/data/akt_inhibitors.smi", 'r').read().splitlines()]
         drug_mols = [Chem.MolFromSmiles(smi) for smi in drug_smiles]
         drug_vecs = [AllChem.GetMorganFingerprintAsBitVect(x, 2, nBits=1024) for x in drug_mols if x is not None]
 
@@ -156,13 +156,13 @@ class Inference(object):
         metric_calc_dr = []
         uniqueness_calc = []
         real_smiles_snn = []
+        nodes_sample = torch.Tensor(size=[1,45,1]).to(self.device)
 
         val_counter = 0
         none_counter = 0
-        
         # Inference mode
         with torch.inference_mode():
-            pbar = tqdm(range(self.inference_sample_num))
+            pbar = tqdm(range(self.sample_num))
             pbar.set_description('Inference mode for {} model started'.format(self.submodel))
             for i, data in enumerate(self.inf_loader):
 
@@ -176,25 +176,17 @@ class Inference(object):
                     m_dim=self.m_dim,
                 )
 
-
-                generator_output = generator_loss(self.G,
-                                                    self.D,
-                                                    a_tensor,
-                                                    x_tensor,
-                                                    self.inf_batch_size,
-                                                    self.dataset.matrices2mol,
-                                                    self.dataset_name)
-                _, node, edge, node_sample, edge_sample = generator_output
+                _, _, node_sample, edge_sample = self.G(a_tensor, x_tensor)
 
                 g_edges_hat_sample = torch.max(edge_sample, -1)[1]
                 g_nodes_hat_sample = torch.max(node_sample, -1)[1]
 
-                fake_mol_g = [self.dataset.matrices2mol_drugs(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True, file_name=self.dataset_name) 
+                fake_mol_g = [self.inf_dataset.matrices2mol_drugs(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True, file_name=self.dataset_name) 
                         for e_, n_ in zip(g_edges_hat_sample, g_nodes_hat_sample)]
 
                 a_tensor_sample = torch.max(a_tensor, -1)[1]
                 x_tensor_sample = torch.max(x_tensor, -1)[1]
-                real_mols = [self.dataset.matrices2mol_drugs(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True, file_name=self.dataset_name) 
+                real_mols = [self.inf_dataset.matrices2mol_drugs(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True, file_name=self.dataset_name) 
                         for e_, n_ in zip(a_tensor_sample, x_tensor_sample)]
 
                 inference_drugs = [None if line is None else Chem.MolToSmiles(line) for line in fake_mol_g]
@@ -204,7 +196,7 @@ class Inference(object):
                             if molecules is None:
                                 none_counter += 1
 
-                with open("DrugGEN_prot/experiments/inference/{}/inference_drugs.txt".format(self.submodel), "a") as f:
+                with open("DrugGEN/experiments/inference/{}/inference_drugs.txt".format(self.submodel), "a") as f:
                     for molecules in inference_drugs:
                         if molecules is not None:
                             molecules = molecules.replace("*", "C") 
@@ -217,7 +209,7 @@ class Inference(object):
 
 
                 generation_number = len([x for x in metric_calc_dr if x is not None])
-                if generation_number == self.inference_sample_num or none_counter == self.inference_sample_num:
+                if generation_number == self.sample_num or none_counter == self.sample_num:
                     break
                 real_smiles_snn.append(real_mols[0])
 
@@ -235,7 +227,7 @@ class Inference(object):
         print("Novelty_test: ", novelty(metric_calc_dr, chembl_test), "\n")
         print("AKT_novelty: ", novelty(metric_calc_dr, drug_smiles), "\n")
         print("max_len: ", Metrics.max_component(uniqueness_calc, self.vertexes), "\n")
-        print("atom_type: ", Metrics.mean_atom_type(nodes_sample), "\n")
+        print("mean_atom_type: ", Metrics.mean_atom_type(nodes_sample), "\n")
         print("snn_chembl: ", average_agg_tanimoto(np.array(real_vecs), np.array(gen_vecs)), "\n")
         print("snn_akt: ", average_agg_tanimoto(np.array(drug_vecs), np.array(gen_vecs)), "\n")
 
@@ -248,7 +240,7 @@ if __name__=="__main__":
     # Inference configuration.
     parser.add_argument('--submodel', type=str, default="CrossLoss", help="Chose model subtype: CrossLoss, NoTarget", choices=['CrossLoss', 'NoTarget'])
     parser.add_argument('--inference_model', type=str, help="Path to the model for inference")
-    parser.add_argument('--inference_sample_num', type=int, default=10000, help='inference samples')
+    parser.add_argument('--sample_num', type=int, default=10000, help='inference samples')
 
     # Data configuration.
     parser.add_argument('--inf_dataset_file', type=str, default='chembl45_test.pt')
