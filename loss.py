@@ -23,7 +23,7 @@ def discriminator_loss(generator, discriminator, mol_graph, batch_size, device, 
     return node, edge, d_loss
 
 
-def generator_loss(generator, discriminator, adj, annot, batch_size, matrices2mol, dataset_name):
+def generator_loss(generator, discriminator, adj, annot, batch_size):
     # Compute loss with fake molecules.
     node, edge, node_sample, edge_sample = generator(adj, annot)
 
