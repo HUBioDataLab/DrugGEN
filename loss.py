@@ -26,15 +26,11 @@ def discriminator_loss(generator, discriminator, mol_graph, batch_size, device, 
 def generator_loss(generator, discriminator, adj, annot, batch_size, matrices2mol, dataset_name):
     # Compute loss with fake molecules.
     node, edge, node_sample, edge_sample = generator(adj, annot)
+
     graph = torch.cat((node_sample.view(batch_size, -1), edge_sample.view(batch_size, -1)), dim=-1)
+
     logits_fake_disc = discriminator(graph)
     prediction_fake = - torch.mean(logits_fake_disc)
-
-    # Produce molecules.
-    g_edges_hat_sample = torch.max(edge_sample, -1)[1]
-    g_nodes_hat_sample = torch.max(node_sample , -1)[1]
-    fake_mol = [matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True, file_name=dataset_name)
-            for e_, n_ in zip(g_edges_hat_sample, g_nodes_hat_sample)]
     g_loss = prediction_fake
 
-    return g_loss, fake_mol, g_edges_hat_sample, g_nodes_hat_sample, node, edge
+    return g_loss, node, edge, node_sample, edge_sample
