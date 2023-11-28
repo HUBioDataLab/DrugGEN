@@ -337,9 +337,7 @@ class Train(object):
                                                     self.D,
                                                     a_tensor,
                                                     x_tensor,
-                                                    self.batch_size,
-                                                    self.dataset.matrices2mol,
-                                                    self.dataset_name)
+                                                    self.batch_size)
                 g_loss, node, edge, node_sample, edge_sample = generator_output
                 g_total = g_loss
 
