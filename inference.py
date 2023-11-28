@@ -83,7 +83,6 @@ class Inference(object):
 
         # Transformer and Convolution configurations.
         self.act = config.act
-        self.z_dim = config.z_dim
         self.dim = config.dim
         self.depth = config.depth
         self.heads = config.heads
@@ -95,8 +94,7 @@ class Inference(object):
 
     def build_model(self):
         """Create generators and discriminators."""
-        self.G = Generator(self.z_dim,
-                           self.act,
+        self.G = Generator(self.act,
                            self.vertexes,
                            self.b_dim,
                            self.m_dim,
@@ -140,27 +138,35 @@ class Inference(object):
         self.restore_model(self.submodel, self.inference_model)
 
         # smiles data for metrics calculation.
-        if self.submodel == "NoTarget":
-            smiles_data = [line for line in open("DrugGEN/data/chembl_train.smi", 'r').read().splitlines()]
-        elif self.submodel == "CrossLoss":
-            smiles_data = [line for line in open("DrugGEN/data/akt_train.smi", 'r').read().splitlines()]
-        ni_score_smiles_data = [line for line in open("DrugGEN/data/chembl_test.smi", 'r').read().splitlines()]
+        chembl_smiles = [line for line in open("DrugGEN/data/chembl_train.smi", 'r').read().splitlines()]
+        chembl_test = [line for line in open("DrugGEN_prot/data/chembl_test.smi", 'r').read().splitlines()]
+        drug_smiles = [line for line in open("DrugGEN_/data/akt_inhibitors.smi", 'r').read().splitlines()]
+        drug_mols = [Chem.MolFromSmiles(smi) for smi in drug_smiles]
+        drug_vecs = [AllChem.GetMorganFingerprintAsBitVect(x, 2, nBits=1024) for x in drug_mols if x is not None]
+
 
         # Make directories if not exist.
         if not os.path.exists("DrugGEN/experiments/inference/{}".format(self.submodel)):
             os.makedirs("DrugGEN/experiments/inference/{}".format(self.submodel))
 
+
         self.G.eval()
 
         start_time = time.time()
         metric_calc_dr = []
+        uniqueness_calc = []
+        real_smiles_snn = []
 
+        val_counter = 0
+        none_counter = 0
+        
         # Inference mode
         with torch.inference_mode():
             pbar = tqdm(range(self.inference_sample_num))
             pbar.set_description('Inference mode for {} model started'.format(self.submodel))
             for i, data in enumerate(self.inf_loader):
 
+                val_counter += 1
                 # Preprocess dataset 
                 _, a_tensor, x_tensor = load_molecules(
                     data=data, 
@@ -178,35 +184,60 @@ class Inference(object):
                                                     self.inf_batch_size,
                                                     self.dataset.matrices2mol,
                                                     self.dataset_name)
-                _, fake_mol_g, _, _, _, _ = generator_output
+                _, node, edge, node_sample, edge_sample = generator_output
 
+                g_edges_hat_sample = torch.max(edge_sample, -1)[1]
+                g_nodes_hat_sample = torch.max(node_sample, -1)[1]
 
-                inference_drugs = [Chem.MolToSmiles(line) for line in fake_mol_g if line is not None]
+                fake_mol_g = [self.dataset.matrices2mol_drugs(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True, file_name=self.dataset_name) 
+                        for e_, n_ in zip(g_edges_hat_sample, g_nodes_hat_sample)]
+
+                a_tensor_sample = torch.max(a_tensor, -1)[1]
+                x_tensor_sample = torch.max(x_tensor, -1)[1]
+                real_mols = [self.dataset.matrices2mol_drugs(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True, file_name=self.dataset_name) 
+                        for e_, n_ in zip(a_tensor_sample, x_tensor_sample)]
+
+                inference_drugs = [None if line is None else Chem.MolToSmiles(line) for line in fake_mol_g]
                 inference_drugs = [None if x is None else max(x.split('.'), key=len) for x in inference_drugs]
 
-                with open("DrugGEN/experiments/inference/{}/inference_drugs.txt".format(self.submodel), "a") as f:
-                    for molecules in inference_drugs:
-                        if molecules is None:
-                            continue
+                for molecules in inference_drugs:
+                            if molecules is None:
+                                none_counter += 1
 
-                        f.write(molecules)
-                        f.write("\n")
+                with open("DrugGEN_prot/experiments/inference/{}/inference_drugs.txt".format(self.submodel), "a") as f:
+                    for molecules in inference_drugs:
+                        if molecules is not None:
+                            molecules = molecules.replace("*", "C") 
+                            f.write(molecules)
+                            f.write("\n")
+                            uniqueness_calc.append(molecules)
+                            nodes_sample = torch.cat((nodes_sample, g_nodes_hat_sample.view(1,45,1)), 0)
+                            pbar.update(1)
                         metric_calc_dr.append(molecules)
 
-                if len(inference_drugs) > 0:
-                    pbar.update(1)
 
-                if len(metric_calc_dr) == self.inference_sample_num:
+                generation_number = len([x for x in metric_calc_dr if x is not None])
+                if generation_number == self.inference_sample_num or none_counter == self.inference_sample_num:
                     break
+                real_smiles_snn.append(real_mols[0])
 
         et = time.time() - start_time
+        gen_vecs = [AllChem.GetMorganFingerprintAsBitVect(Chem.MolFromSmiles(x), 2, nBits=1024) for x in uniqueness_calc if Chem.MolFromSmiles(x) is not None]
+        real_vecs = [AllChem.GetMorganFingerprintAsBitVect(x, 2, nBits=1024) for x in real_smiles_snn if x is not None]
         print("Inference mode is lasted for {:.2f} seconds".format(et))
 
-        print("Metrics calculation started for {} model using MOSES.".format(self.submodel), "\n")
+        print("Metrics calculation started using MOSES.")
+        # post-process * to Carbon atom in valid molecules
+
         print("Validity: ", fraction_valid(metric_calc_dr), "\n")
-        print("Uniqueness: ", fraction_unique(metric_calc_dr), "\n")
-        print("Novelty: ", novelty(metric_calc_dr, smiles_data), "\n")
-        print("Novelty at Inference (NI): ", novelty(metric_calc_dr, ni_score_smiles_data), "\n")
+        print("Uniqueness: ", fraction_unique(uniqueness_calc), "\n")
+        print("Novelty: ", novelty(metric_calc_dr, chembl_smiles), "\n")
+        print("Novelty_test: ", novelty(metric_calc_dr, chembl_test), "\n")
+        print("AKT_novelty: ", novelty(metric_calc_dr, drug_smiles), "\n")
+        print("max_len: ", Metrics.max_component(uniqueness_calc, self.vertexes), "\n")
+        print("atom_type: ", Metrics.mean_atom_type(nodes_sample), "\n")
+        print("snn_chembl: ", average_agg_tanimoto(np.array(real_vecs), np.array(gen_vecs)), "\n")
+        print("snn_akt: ", average_agg_tanimoto(np.array(drug_vecs), np.array(gen_vecs)), "\n")
 
         print("Metrics are calculated.")
 
@@ -228,7 +259,6 @@ if __name__=="__main__":
 
     # Model configuration.
     parser.add_argument('--act', type=str, default="relu", help="Activation function for the model.", choices=['relu', 'tanh', 'leaky', 'sigmoid'])
-    parser.add_argument('--z_dim', type=int, default=16, help='Prior noise for the first GAN')
     parser.add_argument('--max_atom', type=int, default=45, help='Max atom number for molecules must be specified.')
     parser.add_argument('--dim', type=int, default=128, help='Dimension of the Transformer Encoder model for GAN1.')
     parser.add_argument('--depth', type=int, default=1, help='Depth of the Transformer model from the first GAN.')
