@@ -1,12 +1,11 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from layers import TransformerEncoder, TransformerDecoder
+from layers import TransformerEncoder
 
 class Generator(nn.Module):
     """Generator network."""
 
-    def __init__(self, z_dim, act, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio, submodel):
+    def __init__(self, act, vertexes, edges, nodes, dropout, dim, depth, heads, mlp_ratio, submodel):
         super(Generator, self).__init__()
         self.submodel = submodel
         self.vertexes = vertexes
@@ -17,7 +16,6 @@ class Generator(nn.Module):
         self.heads = heads
         self.mlp_ratio = mlp_ratio
         self.dropout = dropout
-        self.z_dim = z_dim
 
         if act == "relu":
             act = nn.ReLU()
