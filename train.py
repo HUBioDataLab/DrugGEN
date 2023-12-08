@@ -5,8 +5,10 @@ import random
 import argparse
 
 import torch
+from torch import nn
 from torch_geometric.loader import DataLoader
 import torch.utils.data
+import wandb
 from rdkit import RDLogger
 torch.set_num_threads(5)
 RDLogger.DisableLog('rdApp.*')
@@ -16,7 +18,6 @@ from models import Generator, simple_disc
 from new_dataloader import DruggenDataset
 from loss import discriminator_loss, generator_loss
 from training_data import load_molecules
-
 
 class Train(object):
     """Trainer for DrugGEN."""
@@ -136,10 +137,18 @@ class Train(object):
         self.resume_iter = config.resume_iter
         self.resume_directory = config.resume_directory
 
-        self.build_model()
+        # wandb configuration
+        self.use_wandb = config.use_wandb
+        self.online = config.online
+        self.exp_name = config.exp_name
+
+        # Arguments for the model.
+        self.arguments = "{}_{}_glr{}_dlr{}_dim{}_depth{}_heads{}_batch{}_epoch{}_dataset{}_dropout{}".format(self.exp_name, self.submodel, self.g_lr, self.d_lr, self.dim, self.depth, self.heads, self.batch_size, self.epoch, self.dataset_name, self.dropout)
+
+        self.build_model(self.model_save_dir, self.arguments)
 
 
-    def build_model(self):
+    def build_model(self, model_save_dir, arguments):
         """Create generators and discriminators."""
         
         ''' Generator is based on Transformer Encoder: 
@@ -181,8 +190,14 @@ class Train(object):
         self.g_optimizer = torch.optim.AdamW(self.G.parameters(), self.g_lr, [self.beta1, self.beta2])
         self.d_optimizer = torch.optim.AdamW(self.D.parameters(), self.d_lr, [self.beta1, self.beta2])
 
-        self.print_network(self.G, 'G')
-        self.print_network(self.D, 'D')
+        network_path = os.path.join(model_save_dir, arguments)
+        self.print_network(self.G, 'G', network_path)
+        self.print_network(self.D, 'D', network_path)
+
+        if torch.cuda.device_count() > 1:
+            print(f"Using {torch.cuda.device_count()} GPUs!")
+            self.G = nn.DataParallel(self.G)
+            self.D = nn.DataParallel(self.D)
 
         self.G.to(self.device)
         self.D.to(self.device)
@@ -200,14 +215,27 @@ class Train(object):
             return pickle.load(f)
 
 
-    def print_network(self, model, name):
+    def print_network(self, model, name, save_dir):
         """Print out the network information."""
         num_params = 0
         for p in model.parameters():
-            num_params += p.numel() 
-        print(model)
-        print(name)
-        print("The number of parameters: {}".format(num_params))
+            num_params += p.numel()
+
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        network_path = os.path.join(save_dir, "{}_modules.txt".format(name))
+        with open(network_path, "w+") as file:
+            for module in model.modules():
+                file.write(f"{module.__class__.__name__}:\n")
+                print(module.__class__.__name__)
+                for n, param in module.named_parameters():
+                    if param is not None:
+                        file.write(f"  - {n}: {param.size()}\n")
+                        print(f"  - {n}: {param.size()}")
+                break
+            file.write(f"Total number of parameters: {num_params}\n")
+            print(f"Total number of parameters: {num_params}\n\n")
 
 
     def restore_model(self, epoch, iteration, model_directory):
@@ -247,9 +275,19 @@ class Train(object):
         return gradient_penalty
 
 
-    def train(self):
+    def train(self, config):
         ''' Training Script starts from here'''
-        self.arguments = "{}_glr{}_dlr{}_dim{}_depth{}_heads{}_batch{}_epoch{}_dataset{}_dropout{}".format(self.submodel, self.g_lr, self.d_lr, self.dim, self.depth, self.heads, self.batch_size, self.epoch, self.dataset_name, self.dropout)
+
+        if self.use_wandb:
+            mode = 'online' if self.online else 'offline'
+        else:
+            mode = 'disabled'
+        kwargs = {'name': self.exp_name, 'project': 'druggen', 'config': config,
+                'settings': wandb.Settings(_disable_stats=True), 'reinit': True, 'mode': mode, 'save_code': True}
+        wandb.init(**kwargs)
+
+        wandb.save(os.path.join(self.model_save_dir, self.arguments, "G_modules.txt"))
+        wandb.save(os.path.join(self.model_save_dir, self.arguments, "D_modules.txt"))
 
         self.model_directory = os.path.join(self.model_save_dir, self.arguments)
         self.sample_directory = os.path.join(self.sample_dir, self.arguments)
@@ -284,6 +322,9 @@ class Train(object):
                 except StopIteration:
                     dataloader_iterator = iter(self.drugs_loader)
                     drugs = next(dataloader_iterator)
+
+                #wandb.log({"iter": i})
+                wandb.log({"epoch": idx})
 
                 # Preprocess both dataset
                 real_graphs, a_tensor, x_tensor = load_molecules(
@@ -325,6 +366,7 @@ class Train(object):
                                             a_tensor,
                                             x_tensor)
                 d_total = d_loss
+                wandb.log({"d_loss": d_total.item()})
 
                 loss["d_total"] = d_total.item()
                 d_total.backward()
@@ -340,6 +382,7 @@ class Train(object):
                                                     self.batch_size)
                 g_loss, node, edge, node_sample, edge_sample = generator_output
                 g_total = g_loss
+                wandb.log({"g_loss": g_total.item()})
 
                 loss["g_total"] = g_total.item()
                 g_total.backward()
@@ -349,7 +392,7 @@ class Train(object):
                 if (i+1) % self.log_step == 0:
                     logging(self.log_path, self.start_time, i, idx, loss, self.sample_directory,
                             drug_smiles,edge_sample, node_sample, self.dataset.matrices2mol,
-                            self.dataset_name,a_tensor, x_tensor,drug_vecs)
+                            self.dataset_name, a_tensor, x_tensor, drug_vecs)
 
                     mol_sample(self.sample_directory, edge_sample.detach(), node_sample.detach(),
                                idx, i, self.dataset.matrices2mol, self.dataset_name)
@@ -371,6 +414,7 @@ if __name__ == '__main__':
     parser.add_argument('--drug_raw_file', type=str, default='DrugGEN/data/akt_train.smi')
     parser.add_argument('--drug_data_dir', type=str, default='DrugGEN/data')
     parser.add_argument('--mol_data_dir', type=str, default='DrugGEN/data')
+    parser.add_argument('--features', type=str2bool, default=False, help='features dimension for nodes')
 
 
     # Model configuration.
@@ -407,6 +451,11 @@ if __name__ == '__main__':
     parser.add_argument('--set_seed', type=bool, default=False, help='set seed for reproducibility')
     parser.add_argument('--seed', type=int, default=1, help='seed for reproducibility')
 
+    # wandb configuration.
+    parser.add_argument('--use_wandb', type=bool, default=False, help='use wandb for logging')
+    parser.add_argument('--online', type=bool, default=True, help='use wandb online')
+    parser.add_argument('--exp_name', type=str, default='druggen', help='experiment name')
+
     config = parser.parse_args()
     trainer = Train(config)
-    trainer.train()
+    trainer.train(config)
