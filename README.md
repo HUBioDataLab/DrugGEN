@@ -41,7 +41,7 @@ Our up-to-date pre-print is shared [here](https://github.com/HUBioDataLab/DrugGE
 
 <!--PUT THE ANIMATED GIF VERSION OF THE DRUGGEN MODEL (Figure 1)-->
 <p float="center">
-  <img src="assets/DrugGEN_Figure1.png" width="100%" />
+  <img src="assets/DrugGEN_Figure.png" width="100%" />
 </p>
 
 **Fig. 1.** The schematic representation of the architecture of the DrugGEN model. Generator module of the GAN consists of a multi-layered perceptron (MLP) and a graph transformer encoder module. The generator encodes the given input into a new molecular representation; the MLP-based discriminator of the GAN compares the generated de novo molecules to the known inhibitors of the given target protein, scoring them for their assignment to the classes of “real” and “fake” molecules (abbreviations; MLP: multi-layered perceptron, Norm: normalization, Concat: concatenation, MatMul: matrix multiplication, ElementMul: element wise multiplication, Mol. adj: molecule adjacency tensor, Mol. Anno: molecule annotation matrix, Upd: updated).
