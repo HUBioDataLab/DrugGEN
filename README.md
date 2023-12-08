@@ -62,7 +62,7 @@ Given a random noise *z*, **the first generator** *G* (below) creates annotation
 
 
 <!-- ADD THE ANIMATED GIF VERSION OF THE GAN1 AND GAN2 -->
-| First Generator |
+| Generator |
 |------------------------------------------------------------------------------------------------------------|
  | ![FirstGAN](assets/DrugGEN_G1_final2.gif) |
 
