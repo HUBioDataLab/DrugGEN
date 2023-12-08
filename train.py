@@ -397,11 +397,8 @@ class Train(object):
                     mol_sample(self.sample_directory, edge_sample.detach(), node_sample.detach(),
                                idx, i, self.dataset.matrices2mol, self.dataset_name)
 
-
-            # Save model checkpoints.
-            if (idx+1) % 10 == 0:
-                self.save_model(self.model_directory, idx, i)
-                print("model saved at epoch {} and iteration {}".format(idx,i))
+                    self.save_model(self.model_directory, idx, i)
+                    print("model saved at epoch {} and iteration {}".format(idx,i))
 
 
 if __name__ == '__main__':
