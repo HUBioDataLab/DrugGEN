@@ -43,7 +43,7 @@ class Metrics(object):
     @staticmethod
     def max_component(data, max_len):
         
-        return (np.array(list(map(Metrics.mol_length, data)), dtype=np.float32)/max_len).mean()       
+        return ((np.array(list(map(Metrics.mol_length, data)), dtype=np.float32)/max_len).mean())
 
     @staticmethod
     def mean_atom_type(data):
@@ -93,19 +93,17 @@ def mols2grid_image(mols,path):
     
     for i in range(len(mols)):
         if Metrics.valid(mols[i]):
-        #if Chem.MolToSmiles(mols[i]) != '':
             AllChem.Compute2DCoords(mols[i])
-            Draw.MolToFile(mols[i], os.path.join(path,"{}.png".format(i+1)), size=(1200,1200)) 
+            Draw.MolToFile(mols[i], os.path.join(path,"{}.png".format(i+1)), size=(1200,1200))
+            #wandb.save(os.path.join(path,"{}.png".format(i+1)))
         else:
             continue
 
-def save_smiles_matrices(mols,edges_hard, nodes_hard,path,data_source = None): 
+def save_smiles_matrices(mols,edges_hard, nodes_hard, path, data_source = None): 
     mols = [e if e is not None else Chem.RWMol() for e in mols]
     
     for i in range(len(mols)):
         if Metrics.valid(mols[i]):
-            #m0= all_scores_for_print(mols[i], data_source, norm=False)
-        #if Chem.MolToSmiles(mols[i]) != '':
             save_path = os.path.join(path,"{}.txt".format(i+1))
             with open(save_path, "a") as f:
                 np.savetxt(f, edges_hard[i].cpu().numpy(), header="edge matrix:\n",fmt='%1.2f')
@@ -114,9 +112,8 @@ def save_smiles_matrices(mols,edges_hard, nodes_hard,path,data_source = None):
                 f.write("\n")
                 #f.write(m0)
                 f.write("\n")
-        
-
             print(Chem.MolToSmiles(mols[i]), file=open(save_path,"a"))
+            #wandb.save(save_path)
         else:
             continue
 
@@ -217,22 +214,27 @@ def logging(log_path, start_time, i, idx, loss, save_path, drug_smiles, edge, no
     unique = fraction_unique(uniq_smiles_saves, k, check_validity=False)
     novel_starting_mol = novelty(gen_smiles_saves, real_smiles)
     novel_akt = novelty(gen_smiles_saves, drug_smiles)
-    snn_chembl = average_agg_tanimoto(np.array(chembl_vecs),np.array(gen_vecs))
-    snn_akt = average_agg_tanimoto(np.array(drug_vecs),np.array(gen_vecs))
-    maxlen = Metrics.max_component(uniq_smiles_saves, 45)
+    if (len(uniq_smiles_saves) == 0):
+        snn_chembl = 0
+        snn_akt = 0
+        maxlen = 0
+    else:
+        snn_chembl = average_agg_tanimoto(np.array(chembl_vecs),np.array(gen_vecs))
+        snn_akt = average_agg_tanimoto(np.array(drug_vecs),np.array(gen_vecs))
+        maxlen = Metrics.max_component(uniq_smiles_saves, 45)
 
-    loss.update({'Valid': valid})
-    loss.update({'Unique': unique})
-    loss.update({'Novel': novel_starting_mol})
-    loss.update({'Novel_akt': novel_akt})
+    loss.update({'Validity': valid})
+    loss.update({'Uniqueness': unique})
+    loss.update({'Novelty': novel_starting_mol})
+    loss.update({'Novelty_akt': novel_akt})
     loss.update({'SNN_chembl': snn_chembl})
-    loss.update({'SNN_akt': snn_akt}) 
-    loss.update({'maxlen': maxlen})
+    loss.update({'SNN_akt': snn_akt})
+    loss.update({'MaxLen': maxlen})
     loss.update({'Atom_types': atom_types_average})
 
-
-    wandb.log({"epoch": idx+1})
-    wandb.log(loss)
+    wandb.log({"Validity": valid, "Uniqueness": unique, "Novelty": novel_starting_mol,
+                "Novelty_akt": novel_akt, "SNN_chembl": snn_chembl, "SNN_akt": snn_akt,
+                  "MaxLen": maxlen, "Atom_types": atom_types_average})
 
     for tag, value in loss.items():
         log += ", {}: {:.4f}".format(tag, value)
