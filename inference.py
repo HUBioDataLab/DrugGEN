@@ -39,7 +39,13 @@ class Inference(object):
         self.device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 
         # Initialize configurations
-        self.submodel = config.submodel
+        self.targeted = config.targeted
+
+        if targeted:
+            self.submodel = "DrugGEN"
+        else:
+            self.submodel = "DrugGEN-NoTarget"
+        
         self.inference_model = config.inference_model
         self.sample_num = config.sample_num
 
@@ -238,7 +244,7 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser()
 
     # Inference configuration.
-    parser.add_argument('--submodel', type=str, default="CrossLoss", help="Chose model subtype: CrossLoss, NoTarget", choices=['CrossLoss', 'NoTarget'])
+    parser.add_argument('--targeted', type=bool, default=True, help="Whether to use targeted model.")
     parser.add_argument('--inference_model', type=str, help="Path to the model for inference")
     parser.add_argument('--sample_num', type=int, default=10000, help='inference samples')
 
