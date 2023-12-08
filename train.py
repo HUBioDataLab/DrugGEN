@@ -39,7 +39,12 @@ class Train(object):
         self.device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 
         # Initialize configurations
-        self.submodel = config.submodel
+        self.targeted = config.targeted
+
+        if targeted:
+            self.submodel = "DrugGEN"
+        else:
+            self.submodel = "DrugGEN-NoTarget"
 
         # Data loader.
         self.raw_file = config.raw_file  # SMILES containing text file for first dataset. 
@@ -415,7 +420,7 @@ if __name__ == '__main__':
 
 
     # Model configuration.
-    parser.add_argument('--submodel', type=str, default="CrossLoss", help="Chose model subtype: CrossLoss, NoTarget", choices=['CrossLoss', 'NoTarget'])
+    parser.add_argument('--targeted', type=bool, default=True, help="Whether to use targeted model.")
     parser.add_argument('--act', type=str, default="relu", help="Activation function for the model.", choices=['relu', 'tanh', 'leaky', 'sigmoid'])
     parser.add_argument('--max_atom', type=int, default=45, help='Max atom number for molecules must be specified.')
     parser.add_argument('--dim', type=int, default=128, help='Dimension of the Transformer Encoder model for GAN1.')
