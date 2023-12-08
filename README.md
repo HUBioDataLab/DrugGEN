@@ -97,7 +97,7 @@ We provide the implementation of the DrugGEN, along with scripts from PyTorch Ge
 - ```new_dataloader.py``` constructs the graph dataset from given raw data. Uses PyG based data classes.
 - - ```utils.py``` contains performance metrics from several other papers and some unique implementations. (De Cao et al, 2018; Polykovskiy et al., 2020)
 - ```layers.py``` contains **transformer encoder** implementation.  
-- ```models.py``` has the implementation of the **Generators** and **Discriminators** which are used in GAN1 and GAN2.  
+- ```models.py``` has the implementation of the **Generator** and **Discriminator**.  
 - ```train.py``` is the training file for the model. Workflow is constructed in this file.   
 - ```inference.py``` is the testing file for the model. Workflow is constructed in this file.   
 
