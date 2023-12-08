@@ -349,9 +349,9 @@ class Train(object):
                 )
 
                 # Training configuration.
-                if self.submodel == "CrossLoss":
+                if self.submodel == "DrugGEN":
                     DISC_input = drug_graphs
-                elif self.submodel == "NoTarget":
+                elif self.submodel == "DrugGEN-NoTarget":
                     DISC_input = real_graphs
 
                 # =================================================================================== #
