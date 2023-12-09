@@ -77,14 +77,13 @@ def generate_z_values(batch_size=32, z_dim=32, vertexes=32, b_dim=32, m_dim=32, 
 
 def load_molecules(data=None, b_dim=32, m_dim=32, device=None, batch_size=32):
     data = data.to(device)
-    
     a = geoutils.to_dense_adj(
         edge_index = data.edge_index,
         batch=data.batch,
         edge_attr=data.edge_attr,
         max_num_nodes=int(data.batch.shape[0]/batch_size)
     )
-    x_tensor = data.x.view(batch_size,int(data.batch.shape[0]/batch_size),-1)
+    x_tensor = data.x.view(batch_size, int(data.batch.shape[0]/batch_size), -1)
     a_tensor = label2onehot(a, b_dim, device)
 
     a_tensor_vec = a_tensor.reshape(batch_size,-1)
