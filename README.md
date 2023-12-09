@@ -172,7 +172,7 @@ bash dataset_download.sh
 
 cd
 
-# DrugGEN can be trained with the one-liner:
+# Default DrugGEN model can be trained with the one-liner:
 
 python DrugGEN/train.py --raw_file="DrugGEN/data/chembl_train.smi" --dataset_file="chembl45_train.pt" --drug_raw_file="DrugGEN/data/akt_train.smi" --drug_dataset_file="drugs_train.pt" --max_atom=45
 ```
@@ -207,9 +207,8 @@ Training arguments:
   --use_wandb          Whether to use wandb for logging
   --online             Use wandb online
   --exp_name           Name for the experiment
-  --
 Dataset arguments:      
-  --features FEATURES       Additional node features (Boolean) (Please check new_dataloader.py Line 102)
+  --features           Additional node features (Boolean) (Please check new_dataloader.py Line 102)
 ```
 
 <!--ADD HERE TRAINING COMMANDS WITH EXPLAINATIONS-->
