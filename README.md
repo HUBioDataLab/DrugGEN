@@ -72,7 +72,7 @@ Given a random noise *z*, **the generator** *G* (below) creates annotation and a
 ## Model Variations
 
 - **DrugGEN** is the default model. The input of the generator is the real molecules (ChEMBL) dataset (to ease the learning process) and the discriminator compares the generated molecules with the real inhibitors of the given target protein.
-- **DrugGEN-NoTarget** is the non-target-specific version of DrugGEN. This model only focuses on learning the chemical properties from the ChEMBL training dataset.
+- **NoTarget** is the non-target-specific version of DrugGEN. This model only focuses on learning the chemical properties from the ChEMBL training dataset.
 
 &nbsp;
 &nbsp;
@@ -174,7 +174,7 @@ cd
 
 # Default DrugGEN model can be trained with the one-liner:
 
-python DrugGEN/train.py --raw_file="DrugGEN/data/chembl_train.smi" --dataset_file="chembl45_train.pt" --drug_raw_file="DrugGEN/data/akt_train.smi" --drug_dataset_file="drugs_train.pt" --max_atom=45
+python DrugGEN/train.py --submodel="CrossLoss" --raw_file="DrugGEN/data/chembl_train.smi" --dataset_file="chembl45_train.pt" --drug_raw_file="DrugGEN/data/akt_train.smi" --drug_dataset_file="drugs_train.pt" --max_atom=45
 ```
 
 ** Explanations of arguments can be found below:
