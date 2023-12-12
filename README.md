@@ -182,7 +182,6 @@ python DrugGEN/train.py --raw_file="DrugGEN/data/chembl_train.smi" --dataset_fil
 ```bash
 Model arguments:
   --submodel           Choose the submodel for training
-  --targeted           Whether to use targeted GAN.
   --act                Activation function for the model
   --max_atom           Maximum atom number for molecules must be specified
   --lambda_gp          Gradient penalty lambda multiplier
