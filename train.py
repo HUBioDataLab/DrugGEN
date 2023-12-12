@@ -39,12 +39,7 @@ class Train(object):
         self.device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 
         # Initialize configurations
-        self.targeted = config.targeted
-
-        if targeted:
-            self.submodel = "DrugGEN"
-        else:
-            self.submodel = "DrugGEN-NoTarget"
+        self.submodel = config.submodel
 
         # Data loader.
         self.raw_file = config.raw_file  # SMILES containing text file for first dataset. 
@@ -321,6 +316,8 @@ class Train(object):
             # Load the data
             dataloader_iterator = iter(self.drugs_loader)
 
+            wandb.log({"epoch": idx})
+
             for i, data in enumerate(self.loader):
                 try:
                     drugs = next(dataloader_iterator)
@@ -328,8 +325,7 @@ class Train(object):
                     dataloader_iterator = iter(self.drugs_loader)
                     drugs = next(dataloader_iterator)
 
-                #wandb.log({"iter": i})
-                wandb.log({"epoch": idx})
+                wandb.log({"iter": i})
 
                 # Preprocess both dataset
                 real_graphs, a_tensor, x_tensor = load_molecules(
@@ -351,7 +347,7 @@ class Train(object):
                 # Training configuration.
                 if self.submodel == "DrugGEN":
                     DISC_input = drug_graphs
-                elif self.submodel == "DrugGEN-NoTarget":
+                elif self.submodel == "NoTarget":
                     DISC_input = real_graphs
 
                 # =================================================================================== #
@@ -420,7 +416,7 @@ if __name__ == '__main__':
 
 
     # Model configuration.
-    parser.add_argument('--targeted', type=bool, default=True, help="Whether to use targeted model.")
+    parser.add_argument('--submodel', type=str, default="CrossLoss", help="Chose model subtype: CrossLoss, NoTarget", choices=['CrossLoss', 'NoTarget'])
     parser.add_argument('--act', type=str, default="relu", help="Activation function for the model.", choices=['relu', 'tanh', 'leaky', 'sigmoid'])
     parser.add_argument('--max_atom', type=int, default=45, help='Max atom number for molecules must be specified.')
     parser.add_argument('--dim', type=int, default=128, help='Dimension of the Transformer Encoder model for GAN1.')
@@ -428,7 +424,7 @@ if __name__ == '__main__':
     parser.add_argument('--heads', type=int, default=8, help='Number of heads for the MultiHeadAttention module from the first GAN.')
     parser.add_argument('--mlp_ratio', type=int, default=3, help='MLP ratio for the Transformers.')
     parser.add_argument('--dropout', type=float, default=0., help='dropout rate')
-    parser.add_argument('--lambda_gp', type=float, default=1, help='Gradient penalty lambda multiplier for the first GAN.')
+    parser.add_argument('--lambda_gp', type=float, default=10, help='Gradient penalty lambda multiplier for the first GAN.')
 
 
     # Training configuration.
