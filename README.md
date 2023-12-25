@@ -219,6 +219,7 @@ Dataset arguments:
 ## Molecule Generation Using Trained DrugGEN Models in the Inference Mode
 
 - If you want to generate molecules using pre-trained models, it is recommended to use [Hugging Face](https://huggingface.co/spaces/HUBioDataLab/DrugGEN). Alternatively,
+
 - First, download the weights of the chosen trained model from [trained models](https://drive.google.com/drive/folders/1biJLQeXCKqw4MzAYwOuJU6Aw5GIQlJMY), and place it in the folder: "DrugGEN/experiments/models/".
 - After that, please run the code below:
 
