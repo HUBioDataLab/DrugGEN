@@ -4,6 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/HUBioDataLab/DrugGEN/files/10828402/2302.07868.pdf"><img src="https://img.shields.io/badge/paper-report-red"/></a>
+  <a href="https://huggingface.co/spaces/HUBioDataLab/DrugGEN"><img src="https://img.shields.io/badge/model-HuggingFace-yellow?labelColor=gray&color=yellow"/></a>
   <a href="http://www.gnu.org/licenses/"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg"/></a>
   
 </p>
