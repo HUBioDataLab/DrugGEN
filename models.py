@@ -65,8 +65,8 @@ class Generator(nn.Module):
 
         node, edge = self.TransformerEncoder(node,edge)
 
-        node_sample = self.softmax(self.readout_n(node))
-        edge_sample = self.softmax(self.readout_e(edge))
+        node_sample = self.readout_n(node)
+        edge_sample = self.readout_e(edge)
         return node, edge, node_sample, edge_sample
 
 
