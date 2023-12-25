@@ -39,12 +39,7 @@ class Inference(object):
         self.device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 
         # Initialize configurations
-        self.targeted = config.targeted
-
-        if targeted:
-            self.submodel = "DrugGEN"
-        else:
-            self.submodel = "DrugGEN-NoTarget"
+        self.submodel = config.submodel
         
         self.inference_model = config.inference_model
         self.sample_num = config.sample_num
@@ -244,7 +239,7 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser()
 
     # Inference configuration.
-    parser.add_argument('--targeted', type=bool, default=True, help="Whether to use targeted model.")
+    parser.add_argument('--submodel', type=str, default="DrugGEN", help="Chose model subtype: DrugGEN, NoTarget", choices=['DrugGEN', 'NoTarget'])
     parser.add_argument('--inference_model', type=str, help="Path to the model for inference")
     parser.add_argument('--sample_num', type=int, default=10000, help='inference samples')
 
@@ -258,10 +253,10 @@ if __name__=="__main__":
     # Model configuration.
     parser.add_argument('--act', type=str, default="relu", help="Activation function for the model.", choices=['relu', 'tanh', 'leaky', 'sigmoid'])
     parser.add_argument('--max_atom', type=int, default=45, help='Max atom number for molecules must be specified.')
-    parser.add_argument('--dim', type=int, default=128, help='Dimension of the Transformer Encoder model for GAN1.')
-    parser.add_argument('--depth', type=int, default=1, help='Depth of the Transformer model from the first GAN.')
-    parser.add_argument('--heads', type=int, default=8, help='Number of heads for the MultiHeadAttention module from the first GAN.')
-    parser.add_argument('--mlp_ratio', type=int, default=3, help='MLP ratio for the Transformers.')
+    parser.add_argument('--dim', type=int, default=128, help='Dimension of the Transformer Encoder model for the GAN.')
+    parser.add_argument('--depth', type=int, default=1, help='Depth of the Transformer model from the GAN.')
+    parser.add_argument('--heads', type=int, default=8, help='Number of heads for the MultiHeadAttention module from the GAN.')
+    parser.add_argument('--mlp_ratio', type=int, default=3, help='MLP ratio for the Transformer.')
     parser.add_argument('--dropout', type=float, default=0., help='dropout rate')
 
     # Seed configuration.
