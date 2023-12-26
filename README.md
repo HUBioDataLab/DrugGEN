@@ -9,13 +9,6 @@
   
 </p>
 
-<!--PUT HERE SOME QUALITATIVE RESULTS IN THE ASSETS FOLDER-->
-<!--YOU CAN PUT ALSO IN THE GIF OR PNG FORMAT -->
-<!--<p float="center">
-  <img src="assets/sample1.png" width="49%" />
-  <img src="assets/sample2.png" width="49%" />
-</p>-->
-
 
 ## Updated Pre-print!
 
@@ -126,11 +119,6 @@ Clone the repo:
 ```bash
 git clone https://github.com/HUBioDataLab/DrugGEN.git
 ```
-
-<!--## Running the Demo
-You could try Google Colab if you don't already have a suitable environment for running this project.
-It enables cost-free project execution in the cloud. You can use the provided notebook to try out our Colab demo:
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](Give a link here)-->
 
 &nbsp;
 &nbsp;
