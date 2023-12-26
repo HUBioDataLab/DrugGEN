@@ -253,7 +253,7 @@ if __name__=="__main__":
     # Model configuration.
     parser.add_argument('--act', type=str, default="relu", help="Activation function for the model.", choices=['relu', 'tanh', 'leaky', 'sigmoid'])
     parser.add_argument('--max_atom', type=int, default=45, help='Max atom number for molecules must be specified.')
-    parser.add_argument('--dim', type=int, default=128, help='Dimension of the Transformer Encoder model for the GAN.')
+    parser.add_argument('--dim', type=int, default=32, help='Dimension of the Transformer Encoder model for the GAN.')
     parser.add_argument('--depth', type=int, default=1, help='Depth of the Transformer model from the GAN.')
     parser.add_argument('--heads', type=int, default=8, help='Number of heads for the MultiHeadAttention module from the GAN.')
     parser.add_argument('--mlp_ratio', type=int, default=3, help='MLP ratio for the Transformer.')
