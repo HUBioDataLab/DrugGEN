@@ -60,6 +60,8 @@ class Train(object):
         self.features = config.features  # Small model uses atom types as node features. (Boolean, False uses atom types only.)
                                          # Additional node features can be added. Please check new_dataloarder.py Line 102.
         self.batch_size = config.batch_size  # Batch size for training.
+        
+        self.parallel = config.parallel
 
         self.dataset = DruggenDataset(self.mol_data_dir,
                                       self.dataset_file,
@@ -194,7 +196,7 @@ class Train(object):
         self.print_network(self.G, 'G', network_path)
         self.print_network(self.D, 'D', network_path)
 
-        if torch.cuda.device_count() > 1:
+        if self.parallel and torch.cuda.device_count() > 1:
             print(f"Using {torch.cuda.device_count()} GPUs!")
             self.G = nn.DataParallel(self.G)
             self.D = nn.DataParallel(self.D)
@@ -453,6 +455,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_wandb', type=bool, default=False, help='use wandb for logging')
     parser.add_argument('--online', type=bool, default=True, help='use wandb online')
     parser.add_argument('--exp_name', type=str, default='druggen', help='experiment name')
+    parser.add_argument('--parallel', type=bool, default=False, help='Parallelize training')
 
     config = parser.parse_args()
     trainer = Train(config)
