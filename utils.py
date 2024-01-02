@@ -43,6 +43,12 @@ class Metrics(object):
     @staticmethod
     def max_component(data, max_len):
         
+        """Returns the average length of the molecules in the dataset normalized by the maximum length.
+
+        Returns:
+            array: normalized average length of the molecules in the dataset
+        """
+
         return ((np.array(list(map(Metrics.mol_length, data)), dtype=np.float32)/max_len).mean())
 
     @staticmethod
