@@ -42,11 +42,11 @@ class Train(object):
         self.submodel = config.submodel
 
         # Data loader.
-        self.raw_file = config.raw_file  # SMILES containing text file for first dataset. 
+        self.raw_file = config.raw_file  # SMILES containing text file for dataset. 
                                          # Write the full path to file.
         self.drug_raw_file = config.drug_raw_file  # SMILES containing text file for second dataset. 
                                                    # Write the full path to file.       
-        self.dataset_file = config.dataset_file    # Dataset file name for the first GAN. 
+        self.dataset_file = config.dataset_file    # Dataset file name for the GAN. 
                                                    # Contains large number of molecules.
         self.drugs_dataset_file = config.drug_dataset_file  # Drug dataset file name for the second GAN. 
                                                             # Contains drug molecules only. (In this case AKT1 inhibitors.)
@@ -67,7 +67,7 @@ class Train(object):
                                       self.dataset_file,
                                       self.raw_file,
                                       self.max_atom,
-                                      self.features) # Dataset for the first GAN. Custom dataset class from PyG parent class.
+                                      self.features) # Dataset for the GAN. Custom dataset class from PyG parent class.
                                                      # Can create any molecular graph dataset given smiles string.
                                                      # Nonisomeric SMILES are suggested but not necessary.
                                                      # Uses sparse matrix representation for graphs,
@@ -76,7 +76,7 @@ class Train(object):
         self.loader = DataLoader(self.dataset,
                                  shuffle=True,
                                  batch_size=self.batch_size,
-                                 drop_last=True)  # PyG dataloader for the first GAN.
+                                 drop_last=True)  # PyG dataloader for the GAN.
 
         self.drugs = DruggenDataset(self.drug_data_dir, 
                                     self.drugs_dataset_file, 
@@ -94,9 +94,9 @@ class Train(object):
                                        drop_last=True)  # PyG dataloader for the second GAN.
 
         # Atom and bond type dimensions for the construction of the model.
-        self.atom_decoders = self.decoder_load("atom")  # Atom type decoders for first GAN. 
+        self.atom_decoders = self.decoder_load("atom")  # Atom type decoders for  GAN. 
                                                         # eg. 0:0, 1:6 (C), 2:7 (N), 3:8 (O), 4:9 (F)
-        self.bond_decoders = self.decoder_load("bond")  # Bond type decoders for first GAN.
+        self.bond_decoders = self.decoder_load("bond")  # Bond type decoders for  GAN.
                                                         # eg. 0: (no-bond), 1: (single), 2: (double), 3: (triple), 4: (aromatic)
         self.m_dim = len(self.atom_decoders) if not self.features else int(self.loader.dataset[0].x.shape[1]) # Atom type dimension.
         self.b_dim = len(self.bond_decoders) # Bond type dimension.
@@ -155,7 +155,7 @@ class Train(object):
         
         ''' Generator is based on Transformer Encoder: 
             
-            @ g_conv_dim: Dimensions for first MLP layers before Transformer Encoder
+            @ g_conv_dim: Dimensions for MLP layers before Transformer Encoder
             @ vertexes: maximum length of generated molecules (atom length)
             @ b_dim: number of bond types
             @ m_dim: number of atom types (or number of features used)
