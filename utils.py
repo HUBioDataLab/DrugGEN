@@ -42,6 +42,8 @@ class Metrics(object):
     
     @staticmethod
     def max_component(data, max_len):
+
+        # There will be a name change for this function to better reflect what it does
         
         """Returns the average length of the molecules in the dataset normalized by the maximum length.
 
