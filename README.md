@@ -222,9 +222,6 @@ python DrugGEN/inference.py --submodel="{Chosen model name}" --inference_model="
 &nbsp;
 &nbsp;
 
-&nbsp;
-&nbsp;
-
 ## Deep Learning based Bioactivity Prediction 
 
 - If you want to re-produce DEEPScreen results, first download the model from [this link](https://drive.google.com/file/d/1aG9oYspCsF9yG1gEGtFI_E2P4qlITqio/view?usp=drive_link).
