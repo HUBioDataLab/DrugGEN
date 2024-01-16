@@ -236,7 +236,7 @@ cd DEEPScreen2.1/chembl_31
 python 8_Prediction.py AKT AKT
 ```
 
-- Results will be saved into DEEPScreen2.1/prediction_files/prediction_outputs/ folder.
+- Results will be saved into "DEEPScreen2.1/prediction_files/prediction_outputs" folder.
 
 
 &nbsp;
