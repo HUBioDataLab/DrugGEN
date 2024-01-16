@@ -222,6 +222,29 @@ python DrugGEN/inference.py --submodel="{Chosen model name}" --inference_model="
 &nbsp;
 &nbsp;
 
+&nbsp;
+&nbsp;
+
+## Deep Learning based Bioactivity Prediction 
+
+- If you want to re-produce DEEPScreen results, first download the model from [this link](https://drive.google.com/file/d/1aG9oYspCsF9yG1gEGtFI_E2P4qlITqio/view?usp=drive_link).
+
+- After that, unzip the compresssed file and follow the instrcutions below.
+
+
+```bash
+
+cd DEEPScreen2.1/chembl_31
+
+python 8_Prediction.py AKT AKT
+```
+
+- Results will be saved into DEEPScreen2.1/prediction_files/prediction_outputs/ folder.
+
+
+&nbsp;
+&nbsp;
+
 ## Results (De Novo Generated Molecules of DrugGEN Models)
 
 - SMILES notations of 50,000 de novo generated molecules from DrugGEN models (10,000 from each) can be downloaded from [here](results/generated_molecules). 
