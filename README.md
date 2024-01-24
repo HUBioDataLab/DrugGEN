@@ -66,7 +66,7 @@ Given a random noise *z*, **the generator** *G* (below) creates annotation and a
 ## Model Variations
 
 - **DrugGEN** is the default model. The input of the generator is the real molecules (ChEMBL) dataset (to ease the learning process) and the discriminator compares the generated molecules with the real inhibitors of the given target protein.
-- **NoTarget** is the non-target-specific version of DrugGEN. This model only focuses on learning the chemical properties from the ChEMBL training dataset.
+- **DrugGEN-NoTarget** is the non-target-specific version of DrugGEN. This model only focuses on learning the chemical properties from the ChEMBL training dataset.
 
 &nbsp;
 &nbsp;
