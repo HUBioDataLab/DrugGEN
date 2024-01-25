@@ -1,6 +1,6 @@
 # DrugGEN - Docking
 [Glide (Schrödinger Suite)](https://www.schrodinger.com/products/glide) was used to perform docking of AKT1 inhibitors, randomly sampled 10K ChEMBL molecules and [DrugGEN generated molecules](https://github.com/HUBioDataLab/DrugGEN/tree/master/paper_results/generated_molecules), using AKT1 crystal structure [(4GV1)](https://www.rcsb.org/structure/4GV1) as a reference protein. 
 The top 1K docking scores for each set are provided in the [Docking](https://github.com/HUBioDataLab/DrugGEN/tree/master/paper_results/docking) folder. Also, the docking results of the crystal structure and selected de novo molecule (MOL_01_027820) were visualized using [PyMOL](https://www.schrodinger.com/products/pymol) and saved as [PDB files](https://github.com/HUBioDataLab/DrugGEN/tree/master/paper_results/docking).
-# DrugGEN - Molecular Dynamics
-The simulation analyses were done with the Simulation Interactions Diagram module integrated in Maestro ([Desmond (Schrödinger Suite)](https://www.schrodinger.com/products/desmond)).
+# DrugGEN - Molecular Dynamics (MD)
+The simulation analyses were done with the Simulation Interactions Diagram module integrated in Maestro ([Desmond (Schrödinger Suite)](https://www.schrodinger.com/products/desmond)). MD files for the [AKT1-Capivasertib complex](https://drive.google.com/drive/u/0/folders/1jLBZ7mIjbXnAwe_oNkO4uhdz5N8rgmm2) and [AKT1-MOL_02_027820 complex](https://drive.google.com/drive/u/0/folders/1jJcKbgVYNm5lLkhLe5EZ9waWtOCW7X5x) have been shared on Google Drive. 
 
