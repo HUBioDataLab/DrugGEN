@@ -150,7 +150,7 @@ pip install -r DrugGEN/requirements.txt
 ```
 
 
-### Starting the training
+### Training the model
 
 ```
 # Download input files:
@@ -224,7 +224,7 @@ python DrugGEN/inference.py --submodel="{Chosen model name}" --inference_model="
 
 ## Deep Learning based Bioactivity Prediction 
 
-- If you want to re-produce DEEPScreen results, first download the model from [this link](https://drive.google.com/file/d/1aG9oYspCsF9yG1gEGtFI_E2P4qlITqio/view?usp=drive_link).
+- If you want to re-produce bioactivity predictions of de novo molecules against AKT1 protein using DEEPScreen, first download the model from [this link](https://drive.google.com/file/d/1aG9oYspCsF9yG1gEGtFI_E2P4qlITqio/view?usp=drive_link).
 
 - After that, unzip the compresssed file and follow the instrcutions below.
 
@@ -236,7 +236,7 @@ cd DEEPScreen2.1/chembl_31
 python 8_Prediction.py AKT AKT
 ```
 
-- Results will be saved into "DEEPScreen2.1/prediction_files/prediction_outputs" folder.
+- Results will be saved into "DEEPScreen2.1/prediction_files/prediction_output" folder.
 
 
 &nbsp;
@@ -254,8 +254,9 @@ SMILES notations of the de novo generated molecules from DrugGEN models, along w
 
 ## Updates
 
+- 30/01/2024: DrugGEN v1.0 is released.
 - 15/02/2023: Our pre-print is shared [here](https://github.com/HUBioDataLab/DrugGEN/files/10828402/2302.07868.pdf).
-- 01/01/2023: DrugGEN models are released.
+- 01/01/2023: DrugGEN v0.1 is released.
 
 &nbsp;
 &nbsp;
@@ -273,7 +274,7 @@ SMILES notations of the de novo generated molecules from DrugGEN models, along w
 }
 ```
 
-Ünlü, A., Çevrim, E., Sarıgün, A., Çelikbilek, H., Güvenilir, H.A., Koyaş, A., Kahraman, D.C., Olğaç, A., Rifaioğlu, A., Doğan, T. (2023). Target Specific De Novo Design of Drug Candidate Molecules with Graph Transformer-based Generative Adversarial Networks. *arXiv preprint* arXiv:2302.07868.
+Ünlü, A., Çevrim, E., Sarıgün, A., Yiğit, M.G., Çelikbilek, H., Bayram, O., Güvenilir, H.A., Koyaş, A., Kahraman, D.C., Olğaç, A., Rifaioğlu, A., Banoğlu, E., Doğan, T. (2023). Target Specific De Novo Design of Drug Candidate Molecules with Graph Transformer-based Generative Adversarial Networks. *arXiv preprint* arXiv:2302.07868.
 
 
 &nbsp;
@@ -286,7 +287,6 @@ In each file, we indicate whether a function or script is imported from another 
 - Molecule generation GAN schematic was inspired from [MolGAN](https://github.com/yongqyu/MolGAN-pytorch).
 - [MOSES](https://github.com/molecularsets/moses) was used for performance calculation (MOSES Script are directly embedded to our code due to current installation issues related to the MOSES repo).
 - [PyG](https://github.com/pyg-team/pytorch_geometric) was used to construct the custom dataset.
-- Transformer architecture was taken from [Vaswani et al. (2017)](https://arxiv.org/abs/1706.03762).
 - Graph Transformer Encoder architecture was taken from [Dwivedi & Bresson (2021)](https://arxiv.org/abs/2012.09699) and [Vignac et al. (2022)](https://github.com/cvignac/DiGress) and modified. 
 
 Our initial project repository was [this one](https://github.com/asarigun/DrugGEN).
@@ -295,7 +295,7 @@ Our initial project repository was [this one](https://github.com/asarigun/DrugGE
 &nbsp;
 
 ## License
-Copyright (C) 2023 HUBioDataLab
+Copyright (C) 2024 HUBioDataLab
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
