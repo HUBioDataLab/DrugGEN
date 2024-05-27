@@ -14,7 +14,7 @@ torch.set_num_threads(5)
 RDLogger.DisableLog('rdApp.*')
 
 from utils import *
-from models import Generator, Discriminator
+from models import Generator, Discriminator, simple_disc
 from new_dataloader import DruggenDataset
 from loss import discriminator_loss, generator_loss
 from training_data import load_molecules
@@ -190,15 +190,19 @@ class Train(object):
             @ depth: Transformer layer number
             @ heads: Number of multihead-attention heads
             @ mlp_ratio: Read-out layer dimension of Transformer'''
-        self.D = Discriminator(self.act,
-                                 self.vertexes,
-                                 self.b_dim,
-                                 self.m_dim,
-                                 self.ddropout,
-                                 dim=self.dim,
-                                 depth=self.ddepth,
-                                 heads=self.heads,
-                                 mlp_ratio=self.mlp_ratio)
+
+        if self.submodel == "DrugGEN":
+            self.D = Discriminator(self.act,
+                                    self.vertexes,
+                                    self.b_dim,
+                                    self.m_dim,
+                                    self.ddropout,
+                                    dim=self.dim,
+                                    depth=self.ddepth,
+                                    heads=self.heads,
+                                    mlp_ratio=self.mlp_ratio)
+        elif self.submodel == "NoTarget":
+            self.D = simple_disc(self.act, self.drugs_m_dim, self.drug_vertexes, self.drugs_b_dim)
 
         self.g_optimizer = torch.optim.AdamW(self.G.parameters(), self.g_lr, [self.beta1, self.beta2])
         self.d_optimizer = torch.optim.AdamW(self.D.parameters(), self.d_lr, [self.beta1, self.beta2])
@@ -362,8 +366,8 @@ class Train(object):
                     DISC_node = drugs_x_tensor
                     DISC_edge = drugs_a_tensor
                 elif self.submodel == "NoTarget":
-                    DISC_node = x_tensor
-                    DISC_edge = a_tensor
+                    DISC_node = real_graphs
+                    DISC_edge = real_graphs
 
                 # =================================================================================== #
                 #                                     2. Train the GAN                                #
@@ -381,7 +385,8 @@ class Train(object):
                                             self.gradient_penalty,
                                             self.lambda_gp,
                                             DISC_edge,
-                                            DISC_node)
+                                            DISC_node,
+                                            self.submodel)
                 d_total = d_loss
                 wandb.log({"d_loss": d_total.item()})
 
@@ -396,7 +401,8 @@ class Train(object):
                                                     self.D,
                                                     DISC_edge,
                                                     DISC_node,
-                                                    self.batch_size)
+                                                    self.batch_size,
+                                                    self.submodel)
                 g_loss, node, edge, node_sample, edge_sample = generator_output
                 g_total = g_loss
                 wandb.log({"g_loss": g_total.item()})

@@ -117,3 +117,27 @@ class Discriminator(nn.Module):
         prediction = self.node_mlp(node)
 
         return prediction
+
+class simple_disc(nn.Module):
+    def __init__(self, act, m_dim, vertexes, b_dim):
+        super().__init__()
+
+        if act == "relu":
+            act = nn.ReLU()
+        elif act == "leaky":
+            act = nn.LeakyReLU()
+        elif act == "sigmoid":
+            act = nn.Sigmoid()
+        elif act == "tanh":
+            act = nn.Tanh()
+        else:
+            raise ValueError("Unsupported activation function: {}".format(act))
+
+        features = vertexes * m_dim + vertexes * vertexes * b_dim
+        self.predictor = nn.Sequential(nn.Linear(features,256), act, nn.Linear(256,128), act, nn.Linear(128,64), act,
+                                       nn.Linear(64,32), act, nn.Linear(32,16), act,
+                                       nn.Linear(16,1))
+
+    def forward(self, x):
+        prediction = self.predictor(x)
+        return prediction
