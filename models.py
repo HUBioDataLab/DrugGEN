@@ -102,7 +102,7 @@ class Discriminator(nn.Module):
         self.edge_features = vertexes * vertexes * dim
         self.node_mlp = nn.Sequential(nn.Linear(self.node_features, 64), act, nn.Linear(64, 32), act, nn.Linear(32, 16), act, nn.Linear(16, 1))
 
-    def forward(self, z_e, z_n, visualize=False):
+    def forward(self, z_e, z_n):
         b, n, c = z_n.shape
         _, _, _ , d = z_e.shape
 
@@ -110,7 +110,7 @@ class Discriminator(nn.Module):
         edge = self.edge_layers(z_e)
         edge = (edge + edge.permute(0, 2, 1, 3)) / 2
 
-        node, edge, attention_map = self.TransformerEncoder(node, edge, visualize)
+        node, edge = self.TransformerEncoder(node, edge)
 
         node = node.view(b, -1)
 
