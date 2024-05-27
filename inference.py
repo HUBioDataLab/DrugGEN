@@ -103,8 +103,7 @@ class Inference(object):
                            dim=self.dim,
                            depth=self.depth,
                            heads=self.heads,
-                           mlp_ratio=self.mlp_ratio,
-                           submodel = self.submodel)
+                           mlp_ratio=self.mlp_ratio)
 
         self.print_network(self.G, 'G')
 

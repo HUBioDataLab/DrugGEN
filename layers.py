@@ -82,7 +82,7 @@ class Encoder_Block(nn.Module):
 
     def forward(self, x, y):
         x1 = self.ln1(x)
-        x2,y1 = self.attn(x1,y)
+        x2, y1 = self.attn(x1, y)
         x2 = x1 + x2
         y2 = y1 + y
         x2 = self.ln3(x2)
@@ -102,5 +102,5 @@ class TransformerEncoder(nn.Module):
 
     def forward(self, x, y):
         for Encoder_Block in self.Encoder_Blocks:
-            x, y = Encoder_Block(x,y)
+            x, y = Encoder_Block(x, y)
         return x, y

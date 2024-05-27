@@ -14,7 +14,7 @@ torch.set_num_threads(5)
 RDLogger.DisableLog('rdApp.*')
 
 from utils import *
-from models import Generator, simple_disc
+from models import Generator, Discriminator
 from new_dataloader import DruggenDataset
 from loss import discriminator_loss, generator_loss
 from training_data import load_molecules
@@ -116,6 +116,8 @@ class Train(object):
         self.depth = config.depth
         self.heads = config.heads
         self.mlp_ratio = config.mlp_ratio
+        self.ddepth = config.ddepth
+        self.ddropout = config.ddropout
 
         # Training configurations.
         self.epoch = config.epoch
@@ -175,19 +177,28 @@ class Train(object):
                            dim=self.dim,
                            depth=self.depth,
                            heads=self.heads,
-                           mlp_ratio=self.mlp_ratio,
-                           submodel = self.submodel)
+                           mlp_ratio=self.mlp_ratio)
 
-
-        ''' Discriminator implementation with MLP:
+        ''' Discriminator implementation with Transformer Encoder:
             
             @ act: Activation function for MLP
-            @ m_dim: number of atom types (or number of features used)
-            @ b_dim: number of bond types
-            @ dropout: dropout possibility 
             @ vertexes: maximum length of generated molecules (molecule length)
-            '''
-        self.D = simple_disc("tanh", self.m_dim, self.vertexes, self.b_dim)
+            @ b_dim: number of bond types
+            @ m_dim: number of atom types (or number of features used)
+            @ dropout: dropout possibility
+            @ dim: Hidden dimension of Transformer Encoder
+            @ depth: Transformer layer number
+            @ heads: Number of multihead-attention heads
+            @ mlp_ratio: Read-out layer dimension of Transformer'''
+        self.D = Discriminator(self.act,
+                                 self.vertexes,
+                                 self.b_dim,
+                                 self.m_dim,
+                                 self.ddropout,
+                                 dim=self.dim,
+                                 depth=self.ddepth,
+                                 heads=self.heads,
+                                 mlp_ratio=self.mlp_ratio)
 
         self.g_optimizer = torch.optim.AdamW(self.G.parameters(), self.g_lr, [self.beta1, self.beta2])
         self.d_optimizer = torch.optim.AdamW(self.D.parameters(), self.d_lr, [self.beta1, self.beta2])
@@ -348,26 +359,29 @@ class Train(object):
 
                 # Training configuration.
                 if self.submodel == "DrugGEN":
-                    DISC_input = drug_graphs
+                    DISC_node = drugs_x_tensor
+                    DISC_edge = drugs_a_tensor
                 elif self.submodel == "NoTarget":
-                    DISC_input = real_graphs
+                    DISC_node = x_tensor
+                    DISC_edge = a_tensor
 
                 # =================================================================================== #
                 #                                     2. Train the GAN                                #
                 # =================================================================================== #
+
                 loss = {}
                 self.reset_grad()
-
                 # Compute discriminator loss.
                 node, edge, d_loss = discriminator_loss(self.G,
                                             self.D,
-                                            DISC_input,
+                                            drugs_a_tensor,
+                                            drugs_x_tensor,
                                             self.batch_size,
                                             self.device,
                                             self.gradient_penalty,
                                             self.lambda_gp,
-                                            a_tensor,
-                                            x_tensor)
+                                            DISC_edge,
+                                            DISC_node)
                 d_total = d_loss
                 wandb.log({"d_loss": d_total.item()})
 
@@ -380,8 +394,8 @@ class Train(object):
                 # Compute generator loss.
                 generator_output = generator_loss(self.G,
                                                     self.D,
-                                                    a_tensor,
-                                                    x_tensor,
+                                                    DISC_edge,
+                                                    DISC_node,
                                                     self.batch_size)
                 g_loss, node, edge, node_sample, edge_sample = generator_output
                 g_total = g_loss
@@ -423,9 +437,11 @@ if __name__ == '__main__':
     parser.add_argument('--max_atom', type=int, default=45, help='Max atom number for molecules must be specified.')
     parser.add_argument('--dim', type=int, default=32, help='Dimension of the Transformer Encoder model for the GAN.')
     parser.add_argument('--depth', type=int, default=1, help='Depth of the Transformer model from the GAN.')
+    parser.add_argument('--ddepth', type=int, default=1, help='Depth of the Transformer model from the discriminator.')
     parser.add_argument('--heads', type=int, default=8, help='Number of heads for the MultiHeadAttention module from the GAN.')
     parser.add_argument('--mlp_ratio', type=int, default=3, help='MLP ratio for the Transformer.')
     parser.add_argument('--dropout', type=float, default=0., help='dropout rate')
+    parser.add_argument('--ddropout', type=float, default=0., help='dropout rate for the discriminator')
     parser.add_argument('--lambda_gp', type=float, default=10, help='Gradient penalty lambda multiplier for the GAN.')
 
 
