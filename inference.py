@@ -4,19 +4,20 @@ import pickle
 import random
 from tqdm import tqdm
 import argparse
-
+import pandas as pd
 import torch
 from torch_geometric.loader import DataLoader
 import torch.utils.data
 from rdkit import RDLogger
 torch.set_num_threads(5)
 RDLogger.DisableLog('rdApp.*')
-
+from rdkit.Chem import QED
 from utils import *
 from models import Generator
 from new_dataloader import DruggenDataset
 from loss import generator_loss
 from training_data import load_molecules
+from smiles_cor import smi_correct
 
 
 class Inference(object):
@@ -43,6 +44,7 @@ class Inference(object):
         
         self.inference_model = config.inference_model
         self.sample_num = config.sample_num
+        self.correct = config.correct
 
         # Data loader.
         self.inf_raw_file = config.inf_raw_file  # SMILES containing text file for first dataset. 
@@ -148,8 +150,15 @@ class Inference(object):
         # Make directories if not exist.
         if not os.path.exists("DrugGEN/experiments/inference/{}".format(self.submodel)):
             os.makedirs("DrugGEN/experiments/inference/{}".format(self.submodel))
-
-
+        if self.correct:
+            correct = smi_correct(self.submodel, "DrugGEN_/experiments/inference/{}".format(self.submodel))
+        search_res = pd.DataFrame(columns=["submodel", "validity",
+                                           "uniqueness", "novelty",
+                                           "novelty_test", "AKT_novelty",
+                                           "max_len", "mean_atom_type",
+                                           "snn_chembl", "snn_akt", "IntDiv", "qed"])
+                   
+            
         self.G.eval()
 
         start_time = time.time()
@@ -157,7 +166,9 @@ class Inference(object):
         uniqueness_calc = []
         real_smiles_snn = []
         nodes_sample = torch.Tensor(size=[1,45,1]).to(self.device)
-
+        f = open("DrugGEN/experiments/inference/{}/inference_drugs.txt".format(self.submodel), "w")
+        f.write("SMILES")
+        f.write("\n")
         val_counter = 0
         none_counter = 0
         # Inference mode
@@ -181,7 +192,7 @@ class Inference(object):
                 g_edges_hat_sample = torch.max(edge_sample, -1)[1]
                 g_nodes_hat_sample = torch.max(node_sample, -1)[1]
 
-                fake_mol_g = [self.inf_dataset.matrices2mol_drugs(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True, file_name=self.dataset_name) 
+                fake_mol_g = [self.inf_dataset.matrices2mol_drugs(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=False, file_name=self.dataset_name) 
                         for e_, n_ in zip(g_edges_hat_sample, g_nodes_hat_sample)]
 
                 a_tensor_sample = torch.max(a_tensor, -1)[1]
@@ -196,42 +207,81 @@ class Inference(object):
                             if molecules is None:
                                 none_counter += 1
 
-                with open("DrugGEN/experiments/inference/{}/inference_drugs.txt".format(self.submodel), "a") as f:
-                    for molecules in inference_drugs:
-                        if molecules is not None:
-                            molecules = molecules.replace("*", "C") 
-                            f.write(molecules)
-                            f.write("\n")
-                            uniqueness_calc.append(molecules)
-                            nodes_sample = torch.cat((nodes_sample, g_nodes_hat_sample.view(1,45,1)), 0)
-                            pbar.update(1)
-                        metric_calc_dr.append(molecules)
+                for molecules in inference_drugs:
+                    if molecules is not None:
+                        molecules = molecules.replace("*", "C") 
+                        f.write(molecules)
+                        f.write("\n")
+                        uniqueness_calc.append(molecules)
+                        nodes_sample = torch.cat((nodes_sample, g_nodes_hat_sample.view(1,45,1)), 0)
+                        pbar.update(1)
+                    metric_calc_dr.append(molecules)
 
-
+                real_smiles_snn.append(real_mols[0])
                 generation_number = len([x for x in metric_calc_dr if x is not None])
                 if generation_number == self.sample_num or none_counter == self.sample_num:
                     break
-                real_smiles_snn.append(real_mols[0])
-
+                
+                
+        f.close()
+        print("Inference completed, starting metrics calculation.")
+        if self.correct:
+            corrected = correct.correct("DrugGEN/experiments/inference/{}/inference_drugs.txt".format(self.submodel))
+            gen_smi = corrected["SMILES"].tolist()
+            
+        else:
+            gen_smi = pd.read_csv("DrugGEN/experiments/inference/{}/inference_drugs.txt".format(self.submodel))["SMILES"].tolist()
+            
+            
         et = time.time() - start_time
+        
         gen_vecs = [AllChem.GetMorganFingerprintAsBitVect(Chem.MolFromSmiles(x), 2, nBits=1024) for x in uniqueness_calc if Chem.MolFromSmiles(x) is not None]
         real_vecs = [AllChem.GetMorganFingerprintAsBitVect(x, 2, nBits=1024) for x in real_smiles_snn if x is not None]
         print("Inference mode is lasted for {:.2f} seconds".format(et))
 
         print("Metrics calculation started using MOSES.")
-        # post-process * to Carbon atom in valid molecules
+        
+        if self.correct:
+            val = round(len(gen_smi)/self.sample_num,3)
+            print("Validity: ", val, "\n")
+        else: 
+            val = round(fraction_valid(gen_smi),3)
+            print("Validity: ", val, "\n")
 
-        print("Validity: ", fraction_valid(metric_calc_dr), "\n")
-        print("Uniqueness: ", fraction_unique(uniqueness_calc), "\n")
-        print("Novelty: ", novelty(metric_calc_dr, chembl_smiles), "\n")
-        print("Novelty_test: ", novelty(metric_calc_dr, chembl_test), "\n")
-        print("AKT_novelty: ", novelty(metric_calc_dr, drug_smiles), "\n")
-        print("max_len: ", Metrics.max_component(uniqueness_calc, self.vertexes), "\n")
-        print("mean_atom_type: ", Metrics.mean_atom_type(nodes_sample), "\n")
-        print("snn_chembl: ", average_agg_tanimoto(np.array(real_vecs), np.array(gen_vecs)), "\n")
-        print("snn_akt: ", average_agg_tanimoto(np.array(drug_vecs), np.array(gen_vecs)), "\n")
+        uniq = round(fraction_unique(gen_smi),3)
+        nov = round(novelty(gen_smi, chembl_smiles),3)
+        nov_test = round(novelty(gen_smi, chembl_test),3)
+        akt_nov = round(novelty(gen_smi, drug_smiles),3)
+        max_len = round(Metrics.max_component(gen_smi, self.vertexes),3)
+        mean_atom = round(Metrics.mean_atom_type(nodes_sample),3)
+        snn_chembl = round(average_agg_tanimoto(np.array(real_vecs), np.array(gen_vecs)),3)
+        snn_akt = round(average_agg_tanimoto(np.array(drug_vecs), np.array(gen_vecs)),3)
+        int_div = round(internal_diversity(np.array(gen_vecs)),3)
+        qed = round(np.mean([QED.qed(Chem.MolFromSmiles(x)) for x in gen_smi if Chem.MolFromSmiles(x) is not None]),3)
+        
+        
+        print("Uniqueness: ", uniq, "\n")
+        print("Novelty: ", nov, "\n")
+        print("Novelty_test: ", nov_test, "\n")
+        print("AKT_novelty: ", akt_nov, "\n")
+        print("max_len: ", max_len, "\n")
+        print("mean_atom_type: ", mean_atom, "\n")
+        print("snn_chembl: ", snn_chembl, "\n")
+        print("snn_akt: ", snn_akt, "\n")
+        print("IntDiv: ", int_div, "\n")
+        print("QED: ", qed, "\n")
 
         print("Metrics are calculated.")
+        model_res = pd.DataFrame({"submodel": [self.submodel], "validity": [val],
+                        "uniqueness": [uniq], "novelty": [nov],
+                        "novelty_test": [nov_test], "AKT_novelty": [akt_nov],
+                        "max_len": [max_len], "mean_atom_type": [mean_atom],
+                        "snn_chembl": [snn_chembl], "snn_akt": [snn_akt], "IntDiv": [int_div], "qed": [qed]})
+        search_res = pd.concat([search_res, model_res], axis=0)
+        os.remove("DrugGEN/experiments/inference/{}/inference_drugs.txt".format(self.submodel))
+        search_res.to_csv("DrugGEN/experiments/inference/{}/inference_results.csv".format(self.submodel), index=False)
+        generatedsmiles = pd.DataFrame({"SMILES": gen_smi})
+        generatedsmiles.to_csv("DrugGEN/experiments/inference/{}/inference_drugs.csv".format(self.submodel), index=False)
 
 
 if __name__=="__main__":
@@ -240,8 +290,9 @@ if __name__=="__main__":
     # Inference configuration.
     parser.add_argument('--submodel', type=str, default="DrugGEN", help="Chose model subtype: DrugGEN, NoTarget", choices=['DrugGEN', 'NoTarget'])
     parser.add_argument('--inference_model', type=str, help="Path to the model for inference")
-    parser.add_argument('--sample_num', type=int, default=10000, help='inference samples')
-
+    parser.add_argument('--sample_num', type=int, default=100, help='inference samples')
+    parser.add_argument('--correct', type=str2bool, default=False, help='Correct smiles')
+   
     # Data configuration.
     parser.add_argument('--inf_dataset_file', type=str, default='chembl45_test.pt')
     parser.add_argument('--inf_raw_file', type=str, default='DrugGEN/data/chembl_test.smi')

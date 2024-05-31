@@ -355,7 +355,7 @@ def canonic_smiles(smiles_or_mol):
     if mol is None:
         return None
     return Chem.MolToSmiles(mol)
-def fraction_unique(gen, k=None, n_jobs=1, check_validity=False):
+def fraction_unique(gen, k=None, n_jobs=1, check_validity=True):
     """
     Computes a number of unique molecules
     Parameters:
@@ -371,11 +371,13 @@ def fraction_unique(gen, k=None, n_jobs=1, check_validity=False):
                 "gen contains only {} molecules".format(len(gen))
             )
         gen = gen[:k]
-    canonic = set(mapper(n_jobs)(canonic_smiles, gen))
-    if None in canonic and check_validity:
-        #canonic = [i for i in canonic if i is not None]
-        raise ValueError("Invalid molecule passed to unique@k")
-    return 0 if len(gen) == 0 else len(canonic) / len(gen)
+    if check_validity:
+        
+        canonic = list(mapper(n_jobs)(canonic_smiles, gen))
+        canonic = [i for i in canonic if i is not None]
+    set_cannonic = set(canonic)
+        #raise ValueError("Invalid molecule passed to unique@k")
+    return 0 if len(canonic) == 0 else len(set_cannonic) / len(canonic)
 
 def novelty(gen, train, n_jobs=1):
     gen_smiles = mapper(n_jobs)(canonic_smiles, gen)
@@ -383,7 +385,8 @@ def novelty(gen, train, n_jobs=1):
     train_set = set(train)
     return 0 if len(gen_smiles_set) == 0 else len(gen_smiles_set - train_set) / len(gen_smiles_set)
 
-
+def internal_diversity(gen):
+    return 1 - average_agg_tanimoto(gen, gen, agg="mean")
 
 def average_agg_tanimoto(stock_vecs, gen_vecs,
                          batch_size=5000, agg='max',
