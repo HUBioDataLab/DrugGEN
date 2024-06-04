@@ -256,6 +256,7 @@ The system is trained to design effective inhibitory molecules against the AKT1 
 
 ## Updates
 
+- 04/06/2024: DrugGEN v1.5 is released.
 - 30/01/2024: DrugGEN v1.0 is released.
 - 15/02/2023: Our pre-print is shared [here](https://github.com/HUBioDataLab/DrugGEN/files/10828402/2302.07868.pdf).
 - 01/01/2023: DrugGEN v0.1 is released.
