@@ -58,8 +58,9 @@ Given a random noise *z*, **the generator** *G* (below) creates annotation and a
 <!-- ADD THE ANIMATED GIF VERSION OF THE GAN1 AND GAN2 -->
 | Generator |
 |------------------------------------------------------------------------------------------------------------|
-<!--  | ![FirstGAN](assets/DrugGEN_generator.gif) |  -->
-<img src="/assets/DrugGEN_GIF.gif" width="60%" height="60%"/>
+<!-- | ![FirstGAN](assets/DrugGEN_generator.gif) | -->
+
+ <img src="/assets/DrugGEN_GIF.gif" width="60%" height="60%"/>  
 
 &nbsp;
 &nbsp;
