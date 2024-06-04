@@ -59,7 +59,7 @@ Given a random noise *z*, **the generator** *G* (below) creates annotation and a
 | Generator |
 |------------------------------------------------------------------------------------------------------------|
 <!--  | ![FirstGAN](assets/DrugGEN_generator.gif) |  -->
-<img src="/assets/DrugGEN_generator.gif" width="70%" height="70%"/>
+<img src="/assets/DrugGEN_GIF.gif" width="70%" height="70%"/>
 
 &nbsp;
 &nbsp;
