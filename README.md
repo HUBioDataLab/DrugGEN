@@ -35,7 +35,7 @@ Our up-to-date pre-print is shared [here](https://github.com/HUBioDataLab/DrugGE
 
 <!--PUT THE ANIMATED GIF VERSION OF THE DRUGGEN MODEL (Figure 1)-->
 <p float="center">
-  <img src="assets/DrugGEN_Figure1D.png" width="80%" />
+  <img src="assets/DrugGEN_Figure1d_final.png" width="80%" />
 </p>
 
 **Fig. 1.** The schematic representation of the architecture of the DrugGEN model with powerful graph transformer encoder modules in both generator and discriminator networks. The generator module transforms the given input into a new molecular representation. The discriminator compares the generated de novo molecules to the known inhibitors of the given target protein, scoring them for their assignment to the classes of “real” and “fake” molecules (abbreviations; MLP: multi-layered perceptron, Norm: normalisation, Concat: concatenation, MatMul: matrix multiplication, ElementMul: element-wise multiplication, Mol. adj: molecule adjacency tensor, Mol. Anno: molecule annotation matrix, Upd: updated).
