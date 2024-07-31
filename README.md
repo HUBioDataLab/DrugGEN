@@ -3,7 +3,7 @@
 
 
 <p align="center">
-  <a href="https://github.com/HUBioDataLab/DrugGEN/files/10828402/2302.07868.pdf"><img src="https://img.shields.io/badge/Pre--print-%40arXiv-ff0000"/></a>
+  <a href="https://arxiv.org/abs/2302.07868"><img src="https://img.shields.io/badge/Pre--print-%40arXiv-ff0000"/></a>
   <a href="https://huggingface.co/spaces/HUBioDataLab/DrugGEN"><img src="https://img.shields.io/badge/model-HuggingFace-yellow?labelColor=gray&color=yellow"/></a>
   <a href="http://www.gnu.org/licenses/"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg"/></a>
   
@@ -12,7 +12,7 @@
 
 ## Updated Pre-print!
 
-**Please see our most up-to-date document (pre-print) from 15.02.2023 here:** [2302.07868.pdf](https://github.com/HUBioDataLab/DrugGEN/files/10828402/2302.07868.pdf), [arXiv link](https://arxiv.org/abs/2302.07868)
+**Please see our most up-to-date document (pre-print) from 26.07.2024 here:**  [arXiv link](https://arxiv.org/abs/2302.07868)
 
 &nbsp;
 &nbsp;
@@ -256,6 +256,7 @@ The system is trained to design effective inhibitory molecules against the AKT1 
 
 ## Updates
 
+- 26/07/2024: DrugGEN pre-print is updated for v1.5 release.
 - 04/06/2024: DrugGEN v1.5 is released.
 - 30/01/2024: DrugGEN v1.0 is released.
 - 15/02/2023: Our pre-print is shared [here](https://github.com/HUBioDataLab/DrugGEN/files/10828402/2302.07868.pdf).
