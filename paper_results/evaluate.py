@@ -27,16 +27,16 @@ class MoleculeEvaluator:
         self.ref_smiles_2 = ref_smiles_2
         self.n_jobs = n_jobs
         
-        # Convert SMILES to RDKit molecules
-        self.gen_mols = [Chem.MolFromSmiles(s) for s in gen_smiles if s]
-        self.ref_mols_1 = [Chem.MolFromSmiles(s) for s in ref_smiles_1 if s]
-        self.ref_mols_2 = [Chem.MolFromSmiles(s) for s in ref_smiles_2] if ref_smiles_2 else None
+        # Convert SMILES to RDKit molecules and filter out invalid ones
+        self.gen_mols = [mol for s in gen_smiles if s and (mol := Chem.MolFromSmiles(s)) is not None]
+        self.ref_mols_1 = [mol for s in ref_smiles_1 if s and (mol := Chem.MolFromSmiles(s)) is not None]
+        self.ref_mols_2 = [mol for s in ref_smiles_2 if s and (mol := Chem.MolFromSmiles(s)) is not None] if ref_smiles_2 else None
         
         # Initialize metrics that need setup
         self.fcd = FCD(device='cuda' if torch.cuda.is_available() else 'cpu')
         self.pains_catalog = load_pains_filters()
-        self.frag_metric = FragMetric(n_jobs=n_jobs)
-        self.scaf_metric = ScafMetric(n_jobs=n_jobs)
+        self.frag_metric = FragMetric(n_jobs=1)
+        self.scaf_metric = ScafMetric(n_jobs=1)
 
     def calculate_basic_metrics(self):
         """Calculate validity, uniqueness, novelty, and internal diversity"""
@@ -54,7 +54,7 @@ class MoleculeEvaluator:
 
     def calculate_property_metrics(self):
         """Calculate QED and SA scores"""
-        qed_scores = [QED.default(mol) for mol in self.gen_mols if mol is not None]
+        qed_scores = [QED.qed(mol) for mol in self.gen_mols if mol is not None]
         sa_scores = [sascorer.calculateScore(mol) for mol in self.gen_mols if mol is not None]
         
         return {
@@ -82,6 +82,7 @@ class MoleculeEvaluator:
 
     def calculate_similarity_metrics(self):
         """Calculate fragment and scaffold similarity"""
+
         results = {
             'frag_sim_ref1': self.frag_metric(gen=self.gen_mols, ref=self.ref_mols_1),
             'scaf_sim_ref1': self.scaf_metric(gen=self.gen_mols, ref=self.ref_mols_1)
