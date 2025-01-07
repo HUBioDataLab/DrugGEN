@@ -17,6 +17,17 @@ import wandb
 RDLogger.DisableLog('rdApp.*')
 import warnings
 from multiprocessing import Pool
+from rdkit.Chem import Descriptors, Lipinski, Crippen
+from copy import deepcopy
+from rdkit.Chem import rdMolDescriptors
+from rdkit.Chem import FilterCatalog
+from rdkit.Chem import AllChem
+from collections import Counter
+from functools import partial
+from multiprocessing import Pool
+from rdkit.Chem.Scaffolds import MurckoScaffold
+from scipy.spatial.distance import cosine as cos_distance
+
 class Metrics(object):
 
     @staticmethod
@@ -430,3 +441,184 @@ def average_agg_tanimoto(stock_vecs, gen_vecs,
 
 def str2bool(v):
     return v.lower() in ('true')
+
+
+
+
+def obey_lipinski(mol):
+    mol = deepcopy(mol)
+    Chem.SanitizeMol(mol)
+    rule_1 = Descriptors.ExactMolWt(mol) < 500
+    rule_2 = Lipinski.NumHDonors(mol) <= 5
+    rule_3 = Lipinski.NumHAcceptors(mol) <= 10
+    rule_4 = (logp := Crippen.MolLogP(mol) >= -2) & (logp <= 5)
+    rule_5 = Chem.rdMolDescriptors.CalcNumRotatableBonds(mol) <= 10
+    return np.sum([int(a) for a in [rule_1, rule_2, rule_3, rule_4, rule_5]])
+
+def obey_veber(mol):
+    mol = deepcopy(mol)
+    Chem.SanitizeMol(mol)
+    # Veber's rule criteria
+    rule_1 = rdMolDescriptors.CalcNumRotatableBonds(mol) <= 10
+    rule_2 = rdMolDescriptors.CalcTPSA(mol) <= 140
+    return np.sum([int(a) for a in [rule_1, rule_2]])
+
+def load_pains_filters():
+    # Load PAINS A, B, and C filters
+    params = FilterCatalog.FilterCatalogParams()
+    params.AddCatalog(FilterCatalog.FilterCatalogParams.FilterCatalogs.PAINS_A)
+    params.AddCatalog(FilterCatalog.FilterCatalogParams.FilterCatalogs.PAINS_B)
+    params.AddCatalog(FilterCatalog.FilterCatalogParams.FilterCatalogs.PAINS_C)
+    
+    catalog = FilterCatalog.FilterCatalog(params)
+    return catalog
+
+def is_pains(mol, catalog):
+    # Check if the molecule is a PAINS compound
+    entry = catalog.GetFirstMatch(mol)
+    return entry is not None
+
+def mapper(n_jobs):
+    '''
+    Returns function for map call.
+    If n_jobs == 1, will use standard map
+    If n_jobs > 1, will use multiprocessing pool
+    If n_jobs is a pool object, will return its map function
+    '''
+    if n_jobs == 1:
+        def _mapper(*args, **kwargs):
+            return list(map(*args, **kwargs))
+
+        return _mapper
+    if isinstance(n_jobs, int):
+        pool = Pool(n_jobs)
+
+        def _mapper(*args, **kwargs):
+            try:
+                result = pool.map(*args, **kwargs)
+            finally:
+                pool.terminate()
+            return result
+
+        return _mapper
+    return n_jobs.map
+
+def fragmenter(mol):
+    """
+    fragment mol using BRICS and return smiles list
+    """
+    fgs = AllChem.FragmentOnBRICSBonds(get_mol(mol))
+    fgs_smi = Chem.MolToSmiles(fgs).split(".")
+    return fgs_smi
+
+def get_mol(smiles_or_mol):
+    '''
+    Loads SMILES/molecule into RDKit's object
+    '''
+    if isinstance(smiles_or_mol, str):
+        if len(smiles_or_mol) == 0:
+            return None
+        mol = Chem.MolFromSmiles(smiles_or_mol)
+        if mol is None:
+            return None
+        try:
+            Chem.SanitizeMol(mol)
+        except ValueError:
+            return None
+        return mol
+    return smiles_or_mol
+
+
+def compute_fragments(mol_list, n_jobs=1):
+    """
+    fragment list of mols using BRICS and return smiles list
+    """
+    fragments = Counter()
+    for mol_frag in mapper(n_jobs)(fragmenter, mol_list):
+        fragments.update(mol_frag)
+    return fragments
+
+def compute_scaffolds(mol_list, n_jobs=1, min_rings=2):
+    """
+    Extracts a scafold from a molecule in a form of a canonic SMILES
+    """
+    scaffolds = Counter()
+    map_ = mapper(n_jobs)
+    scaffolds = Counter(
+        map_(partial(compute_scaffold, min_rings=min_rings), mol_list))
+    if None in scaffolds:
+        scaffolds.pop(None)
+    return scaffolds
+
+def get_n_rings(mol):
+    """
+    Computes the number of rings in a molecule
+    """
+    return mol.GetRingInfo().NumRings()
+
+def compute_scaffold(mol, min_rings=2):
+    mol = get_mol(mol)
+    try:
+        scaffold = MurckoScaffold.GetScaffoldForMol(mol)
+    except (ValueError, RuntimeError):
+        return None
+    n_rings = get_n_rings(scaffold)
+    scaffold_smiles = Chem.MolToSmiles(scaffold)
+    if scaffold_smiles == '' or n_rings < min_rings:
+        return None
+    return scaffold_smiles
+
+class Metric:
+    def __init__(self, n_jobs=1, device='cpu', batch_size=512, **kwargs):
+        self.n_jobs = n_jobs
+        self.device = device
+        self.batch_size = batch_size
+        for k, v in kwargs.values():
+            setattr(self, k, v)
+
+    def __call__(self, ref=None, gen=None, pref=None, pgen=None):
+        assert (ref is None) != (pref is None), "specify ref xor pref"
+        assert (gen is None) != (pgen is None), "specify gen xor pgen"
+        if pref is None:
+            pref = self.precalc(ref)
+        if pgen is None:
+            pgen = self.precalc(gen)
+        return self.metric(pref, pgen)
+
+    def precalc(self, moleclues):
+        raise NotImplementedError
+
+    def metric(self, pref, pgen):
+        raise NotImplementedError
+
+class FragMetric(Metric):
+    def precalc(self, mols):
+        return {'frag': compute_fragments(mols, n_jobs=self.n_jobs)}
+
+    def metric(self, pref, pgen):
+        return cos_similarity(pref['frag'], pgen['frag'])
+
+
+class ScafMetric(Metric):
+    def precalc(self, mols):
+        return {'scaf': compute_scaffolds(mols, n_jobs=self.n_jobs)}
+
+    def metric(self, pref, pgen):
+        return cos_similarity(pref['scaf'], pgen['scaf'])
+    
+def cos_similarity(ref_counts, gen_counts):
+    """
+    Computes cosine similarity between
+     dictionaries of form {name: count}. Non-present
+     elements are considered zero:
+
+     sim = <r, g> / ||r|| / ||g||
+    """
+    if len(ref_counts) == 0 or len(gen_counts) == 0:
+        return np.nan
+    keys = np.unique(list(ref_counts.keys()) + list(gen_counts.keys()))
+    ref_vec = np.array([ref_counts.get(k, 0) for k in keys])
+    gen_vec = np.array([gen_counts.get(k, 0) for k in keys])
+    return 1 - cos_distance(ref_vec, gen_vec)
+
+
