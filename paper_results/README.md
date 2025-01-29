@@ -10,3 +10,25 @@
 ## Molecular Dynamics (MD)
 The simulation analyses were conducted for AKT1-Capivasertib complex (crystal structure: [4GV1](https://www.rcsb.org/structure/4gv1)) and AKT1-MOL_02_027820 complex (consisting of the 4GV1 protein and a de novo generated molecule) using the Simulation Interactions Diagram module integrated into Maestro ([Desmond (Schrödinger Suite)](https://www.schrodinger.com/products/desmond)). MD files for the [AKT1-Capivasertib complex](https://drive.google.com/drive/u/0/folders/1jLBZ7mIjbXnAwe_oNkO4uhdz5N8rgmm2) and [AKT1-MOL_02_027820 complex](https://drive.google.com/drive/u/0/folders/1jJcKbgVYNm5lLkhLe5EZ9waWtOCW7X5x) have been shared on Google Drive. 
 
+
+## Evaluation Script
+
+This script takes three arguments:
+- `gen_smiles`: A list of SMILES strings representing the de novo generated molecules. Molecules should be found under a column named "SMILES".
+- `ref_smiles_1`: A list of SMILES strings representing the reference molecules for novelty calculation. (e.g. ChEMBL molecules)
+- `ref_smiles_2`: A list of SMILES strings representing the reference molecules for novelty calculation. (e.g. selected inhibitors)
+
+The script calculates the following metrics:
+- Validity: The fraction of valid molecules in the generated set.
+- Uniqueness: The fraction of unique molecules in the generated set.
+- Novelty: The fraction of molecules in the generated set that are not present in the reference sets.
+- Internal Diversity: The average Tanimoto similarity between all pairs of molecules in the generated set.
+- QED: The average QED score of the molecules in the generated set.
+- SA: The average SA score of the molecules in the generated set.
+- FCD: The average FCD score of the molecules in the generated set against both reference sets.
+- Fragment Similarity: The average fragment similarity score of the molecules in the generated set against both reference sets.
+- Scaffold Similarity: The average scaffold similarity score of the molecules in the generated set against both reference sets.
+- Lipinski: The fraction of molecules in the generated set that pass the Lipinski filter.
+- Veber: The fraction of molecules in the generated set that pass the Veber filter.
+- PAINS: The fraction of molecules in the generated set that pass the PAINS filter.
+
