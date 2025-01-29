@@ -44,6 +44,7 @@ class MoleculeEvaluator:
         fps = np.array([AllChem.GetMorganFingerprintAsBitVect(mol, 2, 1024) for mol in self.gen_mols if mol is not None])
         
         results = {
+            'validity': fraction_valid(self.gen_smiles, n_jobs=self.n_jobs),
             'uniqueness': fraction_unique(self.gen_smiles, n_jobs=self.n_jobs),
             'novelty_ref1': novelty(self.gen_smiles, self.ref_smiles_1, n_jobs=self.n_jobs),
             'internal_diversity': internal_diversity(fps)  # Pass fingerprints instead of molecules
