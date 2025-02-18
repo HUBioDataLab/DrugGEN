@@ -397,11 +397,12 @@ def novelty(gen, train, n_jobs=1):
     return 0 if len(gen_smiles_set) == 0 else len(gen_smiles_set - train_set) / len(gen_smiles_set)
 
 def internal_diversity(gen):
-    return 1 - average_agg_tanimoto(gen, gen, agg="mean")
+    diversity = [1 - x for x in average_agg_tanimoto(gen, gen, agg="mean", intdiv=True)]
+    return np.mean(diversity), np.std(diversity)
 
 def average_agg_tanimoto(stock_vecs, gen_vecs,
                          batch_size=5000, agg='max',
-                         device='cpu', p=1):
+                         device='cpu', p=1, intdiv=False):
     """
     For each molecule in gen_vecs finds closest molecule in stock_vecs.
     Returns average tanimoto score for between these molecules
@@ -437,7 +438,10 @@ def average_agg_tanimoto(stock_vecs, gen_vecs,
         agg_tanimoto /= total
     if p != 1:
         agg_tanimoto = (agg_tanimoto)**(1/p)
-    return np.mean(agg_tanimoto)
+    if intdiv:
+        return agg_tanimoto
+    else:
+        return np.mean(agg_tanimoto)
 
 def str2bool(v):
     return v.lower() in ('true')
