@@ -362,12 +362,14 @@ class Train(object):
                 )
 
                 # Training configuration.
+                GEN_node = x_tensor             # Generator input node features (annotation matrix of real molecules)
+                GEN_edge = a_tensor             # Generator input edge features (adjacency matrix of real molecules)
                 if self.submodel == "DrugGEN":
-                    DISC_node = drugs_x_tensor
-                    DISC_edge = drugs_a_tensor
+                    DISC_node = drugs_x_tensor  # Discriminator input node features (annotation matrix of drug molecules)
+                    DISC_edge = drugs_a_tensor  # Discriminator input edge features (adjacency matrix of drug molecules)
                 elif self.submodel == "NoTarget":
-                    DISC_node = real_graphs
-                    DISC_edge = real_graphs
+                    DISC_node = real_graphs     # Discriminator input node features (annotation matrix of real molecules)
+                    DISC_edge = real_graphs     # Discriminator input edge features (adjacency matrix of real molecules)
 
                 # =================================================================================== #
                 #                                     2. Train the GAN                                #
@@ -378,14 +380,14 @@ class Train(object):
                 # Compute discriminator loss.
                 node, edge, d_loss = discriminator_loss(self.G,
                                             self.D,
-                                            drugs_a_tensor,
-                                            drugs_x_tensor,
+                                            DISC_edge,
+                                            DISC_node,
                                             self.batch_size,
                                             self.device,
                                             self.gradient_penalty,
                                             self.lambda_gp,
-                                            DISC_edge,
-                                            DISC_node,
+                                            GEN_edge,
+                                            GEN_node,
                                             self.submodel)
                 d_total = d_loss
                 wandb.log({"d_loss": d_total.item()})
@@ -399,8 +401,8 @@ class Train(object):
                 # Compute generator loss.
                 generator_output = generator_loss(self.G,
                                                     self.D,
-                                                    DISC_edge,
-                                                    DISC_node,
+                                                    GEN_edge,
+                                                    GEN_node,
                                                     self.batch_size,
                                                     self.submodel)
                 g_loss, node, edge, node_sample, edge_sample = generator_output
@@ -419,6 +421,7 @@ class Train(object):
 
                     mol_sample(self.sample_directory, edge_sample.detach(), node_sample.detach(),
                                idx, i, self.dataset.matrices2mol, self.dataset_name)
+                    print("samples saved at epoch {} and iteration {}".format(idx,i))
 
                     self.save_model(self.model_directory, idx, i)
                     print("model saved at epoch {} and iteration {}".format(idx,i))
@@ -436,7 +439,6 @@ if __name__ == '__main__':
     parser.add_argument('--mol_data_dir', type=str, default='DrugGEN/data')
     parser.add_argument('--features', type=str2bool, default=False, help='features dimension for nodes')
 
-
     # Model configuration.
     parser.add_argument('--submodel', type=str, default="DrugGEN", help="Chose model subtype: DrugGEN, NoTarget", choices=['DrugGEN', 'NoTarget'])
     parser.add_argument('--act', type=str, default="relu", help="Activation function for the model.", choices=['relu', 'tanh', 'leaky', 'sigmoid'])
@@ -449,7 +451,6 @@ if __name__ == '__main__':
     parser.add_argument('--dropout', type=float, default=0., help='dropout rate')
     parser.add_argument('--ddropout', type=float, default=0., help='dropout rate for the discriminator')
     parser.add_argument('--lambda_gp', type=float, default=10, help='Gradient penalty lambda multiplier for the GAN.')
-
 
     # Training configuration.
     parser.add_argument('--batch_size', type=int, default=128, help='Batch size for the training.')
