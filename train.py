@@ -278,20 +278,6 @@ class Train(object):
         self.d_optimizer.zero_grad()
 
 
-    def gradient_penalty(self, y, x):
-        """Compute gradient penalty: (L2_norm(dy/dx) - 1)**2."""
-        weight = torch.ones(y.size(),requires_grad=False).to(self.device)
-        dydx = torch.autograd.grad(outputs=y,
-                                   inputs=x,
-                                   grad_outputs=weight,
-                                   retain_graph=True,
-                                   create_graph=True,
-                                   only_inputs=True)[0]
-        dydx = dydx.view(dydx.size(0), -1)
-        gradient_penalty = ((dydx.norm(2, dim=1) - 1) ** 2).mean()
-        return gradient_penalty
-
-
     def train(self, config):
         ''' Training Script starts from here'''
 
@@ -382,12 +368,11 @@ class Train(object):
                                             self.D,
                                             DISC_edge,
                                             DISC_node,
-                                            self.batch_size,
-                                            self.device,
-                                            self.gradient_penalty,
-                                            self.lambda_gp,
                                             GEN_edge,
                                             GEN_node,
+                                            self.batch_size,
+                                            self.device,
+                                            self.lambda_gp,
                                             self.submodel)
                 d_total = d_loss
                 wandb.log({"d_loss": d_total.item()})
