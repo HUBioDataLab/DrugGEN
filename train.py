@@ -54,7 +54,7 @@ class Train(object):
         self.mol_data_dir = config.mol_data_dir  # Directory where the dataset files are stored.
         self.drug_data_dir = config.drug_data_dir  # Directory where the drug dataset files are stored.
         self.dataset_name = self.dataset_file.split(".")[0]
-        self.drugs_name = self.drugs_dataset_file.split(".")[0]
+        self.drugs_dataset_name = self.drugs_dataset_file.split(".")[0]
         self.max_atom = config.max_atom  # Model is based on one-shot generation. 
                                          # Max atom number for molecules must be specified.
         self.features = config.features  # Small model uses atom types as node features. (Boolean, False uses atom types only.)
@@ -64,14 +64,11 @@ class Train(object):
         self.parallel = config.parallel
 
         self.dataset = DruggenDataset(self.mol_data_dir,
-                                      self.dataset_file,
-                                      self.raw_file,
-                                      self.max_atom,
-                                      self.features) # Dataset for the GAN. Custom dataset class from PyG parent class.
-                                                     # Can create any molecular graph dataset given smiles string.
-                                                     # Nonisomeric SMILES are suggested but not necessary.
-                                                     # Uses sparse matrix representation for graphs,
-                                                     # For computational and speed efficiency.
+                                     self.dataset_file,
+                                     self.raw_file,
+                                     self.max_atom,
+                                     self.features,
+                                     joint_raw_file=self.drug_raw_file)  # Add joint file reference
 
         self.loader = DataLoader(self.dataset,
                                  shuffle=True,
@@ -79,14 +76,11 @@ class Train(object):
                                  drop_last=True)  # PyG dataloader for the GAN.
 
         self.drugs = DruggenDataset(self.drug_data_dir, 
-                                    self.drugs_dataset_file, 
-                                    self.drug_raw_file, 
-                                    self.max_atom, 
-                                    self.features)   # Dataset for the second GAN. Custom dataset class from PyG parent class. 
-                                                     # Can create any molecular graph dataset given smiles string. 
-                                                     # Nonisomeric SMILES are suggested but not necessary.
-                                                     # Uses sparse matrix representation for graphs, 
-                                                     # For computational and speed efficiency.
+                                   self.drugs_dataset_file, 
+                                   self.drug_raw_file, 
+                                   self.max_atom, 
+                                   self.features,
+                                   joint_raw_file=self.raw_file)  # Add joint file reference
 
         self.drugs_loader = DataLoader(self.drugs, 
                                        shuffle=True,
@@ -228,7 +222,7 @@ class Train(object):
 
     def drug_decoder_load(self, dictionary_name):
         ''' Loading the atom and bond decoders'''
-        with open("DrugGEN/data/decoders/" + dictionary_name +"_" + self.drugs_name +'.pkl', 'rb') as f:
+        with open("DrugGEN/data/decoders/" + dictionary_name +"_" + self.drugs_dataset_name +'.pkl', 'rb') as f:
             return pickle.load(f)
 
 
