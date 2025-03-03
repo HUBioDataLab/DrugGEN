@@ -1,17 +1,23 @@
 import os
+import sys
 import time
-import pickle
 import random
-from tqdm import tqdm
+import pickle
 import argparse
-import pandas as pd
+
 import torch
-from torch_geometric.loader import DataLoader
 import torch.utils.data
-from rdkit import RDLogger
-torch.set_num_threads(5)
-RDLogger.DisableLog('rdApp.*')
-from rdkit.Chem import QED
+from torch_geometric.loader import DataLoader
+
+import pandas as pd
+from tqdm import tqdm
+
+from rdkit import RDLogger, Chem
+from rdkit.Chem import QED, RDConfig
+
+sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
+import sascorer
+
 from utils import *
 from models import Generator
 from new_dataloader import DruggenDataset
@@ -41,10 +47,9 @@ class Inference(object):
 
         # Initialize configurations
         self.submodel = config.submodel
-        
         self.inference_model = config.inference_model
         self.sample_num = config.sample_num
-        self.correct = config.correct
+        self.disable_correction = config.disable_correction
 
         # Data loader.
         self.inf_raw_file = config.inf_raw_file  # SMILES containing text file for first dataset. 
@@ -59,32 +64,33 @@ class Inference(object):
         self.features = config.features  # Small model uses atom types as node features. (Boolean, False uses atom types only.)
                                          # Additional node features can be added. Please check new_dataloarder.py Line 102.
 
+        # Get atom and bond encoders/decoders
+        self.atom_encoder, self.atom_decoder, self.bond_encoder, self.bond_decoder = get_encoders_decoders(
+            self.train_raw_file,
+            self.train_drug_raw_file,
+            self.max_atom
+        )
+
         self.inf_dataset = DruggenDataset(self.mol_data_dir,
                                       self.inf_dataset_file,
                                       self.inf_raw_file,
                                       self.max_atom,
-                                      self.features) # Dataset for the first GAN. Custom dataset class from PyG parent class.
-                                                     # Can create any molecular graph dataset given smiles string.
-                                                     # Nonisomeric SMILES are suggested but not necessary.
-                                                     # Uses sparse matrix representation for graphs,
-                                                     # For computational and speed efficiency.
-        
+                                      self.features,
+                                      atom_encoder=self.atom_encoder,
+                                      atom_decoder=self.atom_decoder,
+                                      bond_encoder=self.bond_encoder,
+                                      bond_decoder=self.bond_decoder)
+
         self.inf_loader = DataLoader(self.inf_dataset,
                                  shuffle=True,
                                  batch_size=self.inf_batch_size,
                                  drop_last=True)  # PyG dataloader for the first GAN.
 
-
-        # Atom and bond type dimensions for the construction of the model.
-        self.atom_decoders = self.decoder_load("atom")  # Atom type decoders for first GAN. 
-                                                        # eg. 0:0, 1:6 (C), 2:7 (N), 3:8 (O), 4:9 (F)
-        self.bond_decoders = self.decoder_load("bond")  # Bond type decoders for first GAN.
-                                                        # eg. 0: (no-bond), 1: (single), 2: (double), 3: (triple), 4: (aromatic)
-        self.m_dim = len(self.atom_decoders) if not self.features else int(self.inf_loader.dataset[0].x.shape[1]) # Atom type dimension.
-        self.b_dim = len(self.bond_decoders) # Bond type dimension.
+        self.m_dim = len(self.atom_decoder) if not self.features else int(self.inf_loader.dataset[0].x.shape[1]) # Atom type dimension.
+        self.b_dim = len(self.bond_decoder) # Bond type dimension.
         self.vertexes = int(self.inf_loader.dataset[0].x.shape[0]) # Number of nodes in the graph.
 
-        # Transformer and Convolution configurations.
+        # Model configurations.
         self.act = config.act
         self.dim = config.dim
         self.depth = config.depth
@@ -93,7 +99,6 @@ class Inference(object):
         self.dropout = config.dropout
 
         self.build_model()
-
 
     def build_model(self):
         """Create generators and discriminators."""
@@ -106,17 +111,8 @@ class Inference(object):
                            depth=self.depth,
                            heads=self.heads,
                            mlp_ratio=self.mlp_ratio)
-
-        self.print_network(self.G, 'G')
-
         self.G.to(self.device)
-
-
-    def decoder_load(self, dictionary_name):
-        ''' Loading the atom and bond decoders'''
-        with open("DrugGEN/data/decoders/" + dictionary_name + "_" + self.dataset_name + '.pkl', 'rb') as f:
-            return pickle.load(f)
-
+        self.print_network(self.G, 'G')
 
     def print_network(self, model, name):
         """Print out the network information."""
@@ -127,13 +123,11 @@ class Inference(object):
         print(name)
         print("The number of parameters: {}".format(num_params))
 
-
     def restore_model(self, submodel, model_directory):
         """Restore the trained generator and discriminator."""
         print('Loading the model...')
         G_path = os.path.join(model_directory, '{}-G.ckpt'.format(submodel))
         self.G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
-
 
     def inference(self):
         # Load the trained generator.
@@ -150,15 +144,16 @@ class Inference(object):
         # Make directories if not exist.
         if not os.path.exists("DrugGEN/experiments/inference/{}".format(self.submodel)):
             os.makedirs("DrugGEN/experiments/inference/{}".format(self.submodel))
-        if self.correct:
-            correct = smi_correct(self.submodel, "DrugGEN_/experiments/inference/{}".format(self.submodel))
+
+        if not self.disable_correction:
+            correct = smi_correct(self.submodel, "DrugGEN/experiments/inference/{}".format(self.submodel))
+
         search_res = pd.DataFrame(columns=["submodel", "validity",
                                            "uniqueness", "novelty",
                                            "novelty_test", "AKT_novelty",
                                            "max_len", "mean_atom_type",
-                                           "snn_chembl", "snn_akt", "IntDiv", "qed"])
-                   
-            
+                                           "snn_chembl", "snn_akt", "IntDiv", "qed", "sa"])
+
         self.G.eval()
 
         start_time = time.time()
@@ -171,6 +166,7 @@ class Inference(object):
         f.write("\n")
         val_counter = 0
         none_counter = 0
+
         # Inference mode
         with torch.inference_mode():
             pbar = tqdm(range(self.sample_num))
@@ -221,11 +217,10 @@ class Inference(object):
                 generation_number = len([x for x in metric_calc_dr if x is not None])
                 if generation_number == self.sample_num or none_counter == self.sample_num:
                     break
-                
-                
+
         f.close()
         print("Inference completed, starting metrics calculation.")
-        if self.correct:
+        if not self.disable_correction:
             corrected = correct.correct("DrugGEN/experiments/inference/{}/inference_drugs.txt".format(self.submodel))
             gen_smi = corrected["SMILES"].tolist()
             
@@ -241,7 +236,7 @@ class Inference(object):
 
         print("Metrics calculation started using MOSES.")
         
-        if self.correct:
+        if not self.disable_correction:
             val = round(len(gen_smi)/self.sample_num,3)
             print("Validity: ", val, "\n")
         else: 
@@ -258,8 +253,8 @@ class Inference(object):
         snn_akt = round(average_agg_tanimoto(np.array(drug_vecs), np.array(gen_vecs)),3)
         int_div = round(internal_diversity(np.array(gen_vecs)),3)
         qed = round(np.mean([QED.qed(Chem.MolFromSmiles(x)) for x in gen_smi if Chem.MolFromSmiles(x) is not None]),3)
-        
-        
+        sa = round(np.mean([sascorer.calculateScore(Chem.MolFromSmiles(x)) for x in gen_smi if Chem.MolFromSmiles(x) is not None]), 3)
+
         print("Uniqueness: ", uniq, "\n")
         print("Novelty: ", nov, "\n")
         print("Novelty_test: ", nov_test, "\n")
@@ -270,13 +265,15 @@ class Inference(object):
         print("snn_akt: ", snn_akt, "\n")
         print("IntDiv: ", int_div, "\n")
         print("QED: ", qed, "\n")
+        print("SA: ", sa, "\n")
 
         print("Metrics are calculated.")
         model_res = pd.DataFrame({"submodel": [self.submodel], "validity": [val],
                         "uniqueness": [uniq], "novelty": [nov],
                         "novelty_test": [nov_test], "AKT_novelty": [akt_nov],
                         "max_len": [max_len], "mean_atom_type": [mean_atom],
-                        "snn_chembl": [snn_chembl], "snn_akt": [snn_akt], "IntDiv": [int_div], "qed": [qed]})
+                        "snn_chembl": [snn_chembl], "snn_akt": [snn_akt], 
+                        "IntDiv": [int_div], "qed": [qed], "sa": [sa]})
         search_res = pd.concat([search_res, model_res], axis=0)
         os.remove("DrugGEN/experiments/inference/{}/inference_drugs.txt".format(self.submodel))
         search_res.to_csv("DrugGEN/experiments/inference/{}/inference_results.csv".format(self.submodel), index=False)
@@ -291,14 +288,16 @@ if __name__=="__main__":
     parser.add_argument('--submodel', type=str, default="DrugGEN", help="Chose model subtype: DrugGEN, NoTarget", choices=['DrugGEN', 'NoTarget'])
     parser.add_argument('--inference_model', type=str, help="Path to the model for inference")
     parser.add_argument('--sample_num', type=int, default=100, help='inference samples')
-    parser.add_argument('--correct', type=str2bool, default=False, help='Correct smiles')
+    parser.add_argument('--disable_correction', action='store_true', help='Disable SMILES correction')
    
     # Data configuration.
     parser.add_argument('--inf_dataset_file', type=str, default='chembl45_test.pt')
     parser.add_argument('--inf_raw_file', type=str, default='DrugGEN/data/chembl_test.smi')
+    parser.add_argument('--train_raw_file', type=str, default='DrugGEN/data/chembl_train.smi')
+    parser.add_argument('--train_drug_raw_file', type=str, default='DrugGEN/data/akt_train.smi')
     parser.add_argument('--inf_batch_size', type=int, default=1, help='Batch size for inference')
     parser.add_argument('--mol_data_dir', type=str, default='DrugGEN/data')
-    parser.add_argument('--features', type=str2bool, default=False, help='features dimension for nodes')
+    parser.add_argument('--features', action='store_true', help='features dimension for nodes')
 
     # Model configuration.
     parser.add_argument('--act', type=str, default="relu", help="Activation function for the model.", choices=['relu', 'tanh', 'leaky', 'sigmoid'])
@@ -310,7 +309,7 @@ if __name__=="__main__":
     parser.add_argument('--dropout', type=float, default=0., help='dropout rate')
 
     # Seed configuration.
-    parser.add_argument('--set_seed', type=bool, default=False, help='set seed for reproducibility')
+    parser.add_argument('--set_seed', action='store_true', help='set seed for reproducibility')
     parser.add_argument('--seed', type=int, default=1, help='seed for reproducibility')
 
     config = parser.parse_args()

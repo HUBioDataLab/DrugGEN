@@ -1,21 +1,23 @@
 import os
 import time
-import pickle
 import random
+import pickle
 import argparse
 
 import torch
+import torch.utils.data
 from torch import nn
 from torch_geometric.loader import DataLoader
-import torch.utils.data
+
 import wandb
 from rdkit import RDLogger
+
 torch.set_num_threads(5)
 RDLogger.DisableLog('rdApp.*')
 
 from utils import *
 from models import Generator, Discriminator, simple_disc
-from new_dataloader import DruggenDataset
+from new_dataloader import DruggenDataset, get_encoders_decoders
 from loss import discriminator_loss, generator_loss
 from training_data import load_molecules
 
@@ -63,12 +65,22 @@ class Train(object):
         
         self.parallel = config.parallel
 
+        # Get atom and bond encoders/decoders
+        atom_encoder, atom_decoder, bond_encoder, bond_decoder = get_encoders_decoders(
+            self.raw_file,
+            self.drug_raw_file,
+            self.max_atom
+        )
+
         self.dataset = DruggenDataset(self.mol_data_dir,
                                      self.dataset_file,
                                      self.raw_file,
                                      self.max_atom,
                                      self.features,
-                                     joint_raw_file=self.drug_raw_file)  # Add joint file reference
+                                     atom_encoder=atom_encoder,
+                                     atom_decoder=atom_decoder,
+                                     bond_encoder=bond_encoder,
+                                     bond_decoder=bond_decoder)
 
         self.loader = DataLoader(self.dataset,
                                  shuffle=True,
@@ -76,34 +88,25 @@ class Train(object):
                                  drop_last=True)  # PyG dataloader for the GAN.
 
         self.drugs = DruggenDataset(self.drug_data_dir, 
-                                   self.drugs_dataset_file, 
-                                   self.drug_raw_file, 
-                                   self.max_atom, 
-                                   self.features,
-                                   joint_raw_file=self.raw_file)  # Add joint file reference
+                                 self.drugs_dataset_file, 
+                                 self.drug_raw_file, 
+                                 self.max_atom, 
+                                 self.features,
+                                 atom_encoder=atom_encoder,
+                                 atom_decoder=atom_decoder,
+                                 bond_encoder=bond_encoder,
+                                 bond_decoder=bond_decoder)
 
         self.drugs_loader = DataLoader(self.drugs, 
                                        shuffle=True,
                                        batch_size=self.batch_size, 
                                        drop_last=True)  # PyG dataloader for the second GAN.
 
-        # Atom and bond type dimensions for the construction of the model.
-        self.atom_decoders = self.decoder_load("atom")  # Atom type decoders for  GAN. 
-                                                        # eg. 0:0, 1:6 (C), 2:7 (N), 3:8 (O), 4:9 (F)
-        self.bond_decoders = self.decoder_load("bond")  # Bond type decoders for  GAN.
-                                                        # eg. 0: (no-bond), 1: (single), 2: (double), 3: (triple), 4: (aromatic)
-        self.m_dim = len(self.atom_decoders) if not self.features else int(self.loader.dataset[0].x.shape[1]) # Atom type dimension.
-        self.b_dim = len(self.bond_decoders) # Bond type dimension.
+        self.m_dim = len(self.atom_decoder) if not self.features else int(self.loader.dataset[0].x.shape[1]) # Atom type dimension.
+        self.b_dim = len(self.bond_decoder) # Bond type dimension.
         self.vertexes = int(self.loader.dataset[0].x.shape[0]) # Number of nodes in the graph.
-        self.drugs_atom_decoders = self.drug_decoder_load("atom") # Atom type decoders for second GAN.
-                                                                  # eg. 0:0, 1:6 (C), 2:7 (N), 3:8 (O), 4:9 (F)
-        self.drugs_bond_decoders = self.drug_decoder_load("bond") # Bond type decoders for second GAN.
-                                                                  # eg. 0: (no-bond), 1: (single), 2: (double), 3: (triple), 4: (aromatic)
-        self.drugs_m_dim = len(self.drugs_atom_decoders) if not self.features else int(self.drugs_loader.dataset[0].x.shape[1]) # Atom type dimension.
-        self.drugs_b_dim = len(self.drugs_bond_decoders)    # Bond type dimension.
-        self.drug_vertexes = int(self.drugs_loader.dataset[0].x.shape[0])  # Number of nodes in the graph.
 
-        # Transformer and Convolution configurations.
+        # Model configurations.
         self.act = config.act
         self.lambda_gp = config.lambda_gp
         self.dim = config.dim
@@ -195,8 +198,9 @@ class Train(object):
                                     depth=self.ddepth,
                                     heads=self.heads,
                                     mlp_ratio=self.mlp_ratio)
+
         elif self.submodel == "NoTarget":
-            self.D = simple_disc(self.act, self.drugs_m_dim, self.drug_vertexes, self.drugs_b_dim)
+            self.D = simple_disc(self.act, self.m_dim, self.vertexes, self.b_dim)
 
         self.g_optimizer = torch.optim.AdamW(self.G.parameters(), self.g_lr, [self.beta1, self.beta2])
         self.d_optimizer = torch.optim.AdamW(self.D.parameters(), self.d_lr, [self.beta1, self.beta2])
@@ -212,19 +216,6 @@ class Train(object):
 
         self.G.to(self.device)
         self.D.to(self.device)
-
-
-    def decoder_load(self, dictionary_name):
-        ''' Loading the atom and bond decoders'''
-        with open("DrugGEN/data/decoders/" + dictionary_name + "_" + self.dataset_name + '.pkl', 'rb') as f:
-            return pickle.load(f)
-
-
-    def drug_decoder_load(self, dictionary_name):
-        ''' Loading the atom and bond decoders'''
-        with open("DrugGEN/data/decoders/" + dictionary_name +"_" + self.drugs_dataset_name +'.pkl', 'rb') as f:
-            return pickle.load(f)
-
 
     def print_network(self, model, name, save_dir):
         """Print out the network information."""
@@ -248,7 +239,6 @@ class Train(object):
             file.write(f"Total number of parameters: {num_params}\n")
             print(f"Total number of parameters: {num_params}\n\n")
 
-
     def restore_model(self, epoch, iteration, model_directory):
         """Restore the trained generator and discriminator."""
         print('Loading the trained models from epoch / iteration {}-{}...'.format(epoch, iteration))
@@ -258,23 +248,19 @@ class Train(object):
         self.G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
         self.D.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
 
-
     def save_model(self, model_directory, idx,i):
         G_path = os.path.join(model_directory, '{}-{}-G.ckpt'.format(idx+1,i+1))
         D_path = os.path.join(model_directory, '{}-{}-D.ckpt'.format(idx+1,i+1))
         torch.save(self.G.state_dict(), G_path)
         torch.save(self.D.state_dict(), D_path)
 
-
     def reset_grad(self):
         """Reset the gradient buffers."""
         self.g_optimizer.zero_grad()
         self.d_optimizer.zero_grad()
 
-
     def train(self, config):
         ''' Training Script starts from here'''
-
         if self.use_wandb:
             mode = 'online' if self.online else 'offline'
         else:
@@ -298,7 +284,6 @@ class Train(object):
         drug_smiles = [line for line in open("DrugGEN/data/akt_train.smi", 'r').read().splitlines()]
         drug_mols = [Chem.MolFromSmiles(smi) for smi in drug_smiles]
         drug_vecs = [AllChem.GetMorganFingerprintAsBitVect(x, 2, nBits=1024) for x in drug_mols if x is not None]
-
 
         if self.resume:
             self.restore_model(self.resume_epoch, self.resume_iter, self.resume_directory)
