@@ -15,11 +15,11 @@ from rdkit import RDLogger
 torch.set_num_threads(5)
 RDLogger.DisableLog('rdApp.*')
 
-from utils import *
-from models import Generator, Discriminator, simple_disc
-from new_dataloader import DruggenDataset, get_encoders_decoders
-from loss import discriminator_loss, generator_loss
-from training_data import load_molecules
+from src.util.utils import *
+from src.model.models import Generator, Discriminator, simple_disc
+from src.data.dataset import DruggenDataset
+from src.data.utils import get_encoders_decoders, load_molecules
+from src.model.loss import discriminator_loss, generator_loss
 
 class Train(object):
     """Trainer for DrugGEN."""

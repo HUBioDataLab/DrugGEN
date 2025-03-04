@@ -18,12 +18,12 @@ from rdkit.Chem import QED, RDConfig
 sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
 import sascorer
 
-from utils import *
-from models import Generator
-from new_dataloader import DruggenDataset
-from loss import generator_loss
-from training_data import load_molecules
-from smiles_cor import smi_correct
+from src.util.utils import *
+from src.model.models import Generator
+from src.data.dataset import DruggenDataset
+from src.data.utils import get_encoders_decoders, load_molecules
+from src.model.loss import generator_loss
+from src.util.smiles_cor import smi_correct
 
 
 class Inference(object):
@@ -52,11 +52,13 @@ class Inference(object):
         self.disable_correction = config.disable_correction
 
         # Data loader.
-        self.inf_raw_file = config.inf_raw_file  # SMILES containing text file for first dataset. 
+        self.inf_smiles = config.inf_smiles  # SMILES containing text file for first dataset. 
                                          # Write the full path to file.
         self.inf_dataset_file = config.inf_dataset_file    # Dataset file name for the first GAN. 
                                                    # Contains large number of molecules.
         self.inf_batch_size = config.inf_batch_size
+        self.train_smiles = config.train_smiles
+        self.train_drug_smiles = config.train_drug_smiles
         self.mol_data_dir = config.mol_data_dir  # Directory where the dataset files are stored.
         self.dataset_name = self.inf_dataset_file.split(".")[0]
         self.max_atom = config.max_atom  # Model is based on one-shot generation. 
@@ -66,14 +68,14 @@ class Inference(object):
 
         # Get atom and bond encoders/decoders
         self.atom_encoder, self.atom_decoder, self.bond_encoder, self.bond_decoder = get_encoders_decoders(
-            self.train_raw_file,
-            self.train_drug_raw_file,
+            self.train_smiles,
+            self.train_drug_smiles,
             self.max_atom
         )
 
         self.inf_dataset = DruggenDataset(self.mol_data_dir,
                                       self.inf_dataset_file,
-                                      self.inf_raw_file,
+                                      self.inf_smiles,
                                       self.max_atom,
                                       self.features,
                                       atom_encoder=self.atom_encoder,
@@ -188,12 +190,12 @@ class Inference(object):
                 g_edges_hat_sample = torch.max(edge_sample, -1)[1]
                 g_nodes_hat_sample = torch.max(node_sample, -1)[1]
 
-                fake_mol_g = [self.inf_dataset.matrices2mol_drugs(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=False, file_name=self.dataset_name) 
+                fake_mol_g = [self.inf_dataset.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=False, file_name=self.dataset_name) 
                         for e_, n_ in zip(g_edges_hat_sample, g_nodes_hat_sample)]
 
                 a_tensor_sample = torch.max(a_tensor, -1)[1]
                 x_tensor_sample = torch.max(x_tensor, -1)[1]
-                real_mols = [self.inf_dataset.matrices2mol_drugs(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True, file_name=self.dataset_name) 
+                real_mols = [self.inf_dataset.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True, file_name=self.dataset_name) 
                         for e_, n_ in zip(a_tensor_sample, x_tensor_sample)]
 
                 inference_drugs = [None if line is None else Chem.MolToSmiles(line) for line in fake_mol_g]
@@ -237,22 +239,22 @@ class Inference(object):
         print("Metrics calculation started using MOSES.")
         
         if not self.disable_correction:
-            val = round(len(gen_smi)/self.sample_num,3)
+            val = round(len(gen_smi)/self.sample_num, 3)
             print("Validity: ", val, "\n")
         else: 
-            val = round(fraction_valid(gen_smi),3)
+            val = round(fraction_valid(gen_smi), 3)
             print("Validity: ", val, "\n")
 
-        uniq = round(fraction_unique(gen_smi),3)
-        nov = round(novelty(gen_smi, chembl_smiles),3)
-        nov_test = round(novelty(gen_smi, chembl_test),3)
-        akt_nov = round(novelty(gen_smi, drug_smiles),3)
-        max_len = round(Metrics.max_component(gen_smi, self.vertexes),3)
-        mean_atom = round(Metrics.mean_atom_type(nodes_sample),3)
-        snn_chembl = round(average_agg_tanimoto(np.array(real_vecs), np.array(gen_vecs)),3)
-        snn_akt = round(average_agg_tanimoto(np.array(drug_vecs), np.array(gen_vecs)),3)
-        int_div = round(internal_diversity(np.array(gen_vecs)),3)
-        qed = round(np.mean([QED.qed(Chem.MolFromSmiles(x)) for x in gen_smi if Chem.MolFromSmiles(x) is not None]),3)
+        uniq = round(fraction_unique(gen_smi), 3)
+        nov = round(novelty(gen_smi, chembl_smiles), 3)
+        nov_test = round(novelty(gen_smi, chembl_test), 3)
+        akt_nov = round(novelty(gen_smi, drug_smiles), 3)
+        max_len = round(Metrics.max_component(gen_smi, self.vertexes), 3)
+        mean_atom = round(Metrics.mean_atom_type(nodes_sample), 3)
+        snn_chembl = round(average_agg_tanimoto(np.array(real_vecs), np.array(gen_vecs)), 3)
+        snn_akt = round(average_agg_tanimoto(np.array(drug_vecs), np.array(gen_vecs)), 3)
+        int_div = round((internal_diversity(np.array(gen_vecs)))[0], 3)
+        qed = round(np.mean([QED.qed(Chem.MolFromSmiles(x)) for x in gen_smi if Chem.MolFromSmiles(x) is not None]), 3)
         sa = round(np.mean([sascorer.calculateScore(Chem.MolFromSmiles(x)) for x in gen_smi if Chem.MolFromSmiles(x) is not None]), 3)
 
         print("Uniqueness: ", uniq, "\n")
@@ -292,9 +294,9 @@ if __name__=="__main__":
    
     # Data configuration.
     parser.add_argument('--inf_dataset_file', type=str, default='chembl45_test.pt')
-    parser.add_argument('--inf_raw_file', type=str, default='DrugGEN/data/chembl_test.smi')
-    parser.add_argument('--train_raw_file', type=str, default='DrugGEN/data/chembl_train.smi')
-    parser.add_argument('--train_drug_raw_file', type=str, default='DrugGEN/data/akt_train.smi')
+    parser.add_argument('--inf_smiles', type=str, default='DrugGEN/data/chembl_test.smi')
+    parser.add_argument('--train_smiles', type=str, default='DrugGEN/data/chembl_train.smi')
+    parser.add_argument('--train_drug_smiles', type=str, default='DrugGEN/data/akt_train.smi')
     parser.add_argument('--inf_batch_size', type=int, default=1, help='Batch size for inference')
     parser.add_argument('--mol_data_dir', type=str, default='DrugGEN/data')
     parser.add_argument('--features', action='store_true', help='features dimension for nodes')

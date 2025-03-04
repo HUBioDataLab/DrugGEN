@@ -1,36 +1,29 @@
-import torch
 import os
-import pandas as pd
-import random
-from chembl_structure_pipeline import standardizer
-from rdkit.Chem import MolStandardize
-from rdkit import Chem
 import time
-import torch
-import torch.nn as nn
-from torchtext.data import TabularDataset, Field, BucketIterator, Iterator
 import random
-import os
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-import random
-from torch import optim
-import numpy as np
+import re
 import itertools
-import time
 import statistics
-from rdkit.Chem import GraphDescriptors, Lipinski, AllChem
-from rdkit.Chem.rdSLNParse import MolFromSLN
-from rdkit.Chem.rdmolfiles import MolFromSmiles
+
+import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import pandas as pd
-import numpy as np
-from rdkit import rdBase, Chem
-import re
-from rdkit import RDLogger
+from torch.utils.data import DataLoader
+from torchtext.data import TabularDataset, Field, BucketIterator, Iterator
+
+from rdkit import Chem, rdBase, RDLogger
+from rdkit.Chem import (
+    MolStandardize,
+    GraphDescriptors,
+    Lipinski,
+    AllChem,
+)
+from rdkit.Chem.rdSLNParse import MolFromSLN
+from rdkit.Chem.rdmolfiles import MolFromSmiles
+from chembl_structure_pipeline import standardizer
+
 RDLogger.DisableLog('rdApp.*')
 
 SEED = 42
