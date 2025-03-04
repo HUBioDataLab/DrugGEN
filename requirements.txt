@@ -1,8 +1,0 @@
-torch
-rdkit-pypi
-tqdm
-numpy
-seaborn
-matplotlib
-pandas
-torch_geometric
