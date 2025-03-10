@@ -17,11 +17,14 @@
 &nbsp;
 &nbsp;
 
-## Abstract
+<details>
+<summary><h2>Abstract</h2></summary>
 
 Discovering novel drug candidate molecules is one of the most fundamental and critical steps in drug development. Generative deep learning models, which create synthetic data given a probability distribution, offer a high potential for designing de novo molecules. However, for them to be useful in real-life drug development pipelines, these models should be able to design drug-like and target-centric molecules. In this study, we propose an end-to-end generative system, DrugGEN, for the de novo design of drug candidate molecules that interact with intended target proteins. The proposed method represents molecules as graphs and processes them via a generative adversarial network comprising graph transformer layers. The system is trained using a large dataset of drug-like compounds and target-specific bioactive molecules to design effective inhibitory molecules against the AKT1 protein, which has critical importance for developing treatments against various types of cancer. We conducted further analysis with molecular docking and dynamics to assess the target-centric generation performance of the model, and attention score visualisation for interpretability. Results indicate that our de novo molecules have a high potential for interacting with the AKT1 protein at the level of its native ligands. Using the open-access DrugGEN codebase, it is possible to easily train models for other druggable proteins, given a dataset of experimentally known bioactive molecules.
 
 Our up-to-date pre-print is shared [here](https://github.com/HUBioDataLab/DrugGEN/files/10828402/2302.07868.pdf)
+
+</details>
 
 <!--Check out our paper below for more details
 
@@ -43,7 +46,8 @@ Our up-to-date pre-print is shared [here](https://github.com/HUBioDataLab/DrugGE
 &nbsp;
 &nbsp;
 
-## Transformer Module
+<details>
+<summary><h2>Transformer Module</h2></summary>
 
 Given a random molecule *z*, **the generator** *G* (below) creates annotation and adjacency matrices of a supposed molecule. *G* processes the input by passing it through a multi-layer perceptron (MLP). The input is then fed to the graph transformer encoder module [Vaswani et al., (2017)](https://arxiv.org/abs/1706.03762), which has a depth of 1 encoder layers with 8 multi-head attention heads for each. In the graph transformer setting, *Q*, *K* and *V* are the variables representing the annotation matrix of the molecule. After the final products are created in the attention mechanism, both the annotation and adjacency matrices are forwarded to layer normalization and then summed with the initial matrices to create a residual connection. These matrices are fed to separate feedforward layers, and finally, given to the discriminator network *D* together with real molecules.
 
@@ -62,18 +66,24 @@ Given a random molecule *z*, **the generator** *G* (below) creates annotation an
 
  <img src="/assets/transformer_module.gif" width="60%" height="60%"/>  
 
+</details>
+
 &nbsp;
 &nbsp;
 
-## Model Variations
+<details>
+<summary><h2>Model Variations</h2></summary>
 
 - **DrugGEN** is the default model. The input of the generator is the real molecules (ChEMBL) dataset (to ease the learning process) and the discriminator compares the generated molecules with the real inhibitors of the given target protein.
 - **DrugGEN-NoTarget** is the non-target-specific version of DrugGEN. This model only focuses on learning the chemical properties from the ChEMBL training dataset.
 
+</details>
+
 &nbsp;
 &nbsp;
 
-## Files & Folders
+<details>
+<summary><h2>Files & Folders</h2></summary>
 
 The DrugGEN repository is organized as follows:
 
@@ -120,10 +130,13 @@ Core implementation of the DrugGEN framework:
 - `inference.py` - Script for generating molecules using trained models
 - `environment.yml` - Conda environment specification
 
+</details>
+
 &nbsp;
 &nbsp;
 
-## Datasets
+<details>
+<summary><h2>Datasets</h2></summary>
 
 The DrugGEN model requires two types of data for training: general compound data and target-specific bioactivity data. Both datasets were carefully curated to ensure high-quality training.
 
@@ -159,12 +172,13 @@ Both datasets undergo extensive preprocessing to convert SMILES strings into gra
 
 For more details on dataset construction and preprocessing methodology, please refer to our [paper](https://arxiv.org/abs/2302.07868).
 
-<!-- ADD SOME INFO HERE -->
+</details>
 
 &nbsp;
 &nbsp;
 
-## Getting Started
+<details>
+<summary><h2>Getting Started</h2></summary>
 
 ### System Requirements
 
@@ -183,8 +197,11 @@ For more details on dataset construction and preprocessing methodology, please r
    cd DrugGEN
    ```
 
-2. **Set up the environment** (see [Training](#training) section for details):
-   - Using conda: `conda env create -f environment.yml`
+2. **Set up and activate the environment**:
+  ```bash
+   conda env create -f DrugGEN/environment.yml
+   conda activate druggen
+   ```
 
 3. **Download datasets**:
    ```bash
@@ -195,39 +212,13 @@ For more details on dataset construction and preprocessing methodology, please r
 
 Now you're ready to start using DrugGEN for molecule generation or model training. Refer to the subsequent sections for specific usage instructions.
 
+</details>
+
 &nbsp;
 &nbsp;
 
-## Training
-
-### Setting up environment
-
-You can set up the environment using conda:
-
-```bash
-# Set up the environment (installs the requirements):
-conda env create -f DrugGEN/environment.yml
-
-# Activate the environment:
-conda activate druggen
-```
-
-### Downloading input files
-
-Before training, you need to download the necessary datasets:
-
-```bash
-# Navigate to the data directory
-cd data
-
-# Download dataset files
-bash dataset_download.sh
-
-# Return to the project root
-cd ..
-```
-
-### Training the model
+<details>
+<summary><h2>Training</h2></summary>
 
 The default DrugGEN model can be trained with the following command:
 
@@ -285,7 +276,6 @@ Below is a comprehensive list of arguments that can be used to customize the tra
 | `--log_sample_step` | Step interval for sampling and evaluating molecules during training. | `1000` |
 | `--parallel` | Whether to parallelize training across multiple GPUs. | `False` |
 
-
 #### Reproducibility Arguments
 | Argument | Description | Default Value |
 |----------|-------------|---------------|
@@ -299,29 +289,13 @@ Below is a comprehensive list of arguments that can be used to customize the tra
 | `--online` | Whether to use wandb in online mode (sync results during training). | `True` |
 | `--exp_name` | Experiment name for wandb logging. | `druggen` |
 
+</details>
 
 &nbsp;
 &nbsp;
 
-## Molecule Generation Using Trained DrugGEN Models in the Inference Mode
-
-- If you want to generate molecules using pre-trained models, it is recommended to use [Hugging Face](https://huggingface.co/spaces/HUBioDataLab/DrugGEN). Alternatively,
-
-- First, download the weights of the chosen trained model from [trained models](https://drive.google.com/drive/folders/1biJLQeXCKqw4MzAYwOuJU6Aw5GIQlJMY), and place it in the folder: "DrugGEN/experiments/models/".
-- After that, please run the code below:
-
-
-```bash
-
-python DrugGEN/inference.py --submodel="{Chosen model name}" --inference_model="DrugGEN/experiments/models/{Chosen model name}"
-```
-
-- SMILES representation of the generated molecules will be saved into the file: "DrugGEN/experiments/inference/{Chosen model name}/denovo_molecules.txt".
-
-&nbsp;
-&nbsp;
-
-## Molecule Generation with Trained Models
+<details>
+<summary><h2>Molecule Generation with Trained Models</h2></summary>
 
 ### Using the Hugging Face Interface (Recommended)
 
@@ -345,25 +319,98 @@ For local generation, follow these steps:
 4. **Output location**:
    The generated molecules in SMILES format will be saved to:
    ```
-   experiments/inference/[MODEL_NAME]/denovo_molecules.txt
+   experiments/inference/[MODEL_NAME]/inference_drugs.csv
+   ```
+
+   During processing, the model also creates an intermediate file:
+   ```
+   experiments/inference/[MODEL_NAME]/inference_drugs.txt
    ```
 
 ### Inference Parameters
 
-You can customize the molecule generation process using the following parameters:
+The inference process can be customized with various arguments to control how molecules are generated and evaluated:
 
-```bash
-# Generate 100 molecules using the specified model with a batch size of 32
-python inference.py --submodel="DrugGEN" \
-                    --inference_model="experiments/models/DrugGEN" \
-                    --n_samples=100 \
-                    --batch_size=32
-```
+#### Required Arguments
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--submodel` | Model variant to use: `DrugGEN` (target-specific) or `NoTarget` | `DrugGEN` |
+| `--inference_model` | Path to the model weights file | Required |
+
+#### Generation Control
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--sample_num` | Number of molecules to generate | `100` |
+| `--inf_batch_size` | Batch size for inference | `1` |
+| `--disable_correction` | Flag to disable SMILES correction | `False` |
+
+#### Data Configuration
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--inf_dataset_file` | Dataset file for inference | `chembl45_test.pt` |
+| `--inf_smiles` | SMILES file for inference | `DrugGEN/data/chembl_test.smi` |
+| `--train_smiles` | SMILES file used for training the main model | `DrugGEN/data/chembl_train.smi` |
+| `--train_drug_smiles` | Target-specific SMILES file used for training | `DrugGEN/data/akt_train.smi` |
+| `--mol_data_dir` | Directory where datasets are stored | `DrugGEN/data` |
+| `--features` | Whether to use additional node features | `False` |
+
+#### Model Architecture
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--act` | Activation function | `relu` |
+| `--max_atom` | Maximum number of atoms in generated molecules | `45` |
+| `--dim` | Dimension of the Transformer Encoder model | `128` |
+| `--depth` | Depth of the Transformer model | `1` |
+| `--heads` | Number of attention heads | `8` |
+| `--mlp_ratio` | MLP ratio for the Transformer | `3` |
+| `--dropout` | Dropout rate | `0.0` |
+
+#### Reproducibility
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--set_seed` | Flag to set a fixed random seed | `False` |
+| `--seed` | Random seed value | `1` |
+
+### Output Files and Metrics
+
+The inference process generates several files:
+
+1. **Generated molecules**: 
+   ```
+   experiments/inference/[MODEL_NAME]/inference_drugs.csv
+   ```
+
+2. **Evaluation metrics**:
+   ```
+   experiments/inference/[MODEL_NAME]/inference_results.csv
+   ```
+
+The following metrics are reported to evaluate generated molecules:
+
+| Metric | Description |
+|--------|-------------|
+| **Validity** | Fraction of chemically valid molecules |
+| **Uniqueness** | Fraction of unique molecules in the generated set |
+| **Novelty** | Fraction of molecules not present in the training set (ChEMBL) |
+| **Novelty_test** | Fraction of molecules not present in the test set |
+| **AKT_novelty** | Fraction of molecules not present in the AKT inhibitors dataset |
+| **max_len** | Maximum length of generated SMILES strings |
+| **mean_atom_type** | Average number of different atom types per molecule |
+| **snn_chembl** | Similarity to nearest neighbor in ChEMBL dataset |
+| **snn_akt** | Similarity to nearest neighbor in AKT inhibitors dataset |
+| **IntDiv** | Internal diversity of generated molecules |
+| **QED** | Average Quantitative Estimate of Drug-likeness |
+| **SA** | Average Synthetic Accessibility score |
+
+*Note: Some metrics require the MOSES package for calculation.*
+
+</details>
 
 &nbsp;
 &nbsp;
 
-## Deep Learning-based Bioactivity Prediction
+<details>
+<summary><h2>Deep Learning-based Bioactivity Prediction</h2></summary>
 
 To evaluate the bioactivity of generated molecules against the AKT1 and CDK2 proteins, we utilize DEEPScreen, a deep learning-based virtual screening tool. Follow these steps to reproduce our bioactivity predictions:
 
@@ -399,20 +446,26 @@ DEEPScreen2.1/prediction_files/prediction_output/
 
 These results include bioactivity scores that indicate the likelihood of interaction between the generated molecules and the AKT1 target protein. Higher scores suggest stronger potential binding affinity.
 
+</details>
+
 &nbsp;
 &nbsp;
 
-## Results (De Novo Generated Molecules of DrugGEN Models)
+<details>
+<summary><h2>Results (De Novo Generated Molecules of DrugGEN Models)</h2></summary>
 
 The system is trained to design effective inhibitory molecules against the AKT1 protein, which has critical importance for developing treatments against various types of cancer. SMILES notations of the de novo generated molecules from DrugGEN models, along with their deep learning-based bioactivity predictions (DeepScreen), docking and MD analyses, and filtering outcomes, can be accessed under the [paper_results](paper_results) folder. The structural representations of the final selected molecules are depicted in the figure below.
 
 ![structures](assets/Selected_denovo_AKT1_inhibitors.png)
 **Fig. 2.** Promising de novo molecules to effectively target AKT1 protein (generated by DrugGEN model), selected via expert curation from the dataset of molecules with sufficiently low binding free energies (< -8 kcal/mol) in the molecular docking experiment.
 
+</details>
+
 &nbsp;
 &nbsp;
 
-## Updates
+<details>
+<summary><h2>Updates</h2></summary>
 
 - 26/07/2024: DrugGEN pre-print is updated for v1.5 release.
 - 04/06/2024: DrugGEN v1.5 is released.
@@ -420,10 +473,21 @@ The system is trained to design effective inhibitory molecules against the AKT1 
 - 15/02/2023: Our pre-print is shared [here](https://github.com/HUBioDataLab/DrugGEN/files/10828402/2302.07868.pdf).
 - 01/01/2023: DrugGEN v0.1 is released.
 
+</details>
+
 &nbsp;
 &nbsp;
 
 ## Citation
+```
+</details>
+
+&nbsp;
+&nbsp;
+
+<details>
+<summary><h2>Citation</h2></summary>
+
 ```bash
 @misc{nl2023target,
     doi = {10.48550/ARXIV.2302.07868},
@@ -438,11 +502,13 @@ The system is trained to design effective inhibitory molecules against the AKT1 
 
 Ünlü, A., Çevrim, E., Sarıgün, A., Yiğit, M.G., Çelikbilek, H., Bayram, O., Güvenilir, H.A., Koyaş, A., Kahraman, D.C., Olğaç, A., Rifaioğlu, A., Banoğlu, E., Doğan, T. (2023). Target Specific De Novo Design of Drug Candidate Molecules with Graph Transformer-based Generative Adversarial Networks. *arXiv preprint* arXiv:2302.07868.
 
+</details>
 
 &nbsp;
 &nbsp;
 
-## References/Resources
+<details>
+<summary><h2>References/Resources</h2></summary>
 
 In each file, we indicate whether a function or script is imported from another source. Here are some excellent sources from which we benefit from: 
 <!--ADD THE REFERENCES THAT WE USED DURING THE IMPLEMENTATION-->
@@ -453,10 +519,14 @@ In each file, we indicate whether a function or script is imported from another 
 
 Our initial project repository was [this one](https://github.com/asarigun/DrugGEN).
 
+</details>
+
 &nbsp;
 &nbsp;
 
-## License
+<details>
+<summary><h2>License</h2></summary>
+
 Copyright (C) 2024 HUBioDataLab
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
@@ -464,3 +534,5 @@ This program is free software: you can redistribute it and/or modify it under th
 This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License along with this program. If not, see http://www.gnu.org/licenses/.
+
+</details>
