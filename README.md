@@ -160,9 +160,7 @@ The target-specific dataset enables the model to learn the characteristics of mo
   - DrugBank database (known AKT-interacting drug molecules)
 - **Size**: [2,405 bioactive compounds](data/Filtered_AKT_inhibitors.csv)
 - **Filtering**: Molecules larger than 45 heavy atoms were excluded
-- **Purpose**: Guides the model to generate molecules with potential activity against AKT1
-
-
+- **Purpose**: Guides the model to generate molecules with potential activity against AKT1<br><br>
 
 - **Target**: Human CDK2 protein (CHEMBL301)
 - **Sources**: 
