@@ -60,7 +60,7 @@ Given a random molecule *z*, **the generator** *G* (below) creates annotation an
 <!-- |------------------------------------------------------------------------------------------------------------| -->
 <!-- | ![FirstGAN](assets/DrugGEN_generator.gif) | -->
 
- <img src="/assets/transformer_module.gif" width="60%" height="60%"/>  
+ <img src="/assets/druggen_transformer_module.gif" width="60%" height="60%"/>  
 
 &nbsp;
 &nbsp;
