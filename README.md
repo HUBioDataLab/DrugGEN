@@ -144,7 +144,7 @@ The DrugGEN model requires two types of data for training: general compound data
 
 The general compound dataset provides the model with knowledge about valid molecular structures and drug-like properties:
 
-- **Source**: [ChEMBL v29 compound dataset](data/dataset_download.sh)
+- **Source**: [ChEMBL v29 compound dataset](https://drive.google.com/file/d/1oyybQ4oXpzrme_n0kbwc0-CFjvTFSlBG/view?usp=drive_link)
 - **Size**: 1,588,865 stable organic molecules
 - **Composition**: Molecules with a maximum of 45 atoms
 - **Atom types**: C, O, N, F, Ca, K, Br, B, S, P, Cl, and As
