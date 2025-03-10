@@ -155,20 +155,20 @@ The general compound dataset provides the model with knowledge about valid molec
 The target-specific dataset enables the model to learn the characteristics of molecules that interact with the selected protein targets:
 
 - **Target**: Human AKT1 protein (CHEMBL4282)
-- **Sources**: 
-  - ChEMBL bioactivity database (potent inhibitors with pChEMBL ≥ 6, equivalent to IC50 ≤ 1 µM)
-  - DrugBank database (known AKT-interacting drug molecules)
-- **Size**: [2,405 bioactive compounds](https://drive.google.com/file/d/1B2OOim5wrUJalixeBTDKXLHY8BAIvNh-/view?usp=drive_link)
-- **Filtering**: Molecules larger than 45 heavy atoms were excluded
-- **Purpose**: Guides the model to generate molecules with potential activity against AKT1<br><br>
+  - **Sources**: 
+    - ChEMBL bioactivity database (potent inhibitors with pChEMBL ≥ 6, equivalent to IC50 ≤ 1 µM)
+    - DrugBank database (known AKT-interacting drug molecules)
+  - **Size**: [2,405 bioactive compounds](https://drive.google.com/file/d/1B2OOim5wrUJalixeBTDKXLHY8BAIvNh-/view?usp=drive_link)
+  - **Filtering**: Molecules larger than 45 heavy atoms were excluded
+  - **Purpose**: Guides the model to generate molecules with potential activity against AKT1<br><br>
 
 - **Target**: Human CDK2 protein (CHEMBL301)
-- **Sources**: 
-  - ChEMBL bioactivity database (potent inhibitors with pChEMBL ≥ 6, equivalent to IC50 ≤ 1 µM)
-  - DrugBank database (known CDK2-interacting drug molecules)
-- **Size**: [1,817 bioactive compounds](https://drive.google.com/file/d/1C0CGFKx0I2gdSfbIEgUO7q3K2S1P9ksT/view?usp=drive_link)
-- **Filtering**: Molecules larger than 45 heavy atoms were excluded
-- **Purpose**: Guides the model to generate molecules with potential activity against CDK2
+  - **Sources**: 
+    - ChEMBL bioactivity database (potent inhibitors with pChEMBL ≥ 6, equivalent to IC50 ≤ 1 µM)
+    - DrugBank database (known CDK2-interacting drug molecules)
+  - **Size**: [1,817 bioactive compounds](https://drive.google.com/file/d/1C0CGFKx0I2gdSfbIEgUO7q3K2S1P9ksT/view?usp=drive_link)
+  - **Filtering**: Molecules larger than 45 heavy atoms were excluded
+  - **Purpose**: Guides the model to generate molecules with potential activity against CDK2
 
 ### Data Processing
 
