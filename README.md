@@ -162,6 +162,14 @@ The target-specific dataset enables the model to learn the characteristics of mo
 - **Filtering**: Molecules larger than 45 heavy atoms were excluded
 - **Purpose**: Guides the model to generate molecules with potential activity against AKT1
 
+- **Target**: Human CDK2 protein (CHEMBL301)
+- **Sources**: 
+  - ChEMBL bioactivity database (potent inhibitors with pChEMBL ≥ 6, equivalent to IC50 ≤ 1 µM)
+  - DrugBank database (known CDK2-interacting drug molecules)
+- **Size**: [1,817 bioactive compounds](data/Filtered_AKT_inhibitors.csv)
+- **Filtering**: Molecules larger than 45 heavy atoms were excluded
+- **Purpose**: Guides the model to generate molecules with potential activity against CDK2
+
 ### Data Processing
 
 Both datasets undergo extensive preprocessing to convert SMILES strings into graph representations suitable for the model. This includes:
