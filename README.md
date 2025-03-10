@@ -527,7 +527,7 @@ Our initial project repository was [this one](https://github.com/asarigun/DrugGE
 &nbsp;
 &nbsp;
 
-<details>
+<details open>
 <summary><h2>License</h2></summary>
 
 Copyright (C) 2024 HUBioDataLab
