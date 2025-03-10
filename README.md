@@ -158,7 +158,7 @@ The target-specific dataset enables the model to learn the characteristics of mo
 - **Sources**: 
   - ChEMBL bioactivity database (potent inhibitors with pChEMBL ≥ 6, equivalent to IC50 ≤ 1 µM)
   - DrugBank database (known AKT-interacting drug molecules)
-- **Size**: [2,405 bioactive compounds](data/Filtered_AKT_inhibitors.csv)
+- **Size**: [2,405 bioactive compounds](https://drive.google.com/file/d/1B2OOim5wrUJalixeBTDKXLHY8BAIvNh-/view?usp=drive_link)
 - **Filtering**: Molecules larger than 45 heavy atoms were excluded
 - **Purpose**: Guides the model to generate molecules with potential activity against AKT1<br><br>
 
@@ -166,7 +166,7 @@ The target-specific dataset enables the model to learn the characteristics of mo
 - **Sources**: 
   - ChEMBL bioactivity database (potent inhibitors with pChEMBL ≥ 6, equivalent to IC50 ≤ 1 µM)
   - DrugBank database (known CDK2-interacting drug molecules)
-- **Size**: [1,817 bioactive compounds](data/Filtered_AKT_inhibitors.csv)
+- **Size**: [1,817 bioactive compounds](https://drive.google.com/file/d/11nT1aZLLvtkHv8NvbSa-ANYmv4YhTlWo/view?usp=drive_link)
 - **Filtering**: Molecules larger than 45 heavy atoms were excluded
 - **Purpose**: Guides the model to generate molecules with potential activity against CDK2
 
