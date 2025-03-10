@@ -152,7 +152,7 @@ The general compound dataset provides the model with knowledge about valid molec
 
 ### Bioactivity Data
 
-The target-specific dataset enables the model to learn the characteristics of molecules that interact with the selected protein target:
+The target-specific dataset enables the model to learn the characteristics of molecules that interact with the selected protein targets:
 
 - **Target**: Human AKT1 protein (CHEMBL4282)
 - **Sources**: 
@@ -161,6 +161,8 @@ The target-specific dataset enables the model to learn the characteristics of mo
 - **Size**: [2,405 bioactive compounds](data/Filtered_AKT_inhibitors.csv)
 - **Filtering**: Molecules larger than 45 heavy atoms were excluded
 - **Purpose**: Guides the model to generate molecules with potential activity against AKT1
+
+
 
 - **Target**: Human CDK2 protein (CHEMBL301)
 - **Sources**: 
