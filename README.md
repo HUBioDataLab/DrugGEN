@@ -454,7 +454,7 @@ These results include bioactivity scores that indicate the likelihood of interac
  <details open>
 <summary><h2>Results (De Novo Generated Molecules of DrugGEN Models)</h2></summary>
 
-The system is trained to design effective inhibitory molecules against the AKT1 protein, which has critical importance for developing treatments against various types of cancer. SMILES notations of the de novo generated molecules from DrugGEN models, along with their deep learning-based bioactivity predictions (DeepScreen), docking and MD analyses, and filtering outcomes, can be accessed under the [paper_results](paper_results) folder. The structural representations of the final selected molecules are depicted in the figure below.
+The system is trained to design effective inhibitory molecules against the AKT1 protein, which has critical importance for developing treatments against various types of cancer. SMILES notations of the de novo generated molecules from DrugGEN models, along with their deep learning-based bioactivity predictions (DeepScreen), docking and MD analyses, and filtering outcomes, can be accessed under the [results](results) folder. The structural representations of the final selected molecules are depicted in the figure below.
 
 <p float="center">
   <img src="assets/selectedmols.png" width="100%" />
