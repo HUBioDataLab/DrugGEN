@@ -115,7 +115,7 @@ Core implementation of the DrugGEN framework:
 - `inference/` - Molecules generated in inference mode
 - `results/` - Experimental results and analyses
 
-### Python scripts:
+### Scripts:
 - `train.py` - Main script for training the DrugGEN model
 - `inference.py` - Script for generating molecules using trained models
 - `environment.yml` - Conda environment specification
