@@ -165,14 +165,6 @@ For more details on dataset construction and preprocessing methodology, please r
 &nbsp;
 
 ## Getting Started
-DrugGEN has been implemented and tested on Ubuntu 20.04 with python >= 3.9. It supports both GPU and CPU inference.
-
-Clone the repo:
-```bash
-git clone https://github.com/HUBioDataLab/DrugGEN.git
-```
-
-## Getting Started
 
 ### System Requirements
 
@@ -193,19 +185,12 @@ git clone https://github.com/HUBioDataLab/DrugGEN.git
 
 2. **Set up the environment** (see [Training](#training) section for details):
    - Using conda: `conda env create -f environment.yml`
-   - Using pip: `pip install -r requirements.txt`
 
-3. **Download datasets** (optional, only if training):
+3. **Download datasets**:
    ```bash
    cd data
    bash dataset_download.sh
    cd ..
-   ```
-
-4. **Check installation**:
-   ```bash
-   # Verify that the environment is correctly set up
-   python -c "from src.model.models import Generator; print('Installation successful!')"
    ```
 
 Now you're ready to start using DrugGEN for molecule generation or model training. Refer to the subsequent sections for specific usage instructions.
