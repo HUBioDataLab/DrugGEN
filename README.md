@@ -158,7 +158,7 @@ The target-specific dataset enables the model to learn the characteristics of mo
   - **Sources**: 
     - ChEMBL bioactivity database (potent inhibitors with pChEMBL ≥ 6, equivalent to IC50 ≤ 1 µM)
     - DrugBank database (known AKT-interacting drug molecules)
-  - **Size**: [2,405 bioactive compounds](https://drive.google.com/file/d/1B2OOim5wrUJalixeBTDKXLHY8BAIvNh-/view?usp=drive_link)
+  - **Size**: [2,607 bioactive compounds](https://drive.google.com/file/d/1B2OOim5wrUJalixeBTDKXLHY8BAIvNh-/view?usp=drive_link)
   - **Filtering**: Molecules larger than 45 heavy atoms were excluded
   - **Purpose**: Guides the model to generate molecules with potential activity against AKT1<br><br>
 
