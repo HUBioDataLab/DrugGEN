@@ -38,7 +38,7 @@ Our up-to-date pre-print is shared [here](https://github.com/HUBioDataLab/DrugGE
   <img src="assets/DrugGEN_Figure.png" width="100%" />
 </p>
 
-**Fig. 1.** The schematic representation of the architecture of the DrugGEN model with powerful graph transformer encoder modules in both generator and discriminator networks. The generator module transforms the given input into a new molecular representation. The discriminator compares the generated de novo molecules to the known inhibitors of the given target protein, scoring them for their assignment to the classes of “real” and “fake” molecules (abbreviations; MLP: multi-layered perceptron, Norm: normalisation, Concat: concatenation, MatMul: matrix multiplication, ElementMul: element-wise multiplication, Mol. adj: molecule adjacency tensor, Mol. Anno: molecule annotation matrix, Upd: updated).
+**Fig. 1.** The schematic representation of the architecture of the DrugGEN model with powerful graph transformer encoder modules in both generator and discriminator networks. The generator module transforms the given input into a new molecular representation. The discriminator compares the generated de novo molecules to the known inhibitors of the given target protein, scoring them for their assignment to the classes of "real" and "fake" molecules (abbreviations; MLP: multi-layered perceptron, Norm: normalisation, Concat: concatenation, MatMul: matrix multiplication, ElementMul: element-wise multiplication, Mol. adj: molecule adjacency tensor, Mol. Anno: molecule annotation matrix, Upd: updated).
 
 &nbsp;
 &nbsp;
@@ -75,39 +75,89 @@ Given a random molecule *z*, **the generator** *G* (below) creates annotation an
 
 ## Files & Folders
 
-We provide the implementation of the DrugGEN, along with scripts from PyTorch Geometric framework to generate and run. The repository is organised as follows:
+The DrugGEN repository is organized as follows:
 
-```data``` contains: 
-- **Raw dataset files**, which should be text files containing SMILES strings only. Raw datasets preferably should not contain stereoisomeric SMILES to prevent Hydrogen atoms to be included in the final graph data. 
-- Constructed **graph datasets** (.pt) will be saved in this folder along with atom and bond encoder/decoder files (.pk).
+### `data/`
+- Contains raw dataset files and processed graph data for model training
+- `encoders/` - Contains encoder files for molecule representation
+- `decoders/` - Contains decoder files for molecule representation
+- Format of raw dataset files should be text files containing SMILES strings only
 
-```experiments``` contains: 
-- ```logs``` folder. Model loss and performance metrics will be saved in this directory in seperate files for each model. 
-- ```tboard_output``` folder. Tensorboard files will be saved here if TensorBoard is used.
-- ```models``` folder. Models will be saved in this directory at last or preferred steps. 
-- ```samples``` folder. Molecule samples will be saved in this folder.
-- ```inference``` folder. Molecules generated in inference mode will be saved in this folder.
+### `src/`
+Core implementation of the DrugGEN framework:
+- `data/` - Data processing utilities
+  - `dataset.py` - Handles dataset creation and loading
+  - `utils.py` - Data processing helper functions
+- `model/` - Model architecture components
+  - `models.py` - Implementation of Generator and Discriminator networks
+  - `layers.py` - Contains transformer encoder implementation
+  - `loss.py` - Loss functions for model training
+- `util/` - Utility functions
+  - `utils.py` - Performance metrics and helper functions
+  - `smiles_cor.py` - SMILES processing utilities
 
-**Python scripts:**
+### `assets/`
+- Graphics and figures used in documentation
+- Contains model architecture diagrams and visualization resources
+- Includes images of generated molecules and model animations
 
-- ```new_dataloader.py``` constructs the graph dataset from given raw data. Uses PyG based data classes.
-- - ```utils.py``` contains performance metrics from several other papers and some unique implementations. (De Cao et al, 2018; Polykovskiy et al., 2020)
-- ```layers.py``` contains **transformer encoder** implementation.  
-- ```models.py``` has the implementation of the **Generator** and **Discriminator**.  
-- ```train.py``` is the training file for the model. Workflow is constructed in this file.   
-- ```inference.py``` is the testing file for the model. Workflow is constructed in this file.   
+### `results/`
+- Contains evaluation results and generated molecules
+- `generated_molecules/` - Storage for molecules produced by the model
+- `docking/` - Results from molecular docking analyses
+- `evaluate.py` - Script for evaluating model performance
+
+### `experiments/`
+- Directory for storing experimental artifacts
+- `logs/` - Model training logs and performance metrics
+- `models/` - Saved model checkpoints and weights
+- `samples/` - Molecule samples generated during training
+- `inference/` - Molecules generated in inference mode
+- `results/` - Experimental results and analyses
+
+### Python scripts:
+- `train.py` - Main script for training the DrugGEN model
+- `inference.py` - Script for generating molecules using trained models
+- `environment.yml` - Conda environment specification
 
 &nbsp;
 &nbsp;
 
 ## Datasets
 
-Two different data types (i.e., compound, and bioactivity) were retrieved from various data sources to train our deep generative models.
-- **Compound data** includes atomic, physicochemical, and structural properties of real drug and drug candidate molecules. [ChEMBL v29 compound dataset](data/dataset_download.sh) was used for the GAN module. It consists of 1,588,865 stable organic molecules with a maximum of 45 atoms and containing  C, O, N, F, Ca, K, Br, B, S, P, Cl, and As heavy atoms. 
-- **Bioactivity data** of AKT target protein was retrieved from large-scale ChEMBL bioactivity database. It contains ligand interactions of human AKT1 (CHEMBL4282) protein with a pChEMBL value equal to or greater than 6 (IC50 <= 1 µM) as well as SMILES information of these ligands. The dataset was extended by including drug molecules from DrugBank database known to interact with human AKT proteins. Thus, a total of [2,405 bioactivity data](data/Filtered_AKT_inhibitors.csv) points were obtained for training the AKT-specific generative model, excluding molecules larger than 45 heavy atoms.
-<!-- To enhance the size of the bioactivity dataset, we also obtained two alternative versions by incorporating ligand interactions of protein members in non-specific serine/threonine kinase (STK) and kinase families. -->
+The DrugGEN model requires two types of data for training: general compound data and target-specific bioactivity data. Both datasets were carefully curated to ensure high-quality training.
 
-More details on the construction of datasets can be found in our paper referenced above.
+### Compound Data
+
+The general compound dataset provides the model with knowledge about valid molecular structures and drug-like properties:
+
+- **Source**: [ChEMBL v29 compound dataset](data/dataset_download.sh)
+- **Size**: 1,588,865 stable organic molecules
+- **Composition**: Molecules with a maximum of 45 atoms
+- **Atom types**: C, O, N, F, Ca, K, Br, B, S, P, Cl, and As
+- **Purpose**: Teaches the GAN module about valid chemical space and molecular structures
+
+### Bioactivity Data
+
+The target-specific dataset enables the model to learn the characteristics of molecules that interact with the selected protein target:
+
+- **Target**: Human AKT1 protein (CHEMBL4282)
+- **Sources**: 
+  - ChEMBL bioactivity database (potent inhibitors with pChEMBL ≥ 6, equivalent to IC50 ≤ 1 µM)
+  - DrugBank database (known AKT-interacting drug molecules)
+- **Size**: [2,405 bioactive compounds](data/Filtered_AKT_inhibitors.csv)
+- **Filtering**: Molecules larger than 45 heavy atoms were excluded
+- **Purpose**: Guides the model to generate molecules with potential activity against AKT1
+
+### Data Processing
+
+Both datasets undergo extensive preprocessing to convert SMILES strings into graph representations suitable for the model. This includes:
+- Conversion to molecular graphs
+- Feature extraction and normalization
+- Encoding of atom and bond types
+- Size standardization
+
+For more details on dataset construction and preprocessing methodology, please refer to our [paper](https://arxiv.org/abs/2302.07868).
 
 <!-- ADD SOME INFO HERE -->
 
@@ -122,6 +172,44 @@ Clone the repo:
 git clone https://github.com/HUBioDataLab/DrugGEN.git
 ```
 
+## Getting Started
+
+### System Requirements
+
+- **Operating System**: Ubuntu 20.04 or compatible Linux distribution
+- **Python**: Version 3.9 or higher
+- **Hardware**: 
+  - CPU: Supports CPU-only operation
+  - GPU: Recommended for faster training and inference (CUDA compatible)
+- **RAM**: Minimum 8GB, 16GB+ recommended for larger datasets
+
+### Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/HUBioDataLab/DrugGEN.git
+   cd DrugGEN
+   ```
+
+2. **Set up the environment** (see [Training](#training) section for details):
+   - Using conda: `conda env create -f environment.yml`
+   - Using pip: `pip install -r requirements.txt`
+
+3. **Download datasets** (optional, only if training):
+   ```bash
+   cd data
+   bash dataset_download.sh
+   cd ..
+   ```
+
+4. **Check installation**:
+   ```bash
+   # Verify that the environment is correctly set up
+   python -c "from src.model.models import Generator; print('Installation successful!')"
+   ```
+
+Now you're ready to start using DrugGEN for molecule generation or model training. Refer to the subsequent sections for specific usage instructions.
+
 &nbsp;
 &nbsp;
 
@@ -129,79 +217,103 @@ git clone https://github.com/HUBioDataLab/DrugGEN.git
 
 ### Setting up environment
 
-You can set up the environment using either conda or pip.
-
-Here is with conda:
+You can set up the environment using conda:
 
 ```bash
-# set up the environment (installs the requirements):
+# Set up the environment (installs the requirements):
+conda env create -f DrugGEN/environment.yml
 
-conda env create -f DrugGEN/dependencies.yml
-
-# activate the environment:
-
+# Activate the environment:
 conda activate druggen
 ```
 
-Here is with pip using virtual environment:
+### Downloading input files
+
+Before training, you need to download the necessary datasets:
 
 ```bash
-python -m venv DrugGEN/.venv
-./Druggen/.venv/bin/activate
-pip install -r DrugGEN/requirements.txt
-```
+# Navigate to the data directory
+cd data
 
+# Download dataset files
+bash dataset_download.sh
+
+# Return to the project root
+cd ..
+```
 
 ### Training the model
 
-```
-# Download input files:
-
-cd DrugGEN/data
-
-bash dataset_download.sh
-
-cd
-
-# Default DrugGEN model can be trained with the one-liner:
-
-python DrugGEN/train.py --submodel="DrugGEN" --raw_file="DrugGEN/data/chembl_train.smi" --dataset_file="chembl45_train.pt" --drug_raw_file="DrugGEN/data/akt_train.smi" --drug_dataset_file="drugs_train.pt" --max_atom=45
-```
-
-** Explanations of arguments can be found below:
+The default DrugGEN model can be trained with the following command:
 
 ```bash
-Model arguments:
-  --submodel           Choose the submodel for training
-  --act                Activation function for the model
-  --max_atom           Maximum atom number for molecules must be specified
-  --lambda_gp          Gradient penalty lambda multiplier
-  --dim                Dimension of the Transformer model
-  --depth              Depth of the Transformer model
-  --heads              Number of heads for the MultiHeadAttention module
-  --mlp_ratio          MLP ratio for the Transformers
-  --dropout            Dropout rate for the encoder
-Training arguments:
-  --batch_size         Batch size for the training
-  --epoch              Epoch number for Training
-  --g_lr               Learning rate for G
-  --d_lr               Learning rate for D
-  --beta1              Beta1 for Adam optimizer
-  --beta2              Beta2 for Adam optimizer
-  --resume             Whether to resume training
-  --resume_epoch       Resume training from this epoch
-  --resume_iter        Resume training from this step
-  --resume_directory   Load pretrained weights from this directory
-  --set_seed           Whether to set seed
-  --seed               Seed for reproducibility
-  --use_wandb          Whether to use wandb for logging
-  --online             Use wandb online
-  --exp_name           Name for the experiment
-Dataset arguments:      
-  --features           Additional node features (Boolean) (Please check new_dataloader.py Line 102)
+python train.py --submodel="DrugGEN" \
+                --raw_file="data/chembl_train.smi" \
+                --dataset_file="chembl45_train.pt" \
+                --drug_raw_file="data/akt_train.smi" \
+                --drug_dataset_file="drugs_train.pt" \
+                --max_atom=45
 ```
 
-<!--ADD HERE TRAINING COMMANDS WITH EXPLAINATIONS-->
+### Detailed Explanation of Arguments
+
+Below is a comprehensive list of arguments that can be used to customize the training process:
+
+#### Dataset Arguments
+| Argument | Description | Default Value |
+|----------|-------------|---------------|
+| `--raw_file` | SMILES containing text file for main dataset. Path to file. | `DrugGEN/data/chembl_train.smi` |
+| `--drug_raw_file` | SMILES containing text file for target-specific dataset (e.g., AKT inhibitors). | `DrugGEN/data/akt_train.smi` |
+| `--dataset_file` | Name for processed main dataset file to create or load. | `chembl45_train.pt` |
+| `--drug_dataset_file` | Name for processed target-specific dataset file to create or load. | `drugs_train.pt` |
+| `--mol_data_dir` | Directory where the dataset files are stored. | `DrugGEN/data` |
+| `--drug_data_dir` | Directory where the drug dataset files are stored. | `DrugGEN/data` |
+| `--features` | Whether to use additional node features (False uses atom types only). | `False` |
+
+#### Model Arguments
+| Argument | Description | Default Value |
+|----------|-------------|---------------|
+| `--submodel` | Model variant to train: `DrugGEN` (target-specific) or `NoTarget` (non-target-specific). | `DrugGEN` |
+| `--act` | Activation function for the model (`relu`, `tanh`, `leaky`, `sigmoid`). | `relu` |
+| `--max_atom` | Maximum number of atoms in generated molecules. This is critical as the model uses one-shot generation. | `45` |
+| `--dim` | Dimension of the Transformer Encoder model. Higher values increase model capacity but require more memory. | `128` |
+| `--depth` | Depth (number of layers) of the Transformer model in generator. Deeper models can learn more complex features. | `1` |
+| `--ddepth` | Depth of the Transformer model in discriminator. | `1` |
+| `--heads` | Number of attention heads in the MultiHeadAttention module. | `8` |
+| `--mlp_ratio` | MLP ratio for the Transformer, affects the feed-forward network size. | `3` |
+| `--dropout` | Dropout rate for the generator encoder to prevent overfitting. | `0.0` |
+| `--ddropout` | Dropout rate for the discriminator to prevent overfitting. | `0.0` |
+| `--lambda_gp` | Gradient penalty lambda multiplier for Wasserstein GAN training stability. | `10` |
+
+#### Training Arguments
+| Argument | Description | Default Value |
+|----------|-------------|---------------|
+| `--batch_size` | Number of molecules processed in each training batch. | `128` |
+| `--epoch` | Total number of training epochs. | `10` |
+| `--g_lr` | Learning rate for the Generator network. | `0.00001` |
+| `--d_lr` | Learning rate for the Discriminator network. | `0.00001` |
+| `--beta1` | Beta1 parameter for Adam optimizer, controls first moment decay. | `0.9` |
+| `--beta2` | Beta2 parameter for Adam optimizer, controls second moment decay. | `0.999` |
+| `--log_dir` | Directory to save training logs. | `DrugGEN/experiments/logs` |
+| `--sample_dir` | Directory to save molecule samples during training. | `DrugGEN/experiments/samples` |
+| `--model_save_dir` | Directory to save model checkpoints. | `DrugGEN/experiments/models` |
+| `--log_sample_step` | Step interval for sampling and evaluating molecules during training. | `1000` |
+| `--parallel` | Whether to parallelize training across multiple GPUs. | `False` |
+
+
+#### Reproducibility Arguments
+| Argument | Description | Default Value |
+|----------|-------------|---------------|
+| `--resume` | Whether to resume training from a checkpoint. | `False` |
+| `--resume_epoch` | Epoch number to resume training from. | `None` |
+| `--resume_iter` | Iteration step to resume training from. | `None` |
+| `--resume_directory` | Directory containing model weights to load. | `None` |
+| `--set_seed` | Whether to set a fixed random seed for reproducibility. | `False` |
+| `--seed` | The random seed value to use if `set_seed` is True. | `1` |
+| `--use_wandb` | Whether to use Weights & Biases for experiment tracking. | `False` |
+| `--online` | Whether to use wandb in online mode (sync results during training). | `True` |
+| `--exp_name` | Experiment name for wandb logging. | `druggen` |
+
 
 &nbsp;
 &nbsp;
@@ -224,22 +336,83 @@ python DrugGEN/inference.py --submodel="{Chosen model name}" --inference_model="
 &nbsp;
 &nbsp;
 
-## Deep Learning based Bioactivity Prediction 
+## Molecule Generation with Trained Models
 
-- If you want to re-produce bioactivity predictions of de novo molecules against AKT1 protein using DEEPScreen, first download the model from [this link](https://drive.google.com/file/d/1aG9oYspCsF9yG1gEGtFI_E2P4qlITqio/view?usp=drive_link).
+### Using the Hugging Face Interface (Recommended)
 
-- After that, unzip the compresssed file and follow the instrcutions below.
+For ease of use, we provide a [Hugging Face Space](https://huggingface.co/spaces/HUBioDataLab/DrugGEN) with a user-friendly interface for generating molecules using our pre-trained models.
 
+### Local Generation Using Pre-trained Models
+
+For local generation, follow these steps:
+
+1. **Download pre-trained model weights**:
+   Download the weights of your chosen model from our [model repository](https://drive.google.com/drive/folders/1biJLQeXCKqw4MzAYwOuJU6Aw5GIQlJMY)
+
+2. **Place the model weights** in the `experiments/models/` directory
+
+3. **Run inference**:
+   ```bash
+   python inference.py --submodel="[MODEL_NAME]" --inference_model="experiments/models/[MODEL_NAME]"
+   ```
+   Replace `[MODEL_NAME]` with the name of the specific model you downloaded.
+
+4. **Output location**:
+   The generated molecules in SMILES format will be saved to:
+   ```
+   experiments/inference/[MODEL_NAME]/denovo_molecules.txt
+   ```
+
+### Inference Parameters
+
+You can customize the molecule generation process using the following parameters:
 
 ```bash
+# Generate 100 molecules using the specified model with a batch size of 32
+python inference.py --submodel="DrugGEN" \
+                    --inference_model="experiments/models/DrugGEN" \
+                    --n_samples=100 \
+                    --batch_size=32
+```
 
+&nbsp;
+&nbsp;
+
+## Deep Learning-based Bioactivity Prediction
+
+To evaluate the bioactivity of generated molecules against the AKT1 and CDK2 proteins, we utilize DEEPScreen, a deep learning-based virtual screening tool. Follow these steps to reproduce our bioactivity predictions:
+
+### Setting up DEEPScreen
+
+1. **Download the DEEPScreen model**:
+   Download the pre-trained model from [this link](https://drive.google.com/file/d/1aG9oYspCsF9yG1gEGtFI_E2P4qlITqio/view?usp=drive_link)
+
+2. **Extract the model files**:
+   ```bash
+   # Extract the downloaded file
+   unzip DEEPScreen2.1.zip
+   ```
+
+### Running Predictions
+
+Execute the following commands to predict bioactivity of your generated molecules:
+
+```bash
+# Navigate to the DEEPScreen directory
 cd DEEPScreen2.1/chembl_31
 
+# Run prediction for AKT target
 python 8_Prediction.py AKT AKT
 ```
 
-- Results will be saved into "DEEPScreen2.1/prediction_files/prediction_output" folder.
+### Output
 
+Prediction results will be saved in the following location:
+```
+DEEPScreen2.1/prediction_files/prediction_output/
+```
+
+These results include bioactivity scores that indicate the likelihood of interaction between the generated molecules and the AKT1 target protein. Higher scores suggest stronger potential binding affinity.
 
 &nbsp;
 &nbsp;
