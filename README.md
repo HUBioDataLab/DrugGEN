@@ -17,7 +17,7 @@
 &nbsp;
 &nbsp;
 
-<details>
+ <details open>
 <summary><h2>Abstract</h2></summary>
 
 Discovering novel drug candidate molecules is one of the most fundamental and critical steps in drug development. Generative deep learning models, which create synthetic data given a probability distribution, offer a high potential for designing de novo molecules. However, for them to be useful in real-life drug development pipelines, these models should be able to design drug-like and target-centric molecules. In this study, we propose an end-to-end generative system, DrugGEN, for the de novo design of drug candidate molecules that interact with intended target proteins. The proposed method represents molecules as graphs and processes them via a generative adversarial network comprising graph transformer layers. The system is trained using a large dataset of drug-like compounds and target-specific bioactive molecules to design effective inhibitory molecules against the AKT1 protein, which has critical importance for developing treatments against various types of cancer. We conducted further analysis with molecular docking and dynamics to assess the target-centric generation performance of the model, and attention score visualisation for interpretability. Results indicate that our de novo molecules have a high potential for interacting with the AKT1 protein at the level of its native ligands. Using the open-access DrugGEN codebase, it is possible to easily train models for other druggable proteins, given a dataset of experimentally known bioactive molecules.
@@ -46,7 +46,7 @@ Our up-to-date pre-print is shared [here](https://github.com/HUBioDataLab/DrugGE
 &nbsp;
 &nbsp;
 
-<details>
+ <details open>
 <summary><h2>Transformer Module</h2></summary>
 
 Given a random molecule *z*, **the generator** *G* (below) creates annotation and adjacency matrices of a supposed molecule. *G* processes the input by passing it through a multi-layer perceptron (MLP). The input is then fed to the graph transformer encoder module [Vaswani et al., (2017)](https://arxiv.org/abs/1706.03762), which has a depth of 1 encoder layers with 8 multi-head attention heads for each. In the graph transformer setting, *Q*, *K* and *V* are the variables representing the annotation matrix of the molecule. After the final products are created in the attention mechanism, both the annotation and adjacency matrices are forwarded to layer normalization and then summed with the initial matrices to create a residual connection. These matrices are fed to separate feedforward layers, and finally, given to the discriminator network *D* together with real molecules.
@@ -71,7 +71,7 @@ Given a random molecule *z*, **the generator** *G* (below) creates annotation an
 &nbsp;
 &nbsp;
 
-<details>
+ <details open>
 <summary><h2>Model Variations</h2></summary>
 
 - **DrugGEN** is the default model. The input of the generator is the real molecules (ChEMBL) dataset (to ease the learning process) and the discriminator compares the generated molecules with the real inhibitors of the given target protein.
@@ -82,7 +82,7 @@ Given a random molecule *z*, **the generator** *G* (below) creates annotation an
 &nbsp;
 &nbsp;
 
-<details>
+ <details open>
 <summary><h2>Files & Folders</h2></summary>
 
 The DrugGEN repository is organized as follows:
@@ -135,7 +135,7 @@ Core implementation of the DrugGEN framework:
 &nbsp;
 &nbsp;
 
-<details>
+ <details open>
 <summary><h2>Datasets</h2></summary>
 
 The DrugGEN model requires two types of data for training: general compound data and target-specific bioactivity data. Both datasets were carefully curated to ensure high-quality training.
@@ -177,7 +177,7 @@ For more details on dataset construction and preprocessing methodology, please r
 &nbsp;
 &nbsp;
 
-<details>
+ <details open>
 <summary><h2>Getting Started</h2></summary>
 
 ### System Requirements
@@ -217,7 +217,7 @@ Now you're ready to start using DrugGEN for molecule generation or model trainin
 &nbsp;
 &nbsp;
 
-<details>
+ <details open>
 <summary><h2>Training</h2></summary>
 
 The default DrugGEN model can be trained with the following command:
@@ -294,7 +294,7 @@ Below is a comprehensive list of arguments that can be used to customize the tra
 &nbsp;
 &nbsp;
 
-<details>
+ <details open>
 <summary><h2>Molecule Generation with Trained Models</h2></summary>
 
 ### Using the Hugging Face Interface (Recommended)
@@ -409,7 +409,7 @@ The following metrics are reported to evaluate generated molecules:
 &nbsp;
 &nbsp;
 
-<details>
+ <details open>
 <summary><h2>Deep Learning-based Bioactivity Prediction</h2></summary>
 
 To evaluate the bioactivity of generated molecules against the AKT1 and CDK2 proteins, we utilize DEEPScreen, a deep learning-based virtual screening tool. Follow these steps to reproduce our bioactivity predictions:
@@ -451,7 +451,7 @@ These results include bioactivity scores that indicate the likelihood of interac
 &nbsp;
 &nbsp;
 
-<details>
+ <details open>
 <summary><h2>Results (De Novo Generated Molecules of DrugGEN Models)</h2></summary>
 
 The system is trained to design effective inhibitory molecules against the AKT1 protein, which has critical importance for developing treatments against various types of cancer. SMILES notations of the de novo generated molecules from DrugGEN models, along with their deep learning-based bioactivity predictions (DeepScreen), docking and MD analyses, and filtering outcomes, can be accessed under the [paper_results](paper_results) folder. The structural representations of the final selected molecules are depicted in the figure below.
@@ -467,7 +467,7 @@ The system is trained to design effective inhibitory molecules against the AKT1 
 &nbsp;
 &nbsp;
 
-<details>
+ <details open>
 <summary><h2>Updates</h2></summary>
 
 - 26/07/2024: DrugGEN pre-print is updated for v1.5 release.
@@ -488,7 +488,7 @@ The system is trained to design effective inhibitory molecules against the AKT1 
 &nbsp;
 &nbsp;
 
-<details>
+ <details open>
 <summary><h2>Citation</h2></summary>
 
 ```bash
@@ -510,7 +510,7 @@ The system is trained to design effective inhibitory molecules against the AKT1 
 &nbsp;
 &nbsp;
 
-<details>
+ <details open>
 <summary><h2>References/Resources</h2></summary>
 
 In each file, we indicate whether a function or script is imported from another source. Here are some excellent sources from which we benefit from: 
