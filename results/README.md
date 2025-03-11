@@ -12,7 +12,7 @@ This script takes three arguments:
 - `output`: The output file where the computed metrics will be saved.
 
 ```bash
-python evaluate.py --gen_smiles "[SMILES FILE]" --ref_smiles_1 "[TRAINING SET FILE]" --ref_smiles_2" [TEST SET FILE]" --output "[PERFORMANCE RESULTS FILE]
+python evaluate.py --gen_smiles "[SMILES FILE]" --ref_smiles_1 "[TRAINING SET FILE]" --ref_smiles_2 "[TEST SET FILE]" --output "[PERFORMANCE RESULTS FILE]"
 ```
 
 The script calculates the following metrics:
