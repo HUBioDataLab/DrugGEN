@@ -198,17 +198,25 @@ For more details on dataset construction and preprocessing methodology, please r
    ```
 
 2. **Set up and activate the environment**:
-  ```bash
-   conda env create -f DrugGEN/environment.yml
+   ```bash
+   conda env create -f environment.yml
    conda activate druggen
    ```
 
-3. **Download datasets**:
+3. **Run the setup script**:
    ```bash
-   cd data
-   bash dataset_download.sh
-   cd ..
+   bash setup.sh
    ```
+   
+   This script will:
+   - Download all necessary resources from our Google Drive repository
+   - Install the `gdown` package if needed for Google Drive access
+   - Create required directories if they don't exist
+   - Organize downloaded files in their appropriate locations:
+     - Dataset files and SMILES files → `data/`
+     - Encoder/decoder files → `data/encoders/` and `data/decoders/`
+     - Model weights → `experiments/models/`
+     - SMILES correction files → `data/`
 
 Now you're ready to start using DrugGEN for molecule generation or model training. Refer to the subsequent sections for specific usage instructions.
 
@@ -476,13 +484,6 @@ The system is trained to design effective inhibitory molecules against the AKT1 
 - 15/02/2023: Our pre-print is shared [here](https://github.com/HUBioDataLab/DrugGEN/files/10828402/2302.07868.pdf).
 - 01/01/2023: DrugGEN v0.1 is released.
 
-</details>
-
-&nbsp;
-&nbsp;
-
-## Citation
-```
 </details>
 
 &nbsp;
