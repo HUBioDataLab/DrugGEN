@@ -128,6 +128,7 @@ Core implementation of the DrugGEN framework:
 ### Scripts:
 - `train.py` - Main script for training the DrugGEN model
 - `inference.py` - Script for generating molecules using trained models
+- `setup.sh` - Script for downloading and setting up required resources
 - `environment.yml` - Conda environment specification
 
 </details>
@@ -218,7 +219,6 @@ For more details on dataset construction and preprocessing methodology, please r
    
    This script will:
    - Download all necessary resources from our Google Drive repository
-   - Install the `gdown` package if needed for Google Drive access
    - Create required directories if they don't exist
    - Organize downloaded files in their appropriate locations:
      - Dataset files and SMILES files → `data/`
@@ -300,14 +300,14 @@ Below is a comprehensive list of arguments that can be used to customize the tra
 | `--submodel` | Model variant to train: `DrugGEN` (target-specific) or `NoTarget` (non-target-specific). | `DrugGEN` |
 | `--act` | Activation function for the model (`relu`, `tanh`, `leaky`, `sigmoid`). | `relu` |
 | `--max_atom` | Maximum number of atoms in generated molecules. This is critical as the model uses one-shot generation. | `45` |
-| `--dim` | Dimension of the Transformer Encoder model. Higher values increase model capacity but require more memory. | `128` |
-| `--depth` | Depth (number of layers) of the Transformer model in generator. Deeper models can learn more complex features. | `1` |
+| `--dim` | Dimension of the Transformer Encoder model.| `128` |
+| `--depth` | Depth (number of layers) of the Transformer model in generator.| `1` |
 | `--ddepth` | Depth of the Transformer model in discriminator. | `1` |
 | `--heads` | Number of attention heads in the MultiHeadAttention module. | `8` |
 | `--mlp_ratio` | MLP ratio for the Transformer, affects the feed-forward network size. | `3` |
-| `--dropout` | Dropout rate for the generator encoder to prevent overfitting. | `0.0` |
-| `--ddropout` | Dropout rate for the discriminator to prevent overfitting. | `0.0` |
-| `--lambda_gp` | Gradient penalty lambda multiplier for Wasserstein GAN training stability. | `10` |
+| `--dropout` | Dropout rate for the generator encoder. | `0.0` |
+| `--ddropout` | Dropout rate for the discriminator. | `0.0` |
+| `--lambda_gp` | Gradient penalty lambda multiplier for WGAN-GP training. | `10` |
 
 #### Training Arguments
 | Argument | Description | Default Value |
@@ -316,8 +316,8 @@ Below is a comprehensive list of arguments that can be used to customize the tra
 | `--epoch` | Total number of training epochs. | `10` |
 | `--g_lr` | Learning rate for the Generator network. | `0.00001` |
 | `--d_lr` | Learning rate for the Discriminator network. | `0.00001` |
-| `--beta1` | Beta1 parameter for Adam optimizer, controls first moment decay. | `0.9` |
-| `--beta2` | Beta2 parameter for Adam optimizer, controls second moment decay. | `0.999` |
+| `--beta1` | Beta1 parameter for Adam optimizer. | `0.9` |
+| `--beta2` | Beta2 parameter for Adam optimizer. | `0.999` |
 | `--log_dir` | Directory to save training logs. | `experiments/logs` |
 | `--sample_dir` | Directory to save molecule samples during training. | `experiments/samples` |
 | `--model_save_dir` | Directory to save model checkpoints. | `experiments/models` |
@@ -360,7 +360,7 @@ python inference.py --submodel="[MODEL_TYPE]" \
                     --inference_model="experiments/models/[MODEL_NAME]" \
                     --inf_smiles="data/[TEST_DATASET].smi" \
                     --train_smiles="data/[TRAIN_DATASET].smi" \
-                    --train_drug_smiles="data/[TARGET_DATASET].smi" \
+                    --train_drug_smiles="data/[TRAIN_TARGET_DATASET].smi" \
                     --sample_num=[NUMBER_OF_MOLECULES] \
                     --max_atom=[MAX_ATOM_NUM]
 ```
@@ -373,7 +373,7 @@ To generate molecules targeting AKT1 using a pre-trained model:
 
 ```bash
 python inference.py --submodel="DrugGEN" \
-                    --inference_model="experiments/models/DrugGEN-akt1/DrugGEN-G.ckpt" \
+                    --inference_model="experiments/models/DrugGEN-akt1" \
                     --inf_smiles="data/chembl_test.smi" \
                     --train_smiles="data/chembl_train.smi" \
                     --train_drug_smiles="data/akt_train.smi" \
@@ -387,7 +387,7 @@ To generate molecules targeting CDK2 using a pre-trained model:
 
 ```bash
 python inference.py --submodel="DrugGEN" \
-                    --inference_model="experiments/models/DrugGEN-cdk2/DrugGEN-G.ckpt" \
+                    --inference_model="experiments/models/DrugGEN-cdk2" \
                     --inf_smiles="data/chembl_test.smi" \
                     --train_smiles="data/chembl_train.smi" \
                     --train_drug_smiles="data/cdk2_train.smi" \
@@ -401,7 +401,7 @@ To generate general drug-like molecules without target specificity:
 
 ```bash
 python inference.py --submodel="NoTarget" \
-                    --inference_model="experiments/models/NoTarget/NoTarget-G.ckpt" \
+                    --inference_model="experiments/models/NoTarget" \
                     --inf_smiles="data/chembl_test.smi" \
                     --train_smiles="data/chembl_train.smi" \
                     --train_drug_smiles="data/akt_train.smi" \
@@ -485,16 +485,14 @@ The following metrics are reported to evaluate generated molecules:
 | **Uniqueness** | Fraction of unique molecules in the generated set |
 | **Novelty** | Fraction of molecules not present in the training set (ChEMBL) |
 | **Novelty_test** | Fraction of molecules not present in the test set |
-| **AKT_novelty** | Fraction of molecules not present in the AKT inhibitors dataset |
+| **Drug_novelty** | Fraction of molecules not present in the target inhibitors dataset |
 | **max_len** | Maximum length of generated SMILES strings |
 | **mean_atom_type** | Average number of different atom types per molecule |
 | **snn_chembl** | Similarity to nearest neighbor in ChEMBL dataset |
-| **snn_akt** | Similarity to nearest neighbor in AKT inhibitors dataset |
+| **snn_drug** | Similarity to nearest neighbor in target inhibitors dataset |
 | **IntDiv** | Internal diversity of generated molecules |
 | **QED** | Average Quantitative Estimate of Drug-likeness |
 | **SA** | Average Synthetic Accessibility score |
-
-*Note: Some metrics require the MOSES package for calculation.*
 
 </details>
 
