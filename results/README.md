@@ -5,7 +5,7 @@
 
 ## Evaluation Script
 
-This script takes three arguments:
+This script takes four arguments:
 - `gen_smiles`: A list of SMILES strings representing the de novo generated molecules. Molecules should be found under a column named "SMILES".
 - `ref_smiles_1`: A list of SMILES strings representing the reference molecules for novelty calculation. (e.g. ChEMBL molecules)
 - `ref_smiles_2`(optional): A list of SMILES strings representing the reference molecules for novelty calculation. (e.g. selected inhibitors)
