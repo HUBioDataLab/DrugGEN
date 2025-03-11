@@ -500,10 +500,10 @@ To evaluate the bioactivity of generated molecules against the AKT1 and CDK2 pro
    Download the pre-trained model from [this link](https://drive.google.com/file/d/1aG9oYspCsF9yG1gEGtFI_E2P4qlITqio/view?usp=drive_link)
 
 2. **Extract the model files**:
-   ```bash
-   # Extract the downloaded file
-   unzip DEEPScreen2.1.zip
-   ```
+```bash
+# Extract the downloaded file
+unzip DEEPScreen2.1.zip
+```
 
 ### Running Predictions
 
