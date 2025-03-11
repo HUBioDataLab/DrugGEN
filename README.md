@@ -228,9 +228,13 @@ Now you're ready to start using DrugGEN for molecule generation or model trainin
  <details open>
 <summary><h2>Training</h2></summary>
 
-### Generic Training Example
+### Training Examples
 
-The generic command for training a DrugGEN model is:
+<table>
+<tr>
+<td>
+<details open>
+<summary><b>Generic Example</b></summary>
 
 ```bash
 python train.py --submodel="[MODEL_TYPE]" \
@@ -238,12 +242,14 @@ python train.py --submodel="[MODEL_TYPE]" \
                 --drug_raw_file="data/[TARGET_DATASET].smi" \
                 --max_atom=[MAX_ATOM_NUM]
 ```
+</details>
+</td>
+</tr>
 
-### Target-Specific Training Examples
-
-#### AKT1 Model Training
-
-To train a model specifically for generating potential AKT1 inhibitors:
+<tr>
+<td>
+<details>
+<summary><b>AKT1 Model</b></summary>
 
 ```bash
 python train.py --submodel="DrugGEN" \
@@ -251,10 +257,14 @@ python train.py --submodel="DrugGEN" \
                 --drug_raw_file="data/akt_train.smi" \
                 --max_atom=45
 ```
+</details>
+</td>
+</tr>
 
-#### CDK2 Model Training
-
-To train a model specifically for generating potential CDK2 inhibitors:
+<tr>
+<td>
+<details>
+<summary><b>CDK2 Model</b></summary>
 
 ```bash
 python train.py --submodel="DrugGEN" \
@@ -262,10 +272,14 @@ python train.py --submodel="DrugGEN" \
                 --drug_raw_file="data/cdk2_train.smi" \
                 --max_atom=38
 ```
+</details>
+</td>
+</tr>
 
-### Training Without Target Specificity
-
-To train a general molecule generator without target specificity:
+<tr>
+<td>
+<details>
+<summary><b>NoTarget Model</b></summary>
 
 ```bash
 python train.py --submodel="NoTarget" \
@@ -273,50 +287,68 @@ python train.py --submodel="NoTarget" \
                 --max_atom=45
 ```
 
+</details>
+</td>
+</tr>
+</table>
+
 ### Detailed Explanation of Arguments
 
 Below is a comprehensive list of arguments that can be used to customize the training process:
 
-#### Dataset Arguments
+<details>
+<summary><b>Dataset Arguments</b> (click to expand)</summary>
+
 | Argument | Description | Default Value |
 |----------|-------------|---------------|
 | `--raw_file` | SMILES containing text file for main dataset. Path to file. | Required |
-| `--drug_raw_file` | SMILES containing text file for target-specific dataset (e.g., AKT inhibitors). Required for DrugGEN model, optional for NoTarget model. | Required for DrugGEN models |
+| `--drug_raw_file` | SMILES containing text file for target-specific dataset (e.g., AKT inhibitors). Required for DrugGEN model, optional for NoTarget model. | Required for DrugGEN |
 | `--mol_data_dir` | Directory where the dataset files are stored. | `data` |
 | `--drug_data_dir` | Directory where the drug dataset files are stored. | `data` |
 | `--features` | Whether to use additional node features (False uses atom types only). | `False` |
 
-#### Model Arguments
+**Note**: The processed dataset files are automatically generated from the raw file names by changing their extension from `.smi` to `.pt` and adding the maximum atom number to the filename. For example, if `chembl_train.smi` is used with `max_atom=45`, the processed dataset will be named `chembl_train45.pt`.
+</details>
+
+<details>
+<summary><b>Model Arguments</b> (click to expand)</summary>
+
 | Argument | Description | Default Value |
 |----------|-------------|---------------|
 | `--submodel` | Model variant to train: `DrugGEN` (target-specific) or `NoTarget` (non-target-specific). | `DrugGEN` |
 | `--act` | Activation function for the model (`relu`, `tanh`, `leaky`, `sigmoid`). | `relu` |
 | `--max_atom` | Maximum number of atoms in generated molecules. This is critical as the model uses one-shot generation. | `45` |
-| `--dim` | Dimension of the Transformer Encoder model.| `128` |
-| `--depth` | Depth (number of layers) of the Transformer model in generator.| `1` |
+| `--dim` | Dimension of the Transformer Encoder model. Higher values increase model capacity but require more memory. | `128` |
+| `--depth` | Depth (number of layers) of the Transformer model in generator. Deeper models can learn more complex features. | `1` |
 | `--ddepth` | Depth of the Transformer model in discriminator. | `1` |
 | `--heads` | Number of attention heads in the MultiHeadAttention module. | `8` |
 | `--mlp_ratio` | MLP ratio for the Transformer, affects the feed-forward network size. | `3` |
-| `--dropout` | Dropout rate for the generator encoder. | `0.0` |
-| `--ddropout` | Dropout rate for the discriminator. | `0.0` |
-| `--lambda_gp` | Gradient penalty lambda multiplier for WGAN-GP training. | `10` |
+| `--dropout` | Dropout rate for the generator encoder to prevent overfitting. | `0.0` |
+| `--ddropout` | Dropout rate for the discriminator to prevent overfitting. | `0.0` |
+| `--lambda_gp` | Gradient penalty lambda multiplier for Wasserstein GAN training stability. | `10` |
+</details>
 
-#### Training Arguments
+<details>
+<summary><b>Training Arguments</b> (click to expand)</summary>
+
 | Argument | Description | Default Value |
 |----------|-------------|---------------|
 | `--batch_size` | Number of molecules processed in each training batch. | `128` |
 | `--epoch` | Total number of training epochs. | `10` |
 | `--g_lr` | Learning rate for the Generator network. | `0.00001` |
 | `--d_lr` | Learning rate for the Discriminator network. | `0.00001` |
-| `--beta1` | Beta1 parameter for Adam optimizer. | `0.9` |
-| `--beta2` | Beta2 parameter for Adam optimizer. | `0.999` |
+| `--beta1` | Beta1 parameter for Adam optimizer, controls first moment decay. | `0.9` |
+| `--beta2` | Beta2 parameter for Adam optimizer, controls second moment decay. | `0.999` |
 | `--log_dir` | Directory to save training logs. | `experiments/logs` |
 | `--sample_dir` | Directory to save molecule samples during training. | `experiments/samples` |
 | `--model_save_dir` | Directory to save model checkpoints. | `experiments/models` |
 | `--log_sample_step` | Step interval for sampling and evaluating molecules during training. | `1000` |
 | `--parallel` | Whether to parallelize training across multiple GPUs. | `False` |
+</details>
 
-#### Reproducibility Arguments
+<details>
+<summary><b>Reproducibility Arguments</b> (click to expand)</summary>
+
 | Argument | Description | Default Value |
 |----------|-------------|---------------|
 | `--resume` | Whether to resume training from a checkpoint. | `False` |
@@ -328,12 +360,12 @@ Below is a comprehensive list of arguments that can be used to customize the tra
 | `--use_wandb` | Whether to use Weights & Biases for experiment tracking. | `False` |
 | `--online` | Whether to use wandb in online mode (sync results during training). | `True` |
 | `--exp_name` | Experiment name for wandb logging. | `druggen` |
-
 </details>
+
 
 &nbsp;
 
- <details open>
+<details open>
 <summary><h2>Molecule Generation with Trained Models</h2></summary>
 
 ### Using the Hugging Face Interface (Recommended)
@@ -342,25 +374,31 @@ For ease of use, we provide a [Hugging Face Space](https://huggingface.co/spaces
 
 ### Local Generation Using Pre-trained Models
 
-#### Generic Inference Command
+#### Inference Examples
 
-For local generation, the generic command is:
+<table>
+<tr>
+<td>
+<details open>
+<summary><b>Generic Example</b></summary>
 
 ```bash
 python inference.py --submodel="[MODEL_TYPE]" \
                     --inference_model="experiments/models/[MODEL_NAME]" \
                     --inf_smiles="data/[TEST_DATASET].smi" \
                     --train_smiles="data/[TRAIN_DATASET].smi" \
-                    --train_drug_smiles="data/[TRAIN_TARGET_DATASET].smi" \
+                    --train_drug_smiles="data/[TARGET_DATASET].smi" \
                     --sample_num=[NUMBER_OF_MOLECULES] \
                     --max_atom=[MAX_ATOM_NUM]
 ```
+</details>
+</td>
+</tr>
 
-#### Target-Specific Inference Examples
-
-##### AKT1 Model Inference
-
-To generate molecules targeting AKT1 using a pre-trained model:
+<tr>
+<td>
+<details>
+<summary><b>AKT1 Model</b></summary>
 
 ```bash
 python inference.py --submodel="DrugGEN" \
@@ -371,10 +409,14 @@ python inference.py --submodel="DrugGEN" \
                     --sample_num=1000 \
                     --max_atom=45
 ```
+</details>
+</td>
+</tr>
 
-##### CDK2 Model Inference
-
-To generate molecules targeting CDK2 using a pre-trained model:
+<tr>
+<td>
+<details>
+<summary><b>CDK2 Model</b></summary>
 
 ```bash
 python inference.py --submodel="DrugGEN" \
@@ -385,10 +427,14 @@ python inference.py --submodel="DrugGEN" \
                     --sample_num=1000 \
                     --max_atom=38
 ```
+</details>
+</td>
+</tr>
 
-##### No-Target Model Inference
-
-To generate general drug-like molecules without target specificity:
+<tr>
+<td>
+<details>
+<summary><b>NoTarget Model</b></summary>
 
 ```bash
 python inference.py --submodel="NoTarget" \
@@ -399,6 +445,10 @@ python inference.py --submodel="NoTarget" \
                     --sample_num=1000 \
                     --max_atom=45
 ```
+</details>
+</td>
+</tr>
+</table>
 
 #### Output location:
    The generated molecules in SMILES format will be saved to:
@@ -415,7 +465,9 @@ python inference.py --submodel="NoTarget" \
 
 The inference process can be customized with various arguments to control how molecules are generated and evaluated:
 
-#### Required Arguments
+<details>
+<summary><b>Required Arguments</b> (click to expand)</summary>
+
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `--submodel` | Model variant to use: `DrugGEN` (target-specific) or `NoTarget` | `DrugGEN` |
@@ -423,21 +475,32 @@ The inference process can be customized with various arguments to control how mo
 | `--inf_smiles` | SMILES file for inference | Required |
 | `--train_smiles` | SMILES file used for training the main model | Required |
 | `--train_drug_smiles` | Target-specific SMILES file used for training | Required |
+</details>
 
-#### Generation Control
+<details>
+<summary><b>Generation Control</b> (click to expand)</summary>
+
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `--sample_num` | Number of molecules to generate | `100` |
 | `--inf_batch_size` | Batch size for inference | `1` |
 | `--disable_correction` | Flag to disable SMILES correction | `False` |
+</details>
 
-#### Data Arguments
+<details>
+<summary><b>Data Arguments</b> (click to expand)</summary>
+
 | Argument | Description | Default Value |
 |----------|-------------|---------------|
 | `--mol_data_dir` | Directory where datasets are stored | `data` |
 | `--features` | Whether to use additional node features | `False` |
 
-#### Model Architecture
+**Note**: The processed dataset file for inference is automatically generated from the raw file name by changing its extension from `.smi` to `.pt` and adding the maximum atom number to the filename. For example, if `chembl_test.smi` is used with `max_atom=45`, the processed dataset will be named `chembl_test45.pt`.
+</details>
+
+<details>
+<summary><b>Model Architecture</b> (click to expand)</summary>
+
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `--act` | Activation function | `relu` |
@@ -447,14 +510,19 @@ The inference process can be customized with various arguments to control how mo
 | `--heads` | Number of attention heads | `8` |
 | `--mlp_ratio` | MLP ratio for the Transformer | `3` |
 | `--dropout` | Dropout rate | `0.0` |
+</details>
 
-#### Reproducibility
+<details>
+<summary><b>Reproducibility</b> (click to expand)</summary>
+
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `--set_seed` | Flag to set a fixed random seed | `False` |
 | `--seed` | Random seed value | `1` |
+</details>
 
-### Output Files and Metrics
+<details>
+<summary><b>Output Files and Metrics</b> (click to expand)</summary>
 
 The inference process generates several files:
 
@@ -484,6 +552,7 @@ The following metrics are reported to evaluate generated molecules:
 | **IntDiv** | Internal diversity of generated molecules |
 | **QED** | Average Quantitative Estimate of Drug-likeness |
 | **SA** | Average Synthetic Accessibility score |
+</details>
 
 </details>
 
