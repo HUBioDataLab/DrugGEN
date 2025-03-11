@@ -11,6 +11,10 @@ This script takes three arguments:
 - `ref_smiles_2`(optional): A list of SMILES strings representing the reference molecules for novelty calculation. (e.g. selected inhibitors)
 - `output`: The output file where the computed metrics will be saved.
 
+```bash
+python evaluate.py --gen_smiles "[SMILES FILE]" --ref_smiles_1 "[TRAINING SET FILE]" --ref_smiles_2" [TEST SET FILE]" --output "[PERFORMANCE RESULTS FILE]
+```
+
 The script calculates the following metrics:
 - Validity: The fraction of valid molecules in the generated set.
 - Uniqueness: The fraction of unique molecules in the generated set.
