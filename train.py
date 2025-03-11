@@ -3,6 +3,7 @@ import time
 import random
 import pickle
 import argparse
+import os.path as osp
 
 import torch
 import torch.utils.data
@@ -47,18 +48,27 @@ class Train(object):
         self.raw_file = config.raw_file  # SMILES containing text file for dataset. 
                                          # Write the full path to file.
         self.drug_raw_file = config.drug_raw_file  # SMILES containing text file for second dataset. 
-                                                   # Write the full path to file.       
-        self.dataset_file = config.dataset_file    # Dataset file name for the GAN. 
-                                                   # Contains large number of molecules.
-        self.drugs_dataset_file = config.drug_dataset_file  # Drug dataset file name for the second GAN. 
-                                                            # Contains drug molecules only. (In this case AKT1 inhibitors.)
+                                                   # Write the full path to file.
+        
+        # Automatically infer dataset file names from raw file names
+        raw_file_basename = osp.basename(self.raw_file)
+        drug_raw_file_basename = osp.basename(self.drug_raw_file)
+        
+        # Get the base name without extension and add max_atom to it
+        self.max_atom = config.max_atom  # Model is based on one-shot generation.
+        raw_file_base = os.path.splitext(raw_file_basename)[0]
+        drug_raw_file_base = os.path.splitext(drug_raw_file_basename)[0]
+        
+        # Change extension from .smi to .pt and add max_atom to the filename
+        self.dataset_file = f"{raw_file_base}{self.max_atom}.pt"
+        self.drugs_dataset_file = f"{drug_raw_file_base}{self.max_atom}.pt"
+        
+        print(f"Inferred dataset files: {self.dataset_file} and {self.drugs_dataset_file}")
 
         self.mol_data_dir = config.mol_data_dir  # Directory where the dataset files are stored.
         self.drug_data_dir = config.drug_data_dir  # Directory where the drug dataset files are stored.
         self.dataset_name = self.dataset_file.split(".")[0]
         self.drugs_dataset_name = self.drugs_dataset_file.split(".")[0]
-        self.max_atom = config.max_atom  # Model is based on one-shot generation. 
-                                         # Max atom number for molecules must be specified.
         self.features = config.features  # Small model uses atom types as node features. (Boolean, False uses atom types only.)
                                          # Additional node features can be added. Please check new_dataloarder.py Line 102.
         self.batch_size = config.batch_size  # Batch size for training.
@@ -280,8 +290,8 @@ class Train(object):
         if not os.path.exists(self.sample_directory):
             os.makedirs(self.sample_directory)
 
-        # molecular data
-        drug_smiles = [line for line in open("DrugGEN/data/akt_train.smi", 'r').read().splitlines()]
+        # smiles data for metrics calculation.
+        drug_smiles = [line for line in open(self.drug_raw_file, 'r').read().splitlines()]
         drug_mols = [Chem.MolFromSmiles(smi) for smi in drug_smiles]
         drug_vecs = [AllChem.GetMorganFingerprintAsBitVect(x, 2, nBits=1024) for x in drug_mols if x is not None]
 
@@ -395,13 +405,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # Data configuration.
-    parser.add_argument('--dataset_file', type=str, default='chembl45_train.pt')
-    parser.add_argument('--drug_dataset_file', type=str, default='akt_train.pt')
-    parser.add_argument('--raw_file', type=str, default='DrugGEN/data/chembl_train.smi')
-    parser.add_argument('--drug_raw_file', type=str, default='DrugGEN/data/akt_train.smi')
-    parser.add_argument('--drug_data_dir', type=str, default='DrugGEN/data')
-    parser.add_argument('--mol_data_dir', type=str, default='DrugGEN/data')
-    parser.add_argument('--features', type=str2bool, default=False, help='features dimension for nodes')
+    parser.add_argument('--raw_file', type=str, required=True)
+    parser.add_argument('--drug_raw_file', type=str, required=False, help='Required for DrugGEN model, optional for NoTarget')
+    parser.add_argument('--drug_data_dir', type=str, default='data')
+    parser.add_argument('--mol_data_dir', type=str, default='data')
+    parser.add_argument('--features', action='store_true', help='features dimension for nodes')
 
     # Model configuration.
     parser.add_argument('--submodel', type=str, default="DrugGEN", help="Chose model subtype: DrugGEN, NoTarget", choices=['DrugGEN', 'NoTarget'])
@@ -423,9 +431,9 @@ if __name__ == '__main__':
     parser.add_argument('--d_lr', type=float, default=0.00001, help='learning rate for D')
     parser.add_argument('--beta1', type=float, default=0.9, help='beta1 for Adam optimizer')
     parser.add_argument('--beta2', type=float, default=0.999, help='beta2 for Adam optimizer')
-    parser.add_argument('--log_dir', type=str, default='DrugGEN/experiments/logs')
-    parser.add_argument('--sample_dir', type=str, default='DrugGEN/experiments/samples')
-    parser.add_argument('--model_save_dir', type=str, default='DrugGEN/experiments/models')
+    parser.add_argument('--log_dir', type=str, default='experiments/logs')
+    parser.add_argument('--sample_dir', type=str, default='experiments/samples')
+    parser.add_argument('--model_save_dir', type=str, default='experiments/models')
     parser.add_argument('--log_sample_step', type=int, default=1000, help='step size for sampling during training')
 
     # Resume training.
@@ -435,15 +443,24 @@ if __name__ == '__main__':
     parser.add_argument('--resume_directory', type=str, default=None, help='load pretrained weights from this directory')
 
     # Seed configuration.
-    parser.add_argument('--set_seed', type=bool, default=False, help='set seed for reproducibility')
+    parser.add_argument('--set_seed', action='store_true', help='set seed for reproducibility')
     parser.add_argument('--seed', type=int, default=1, help='seed for reproducibility')
 
     # wandb configuration.
-    parser.add_argument('--use_wandb', type=bool, default=False, help='use wandb for logging')
-    parser.add_argument('--online', type=bool, default=True, help='use wandb online')
+    parser.add_argument('--use_wandb', action='store_true', help='use wandb for logging')
+    parser.add_argument('--online', action='store_true', help='use wandb online')
     parser.add_argument('--exp_name', type=str, default='druggen', help='experiment name')
-    parser.add_argument('--parallel', type=bool, default=False, help='Parallelize training')
+    parser.add_argument('--parallel', action='store_true', help='Parallelize training')
 
     config = parser.parse_args()
+    
+    # Check if drug_raw_file is provided when using DrugGEN model
+    if config.submodel == "DrugGEN" and not config.drug_raw_file:
+        parser.error("--drug_raw_file is required when using DrugGEN model")
+    
+    # If using NoTarget model and drug_raw_file is not provided, use a dummy file
+    if config.submodel == "NoTarget" and not config.drug_raw_file:
+        config.drug_raw_file = config.raw_file  # Use the same file as raw_file for NoTarget
+    
     trainer = Train(config)
     trainer.train(config)

@@ -20,7 +20,7 @@
  <details open>
 <summary><h2>Abstract</h2></summary>
 
-Discovering novel drug candidate molecules is one of the most fundamental and critical steps in drug development. Generative deep learning models, which create synthetic data given a probability distribution, offer a high potential for designing de novo molecules. However, for them to be useful in real-life drug development pipelines, these models should be able to design drug-like and target-centric molecules. In this study, we propose an end-to-end generative system, DrugGEN, for the de novo design of drug candidate molecules that interact with intended target proteins. The proposed method represents molecules as graphs and processes them via a generative adversarial network comprising graph transformer layers. The system is trained using a large dataset of drug-like compounds and target-specific bioactive molecules to design effective inhibitory molecules against the AKT1 protein, which is critically important in developing treatments for various types of cancer. We conducted molecular docking and dynamics, to assess the target-centric generation performance of the model, as well as attention score visualisation to examine model interpretability. In parallel, selected compounds were chemically synthesized and evaluated in the context of in vitro enzymatic assays, which identified two bioactive molecules that inhibited AKT1 at low micromolar concentrations. These results indicate that DrugGEN’s de novo molecules have a high potential for interacting with the AKT1 protein at the level of its native ligands. Using the open-access DrugGEN codebase, it is possible to easily train models for other druggable proteins, given a dataset of experimentally known bioactive molecules.
+Discovering novel drug candidate molecules is one of the most fundamental and critical steps in drug development. Generative deep learning models, which create synthetic data given a probability distribution, offer a high potential for designing de novo molecules. However, for them to be useful in real-life drug development pipelines, these models should be able to design drug-like and target-centric molecules. In this study, we propose an end-to-end generative system, DrugGEN, for the de novo design of drug candidate molecules that interact with intended target proteins. The proposed method represents molecules as graphs and processes them via a generative adversarial network comprising graph transformer layers. The system is trained using a large dataset of drug-like compounds and target-specific bioactive molecules to design effective inhibitory molecules against the AKT1 protein, which is critically important in developing treatments for various types of cancer. We conducted molecular docking and dynamics, to assess the target-centric generation performance of the model, as well as attention score visualisation to examine model interpretability. In parallel, selected compounds were chemically synthesized and evaluated in the context of in vitro enzymatic assays, which identified two bioactive molecules that inhibited AKT1 at low micromolar concentrations. These results indicate that DrugGEN's de novo molecules have a high potential for interacting with the AKT1 protein at the level of its native ligands. Using the open-access DrugGEN codebase, it is possible to easily train models for other druggable proteins, given a dataset of experimentally known bioactive molecules.
 
 Our up-to-date pre-print is shared [here](https://github.com/HUBioDataLab/DrugGEN/files/10828402/2302.07868.pdf)
 
@@ -236,14 +236,48 @@ Now you're ready to start using DrugGEN for molecule generation or model trainin
  <details open>
 <summary><h2>Training</h2></summary>
 
-The default DrugGEN model can be trained with the following command:
+### Generic Training Example
+
+The generic command for training a DrugGEN model is:
+
+```bash
+python train.py --submodel="[MODEL_TYPE]" \
+                --raw_file="data/[GENERAL_DATASET].smi" \
+                --drug_raw_file="data/[TARGET_DATASET].smi" \
+                --max_atom=[MAX_ATOM_NUM]
+```
+
+### Target-Specific Training Examples
+
+#### AKT1 Model Training
+
+To train a model specifically for generating potential AKT1 inhibitors:
 
 ```bash
 python train.py --submodel="DrugGEN" \
                 --raw_file="data/chembl_train.smi" \
-                --dataset_file="chembl45_train.pt" \
                 --drug_raw_file="data/akt_train.smi" \
-                --drug_dataset_file="drugs_train.pt" \
+                --max_atom=45
+```
+
+#### CDK2 Model Training
+
+To train a model specifically for generating potential CDK2 inhibitors:
+
+```bash
+python train.py --submodel="DrugGEN" \
+                --raw_file="data/chembl_train.smi" \
+                --drug_raw_file="data/cdk2_train.smi" \
+                --max_atom=38
+```
+
+### Training Without Target Specificity
+
+To train a general molecule generator without target specificity:
+
+```bash
+python train.py --submodel="NoTarget" \
+                --raw_file="data/chembl_train.smi" \
                 --max_atom=45
 ```
 
@@ -254,12 +288,10 @@ Below is a comprehensive list of arguments that can be used to customize the tra
 #### Dataset Arguments
 | Argument | Description | Default Value |
 |----------|-------------|---------------|
-| `--raw_file` | SMILES containing text file for main dataset. Path to file. | `DrugGEN/data/chembl_train.smi` |
-| `--drug_raw_file` | SMILES containing text file for target-specific dataset (e.g., AKT inhibitors). | `DrugGEN/data/akt_train.smi` |
-| `--dataset_file` | Name for processed main dataset file to create or load. | `chembl45_train.pt` |
-| `--drug_dataset_file` | Name for processed target-specific dataset file to create or load. | `drugs_train.pt` |
-| `--mol_data_dir` | Directory where the dataset files are stored. | `DrugGEN/data` |
-| `--drug_data_dir` | Directory where the drug dataset files are stored. | `DrugGEN/data` |
+| `--raw_file` | SMILES containing text file for main dataset. Path to file. | Required |
+| `--drug_raw_file` | SMILES containing text file for target-specific dataset (e.g., AKT inhibitors). Required for DrugGEN model, optional for NoTarget model. | Required for DrugGEN models |
+| `--mol_data_dir` | Directory where the dataset files are stored. | `data` |
+| `--drug_data_dir` | Directory where the drug dataset files are stored. | `data` |
 | `--features` | Whether to use additional node features (False uses atom types only). | `False` |
 
 #### Model Arguments
@@ -286,9 +318,9 @@ Below is a comprehensive list of arguments that can be used to customize the tra
 | `--d_lr` | Learning rate for the Discriminator network. | `0.00001` |
 | `--beta1` | Beta1 parameter for Adam optimizer, controls first moment decay. | `0.9` |
 | `--beta2` | Beta2 parameter for Adam optimizer, controls second moment decay. | `0.999` |
-| `--log_dir` | Directory to save training logs. | `DrugGEN/experiments/logs` |
-| `--sample_dir` | Directory to save molecule samples during training. | `DrugGEN/experiments/samples` |
-| `--model_save_dir` | Directory to save model checkpoints. | `DrugGEN/experiments/models` |
+| `--log_dir` | Directory to save training logs. | `experiments/logs` |
+| `--sample_dir` | Directory to save molecule samples during training. | `experiments/samples` |
+| `--model_save_dir` | Directory to save model checkpoints. | `experiments/models` |
 | `--log_sample_step` | Step interval for sampling and evaluating molecules during training. | `1000` |
 | `--parallel` | Whether to parallelize training across multiple GPUs. | `False` |
 
@@ -319,20 +351,65 @@ For ease of use, we provide a [Hugging Face Space](https://huggingface.co/spaces
 
 ### Local Generation Using Pre-trained Models
 
-For local generation, follow these steps:
+#### Generic Inference Command
 
-1. **Download pre-trained model weights**:
-   Download the weights of your chosen model from our [model repository](https://drive.google.com/drive/folders/1biJLQeXCKqw4MzAYwOuJU6Aw5GIQlJMY)
+For local generation, the generic command is:
 
-2. **Place the model weights** in the `experiments/models/` directory
+```bash
+python inference.py --submodel="[MODEL_TYPE]" \
+                    --inference_model="experiments/models/[MODEL_NAME]" \
+                    --inf_smiles="data/[TEST_DATASET].smi" \
+                    --train_smiles="data/[TRAIN_DATASET].smi" \
+                    --train_drug_smiles="data/[TARGET_DATASET].smi" \
+                    --sample_num=[NUMBER_OF_MOLECULES] \
+                    --max_atom=[MAX_ATOM_NUM]
+```
 
-3. **Run inference**:
-   ```bash
-   python inference.py --submodel="[MODEL_NAME]" --inference_model="experiments/models/[MODEL_NAME]"
-   ```
-   Replace `[MODEL_NAME]` with the name of the specific model you downloaded.
+#### Target-Specific Inference Examples
 
-4. **Output location**:
+##### AKT1 Model Inference
+
+To generate molecules targeting AKT1 using a pre-trained model:
+
+```bash
+python inference.py --submodel="DrugGEN" \
+                    --inference_model="experiments/models/DrugGEN-akt1/DrugGEN-G.ckpt" \
+                    --inf_smiles="data/chembl_test.smi" \
+                    --train_smiles="data/chembl_train.smi" \
+                    --train_drug_smiles="data/akt_train.smi" \
+                    --sample_num=1000 \
+                    --max_atom=45
+```
+
+##### CDK2 Model Inference
+
+To generate molecules targeting CDK2 using a pre-trained model:
+
+```bash
+python inference.py --submodel="DrugGEN" \
+                    --inference_model="experiments/models/DrugGEN-cdk2/DrugGEN-G.ckpt" \
+                    --inf_smiles="data/chembl_test.smi" \
+                    --train_smiles="data/chembl_train.smi" \
+                    --train_drug_smiles="data/cdk2_train.smi" \
+                    --sample_num=1000 \
+                    --max_atom=38
+```
+
+##### No-Target Model Inference
+
+To generate general drug-like molecules without target specificity:
+
+```bash
+python inference.py --submodel="NoTarget" \
+                    --inference_model="experiments/models/NoTarget/NoTarget-G.ckpt" \
+                    --inf_smiles="data/chembl_test.smi" \
+                    --train_smiles="data/chembl_train.smi" \
+                    --train_drug_smiles="data/akt_train.smi" \
+                    --sample_num=1000 \
+                    --max_atom=45
+```
+
+#### Output location:
    The generated molecules in SMILES format will be saved to:
    ```
    experiments/inference/[MODEL_NAME]/inference_drugs.csv
@@ -352,6 +429,9 @@ The inference process can be customized with various arguments to control how mo
 |----------|-------------|---------|
 | `--submodel` | Model variant to use: `DrugGEN` (target-specific) or `NoTarget` | `DrugGEN` |
 | `--inference_model` | Path to the model weights file | Required |
+| `--inf_smiles` | SMILES file for inference | Required |
+| `--train_smiles` | SMILES file used for training the main model | Required |
+| `--train_drug_smiles` | Target-specific SMILES file used for training | Required |
 
 #### Generation Control
 | Argument | Description | Default |
@@ -360,14 +440,10 @@ The inference process can be customized with various arguments to control how mo
 | `--inf_batch_size` | Batch size for inference | `1` |
 | `--disable_correction` | Flag to disable SMILES correction | `False` |
 
-#### Data Configuration
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--inf_dataset_file` | Dataset file for inference | `chembl45_test.pt` |
-| `--inf_smiles` | SMILES file for inference | `DrugGEN/data/chembl_test.smi` |
-| `--train_smiles` | SMILES file used for training the main model | `DrugGEN/data/chembl_train.smi` |
-| `--train_drug_smiles` | Target-specific SMILES file used for training | `DrugGEN/data/akt_train.smi` |
-| `--mol_data_dir` | Directory where datasets are stored | `DrugGEN/data` |
+#### Data Arguments
+| Argument | Description | Default Value |
+|----------|-------------|---------------|
+| `--mol_data_dir` | Directory where datasets are stored | `data` |
 | `--features` | Whether to use additional node features | `False` |
 
 #### Model Architecture

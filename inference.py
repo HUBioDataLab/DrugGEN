@@ -4,6 +4,7 @@ import time
 import random
 import pickle
 import argparse
+import os.path as osp
 
 import torch
 import torch.utils.data
@@ -54,15 +55,23 @@ class Inference(object):
         # Data loader.
         self.inf_smiles = config.inf_smiles  # SMILES containing text file for first dataset. 
                                          # Write the full path to file.
-        self.inf_dataset_file = config.inf_dataset_file    # Dataset file name for the first GAN. 
-                                                   # Contains large number of molecules.
+        
+        inf_smiles_basename = osp.basename(self.inf_smiles)
+        
+        # Get the base name without extension and add max_atom to it
+        self.max_atom = config.max_atom  # Model is based on one-shot generation.
+        inf_smiles_base = os.path.splitext(inf_smiles_basename)[0]
+        
+        # Change extension from .smi to .pt and add max_atom to the filename
+        self.inf_dataset_file = f"{inf_smiles_base}{self.max_atom}.pt"
+        
+        print(f"Inferred dataset file: {self.inf_dataset_file}")
+        
         self.inf_batch_size = config.inf_batch_size
         self.train_smiles = config.train_smiles
         self.train_drug_smiles = config.train_drug_smiles
         self.mol_data_dir = config.mol_data_dir  # Directory where the dataset files are stored.
         self.dataset_name = self.inf_dataset_file.split(".")[0]
-        self.max_atom = config.max_atom  # Model is based on one-shot generation. 
-                                         # Max atom number for molecules must be specified.
         self.features = config.features  # Small model uses atom types as node features. (Boolean, False uses atom types only.)
                                          # Additional node features can be added. Please check new_dataloarder.py Line 102.
 
@@ -136,25 +145,25 @@ class Inference(object):
         self.restore_model(self.submodel, self.inference_model)
 
         # smiles data for metrics calculation.
-        chembl_smiles = [line for line in open("DrugGEN/data/chembl_train.smi", 'r').read().splitlines()]
-        chembl_test = [line for line in open("DrugGEN/data/chembl_test.smi", 'r').read().splitlines()]
-        drug_smiles = [line for line in open("DrugGEN/data/akt_inhibitors.smi", 'r').read().splitlines()]
+        chembl_smiles = [line for line in open(self.train_smiles, 'r').read().splitlines()]
+        chembl_test = [line for line in open(self.inf_smiles, 'r').read().splitlines()]
+        drug_smiles = [line for line in open(self.train_drug_smiles, 'r').read().splitlines()]
         drug_mols = [Chem.MolFromSmiles(smi) for smi in drug_smiles]
         drug_vecs = [AllChem.GetMorganFingerprintAsBitVect(x, 2, nBits=1024) for x in drug_mols if x is not None]
 
 
         # Make directories if not exist.
-        if not os.path.exists("DrugGEN/experiments/inference/{}".format(self.submodel)):
-            os.makedirs("DrugGEN/experiments/inference/{}".format(self.submodel))
+        if not os.path.exists("experiments/inference/{}".format(self.submodel)):
+            os.makedirs("experiments/inference/{}".format(self.submodel))
 
         if not self.disable_correction:
-            correct = smi_correct(self.submodel, "DrugGEN/experiments/inference/{}".format(self.submodel))
+            correct = smi_correct(self.submodel, "experiments/inference/{}".format(self.submodel))
 
         search_res = pd.DataFrame(columns=["submodel", "validity",
                                            "uniqueness", "novelty",
-                                           "novelty_test", "AKT_novelty",
+                                           "novelty_test", "drug_novelty",
                                            "max_len", "mean_atom_type",
-                                           "snn_chembl", "snn_akt", "IntDiv", "qed", "sa"])
+                                           "snn_chembl", "snn_drug", "IntDiv", "qed", "sa"])
 
         self.G.eval()
 
@@ -163,7 +172,7 @@ class Inference(object):
         uniqueness_calc = []
         real_smiles_snn = []
         nodes_sample = torch.Tensor(size=[1,45,1]).to(self.device)
-        f = open("DrugGEN/experiments/inference/{}/inference_drugs.txt".format(self.submodel), "w")
+        f = open("experiments/inference/{}/inference_drugs.txt".format(self.submodel), "w")
         f.write("SMILES")
         f.write("\n")
         val_counter = 0
@@ -223,11 +232,11 @@ class Inference(object):
         f.close()
         print("Inference completed, starting metrics calculation.")
         if not self.disable_correction:
-            corrected = correct.correct("DrugGEN/experiments/inference/{}/inference_drugs.txt".format(self.submodel))
+            corrected = correct.correct("experiments/inference/{}/inference_drugs.txt".format(self.submodel))
             gen_smi = corrected["SMILES"].tolist()
             
         else:
-            gen_smi = pd.read_csv("DrugGEN/experiments/inference/{}/inference_drugs.txt".format(self.submodel))["SMILES"].tolist()
+            gen_smi = pd.read_csv("experiments/inference/{}/inference_drugs.txt".format(self.submodel))["SMILES"].tolist()
             
             
         et = time.time() - start_time
@@ -248,11 +257,11 @@ class Inference(object):
         uniq = round(fraction_unique(gen_smi), 3)
         nov = round(novelty(gen_smi, chembl_smiles), 3)
         nov_test = round(novelty(gen_smi, chembl_test), 3)
-        akt_nov = round(novelty(gen_smi, drug_smiles), 3)
+        drug_nov = round(novelty(gen_smi, drug_smiles), 3)
         max_len = round(Metrics.max_component(gen_smi, self.vertexes), 3)
         mean_atom = round(Metrics.mean_atom_type(nodes_sample), 3)
         snn_chembl = round(average_agg_tanimoto(np.array(real_vecs), np.array(gen_vecs)), 3)
-        snn_akt = round(average_agg_tanimoto(np.array(drug_vecs), np.array(gen_vecs)), 3)
+        snn_drug = round(average_agg_tanimoto(np.array(drug_vecs), np.array(gen_vecs)), 3)
         int_div = round((internal_diversity(np.array(gen_vecs)))[0], 3)
         qed = round(np.mean([QED.qed(Chem.MolFromSmiles(x)) for x in gen_smi if Chem.MolFromSmiles(x) is not None]), 3)
         sa = round(np.mean([sascorer.calculateScore(Chem.MolFromSmiles(x)) for x in gen_smi if Chem.MolFromSmiles(x) is not None]), 3)
@@ -260,11 +269,11 @@ class Inference(object):
         print("Uniqueness: ", uniq, "\n")
         print("Novelty: ", nov, "\n")
         print("Novelty_test: ", nov_test, "\n")
-        print("AKT_novelty: ", akt_nov, "\n")
+        print("Drug_novelty: ", drug_nov, "\n")
         print("max_len: ", max_len, "\n")
         print("mean_atom_type: ", mean_atom, "\n")
         print("snn_chembl: ", snn_chembl, "\n")
-        print("snn_akt: ", snn_akt, "\n")
+        print("snn_drug: ", snn_drug, "\n")
         print("IntDiv: ", int_div, "\n")
         print("QED: ", qed, "\n")
         print("SA: ", sa, "\n")
@@ -272,15 +281,15 @@ class Inference(object):
         print("Metrics are calculated.")
         model_res = pd.DataFrame({"submodel": [self.submodel], "validity": [val],
                         "uniqueness": [uniq], "novelty": [nov],
-                        "novelty_test": [nov_test], "AKT_novelty": [akt_nov],
+                        "novelty_test": [nov_test], "drug_novelty": [drug_nov],
                         "max_len": [max_len], "mean_atom_type": [mean_atom],
-                        "snn_chembl": [snn_chembl], "snn_akt": [snn_akt], 
+                        "snn_chembl": [snn_chembl], "snn_drug": [snn_drug], 
                         "IntDiv": [int_div], "qed": [qed], "sa": [sa]})
         search_res = pd.concat([search_res, model_res], axis=0)
-        os.remove("DrugGEN/experiments/inference/{}/inference_drugs.txt".format(self.submodel))
-        search_res.to_csv("DrugGEN/experiments/inference/{}/inference_results.csv".format(self.submodel), index=False)
+        os.remove("experiments/inference/{}/inference_drugs.txt".format(self.submodel))
+        search_res.to_csv("experiments/inference/{}/inference_results.csv".format(self.submodel), index=False)
         generatedsmiles = pd.DataFrame({"SMILES": gen_smi})
-        generatedsmiles.to_csv("DrugGEN/experiments/inference/{}/inference_drugs.csv".format(self.submodel), index=False)
+        generatedsmiles.to_csv("experiments/inference/{}/inference_drugs.csv".format(self.submodel), index=False)
 
 
 if __name__=="__main__":
@@ -293,12 +302,11 @@ if __name__=="__main__":
     parser.add_argument('--disable_correction', action='store_true', help='Disable SMILES correction')
    
     # Data configuration.
-    parser.add_argument('--inf_dataset_file', type=str, default='chembl45_test.pt')
-    parser.add_argument('--inf_smiles', type=str, default='DrugGEN/data/chembl_test.smi')
-    parser.add_argument('--train_smiles', type=str, default='DrugGEN/data/chembl_train.smi')
-    parser.add_argument('--train_drug_smiles', type=str, default='DrugGEN/data/akt_train.smi')
+    parser.add_argument('--inf_smiles', type=str, required=True)
+    parser.add_argument('--train_smiles', type=str, required=True)
+    parser.add_argument('--train_drug_smiles', type=str, required=True)
     parser.add_argument('--inf_batch_size', type=int, default=1, help='Batch size for inference')
-    parser.add_argument('--mol_data_dir', type=str, default='DrugGEN/data')
+    parser.add_argument('--mol_data_dir', type=str, default='data')
     parser.add_argument('--features', action='store_true', help='features dimension for nodes')
 
     # Model configuration.
