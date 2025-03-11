@@ -15,7 +15,6 @@
 **Please see our most up-to-date document (pre-print) from 26.07.2024 here:**  [arXiv link](https://arxiv.org/abs/2302.07868)
 
 &nbsp;
-&nbsp;
 
  <details open>
 <summary><h2>Abstract</h2></summary>
@@ -34,7 +33,6 @@ Our up-to-date pre-print is shared [here](https://github.com/HUBioDataLab/DrugGE
 > *Arxiv, 2020* -->
 
 &nbsp;
-&nbsp;
 
 <!--PUT THE ANIMATED GIF VERSION OF THE DRUGGEN MODEL (Figure 1)-->
 <p float="center">
@@ -43,7 +41,6 @@ Our up-to-date pre-print is shared [here](https://github.com/HUBioDataLab/DrugGE
 
 **Fig. 1.** The schematic representation of the architecture of the DrugGEN model with powerful graph transformer encoder modules in both generator and discriminator networks. The generator module transforms the given input into a new molecular representation. The discriminator compares the generated de novo molecules to the known inhibitors of the given target protein, scoring them for their assignment to the classes of "real" and "fake" molecules (abbreviations; MLP: multi-layered perceptron, Norm: normalisation, Concat: concatenation, MatMul: matrix multiplication, ElementMul: element-wise multiplication, Mol. adj: molecule adjacency tensor, Mol. Anno: molecule annotation matrix, Upd: updated).
 
-&nbsp;
 &nbsp;
 
  <details open>
@@ -69,7 +66,6 @@ Given a random molecule *z*, **the generator** *G* (below) creates annotation an
 </details>
 
 &nbsp;
-&nbsp;
 
  <details open>
 <summary><h2>Model Variations</h2></summary>
@@ -79,7 +75,6 @@ Given a random molecule *z*, **the generator** *G* (below) creates annotation an
 
 </details>
 
-&nbsp;
 &nbsp;
 
  <details open>
@@ -134,7 +129,6 @@ Core implementation of the DrugGEN framework:
 </details>
 
 &nbsp;
-&nbsp;
 
  <details open>
 <summary><h2>Datasets</h2></summary>
@@ -184,7 +178,6 @@ For more details on dataset construction and preprocessing methodology, please r
 </details>
 
 &nbsp;
-&nbsp;
 
  <details open>
 <summary><h2>Getting Started</h2></summary>
@@ -230,7 +223,6 @@ Now you're ready to start using DrugGEN for molecule generation or model trainin
 
 </details>
 
-&nbsp;
 &nbsp;
 
  <details open>
@@ -339,7 +331,6 @@ Below is a comprehensive list of arguments that can be used to customize the tra
 
 </details>
 
-&nbsp;
 &nbsp;
 
  <details open>
@@ -497,7 +488,6 @@ The following metrics are reported to evaluate generated molecules:
 </details>
 
 &nbsp;
-&nbsp;
 
  <details open>
 <summary><h2>Deep Learning-based Bioactivity Prediction</h2></summary>
@@ -539,7 +529,6 @@ These results include bioactivity scores that indicate the likelihood of interac
 </details>
 
 &nbsp;
-&nbsp;
 
  <details open>
 <summary><h2>Results (De Novo Generated Molecules of DrugGEN Models)</h2></summary>
@@ -555,7 +544,6 @@ The system is trained to design effective inhibitory molecules against the AKT1 
 </details>
 
 &nbsp;
-&nbsp;
 
  <details open>
 <summary><h2>Updates</h2></summary>
@@ -568,7 +556,6 @@ The system is trained to design effective inhibitory molecules against the AKT1 
 
 </details>
 
-&nbsp;
 &nbsp;
 
  <details open>
@@ -591,7 +578,6 @@ The system is trained to design effective inhibitory molecules against the AKT1 
 </details>
 
 &nbsp;
-&nbsp;
 
  <details open>
 <summary><h2>References/Resources</h2></summary>
@@ -607,7 +593,6 @@ Our initial project repository was [this one](https://github.com/asarigun/DrugGE
 
 </details>
 
-&nbsp;
 &nbsp;
 
 <details open>
