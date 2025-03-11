@@ -228,7 +228,7 @@ Now you're ready to start using DrugGEN for molecule generation or model trainin
  <details open>
 <summary><h2>Training</h2></summary>
 
-### Training Examples
+You can use the following commands to train different variants of the DrugGEN model. Select the appropriate example based on your target protein or use case:
 
 <table>
 <tr>
@@ -362,10 +362,11 @@ Below is a comprehensive list of arguments that can be used to customize the tra
 | `--exp_name` | Experiment name for wandb logging. | `druggen` |
 </details>
 
+</details>
 
 &nbsp;
 
-<details open>
+ <details open>
 <summary><h2>Molecule Generation with Trained Models</h2></summary>
 
 ### Using the Hugging Face Interface (Recommended)
@@ -374,7 +375,7 @@ For ease of use, we provide a [Hugging Face Space](https://huggingface.co/spaces
 
 ### Local Generation Using Pre-trained Models
 
-#### Inference Examples
+Use the following commands to generate molecules with trained models. Select the appropriate example based on your target protein or use case:
 
 <table>
 <tr>
