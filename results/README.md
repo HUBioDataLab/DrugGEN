@@ -6,13 +6,27 @@
 ## Evaluation Script
 
 This script takes four arguments:
-- `gen_smiles`: A list of SMILES strings representing the de novo generated molecules. Molecules should be found under a column named "SMILES".
-- `ref_smiles_1`: A list of SMILES strings representing the reference molecules for novelty calculation. (e.g. ChEMBL molecules)
-- `ref_smiles_2`(optional): A list of SMILES strings representing the reference molecules for novelty calculation. (e.g. selected inhibitors)
-- `output`: The output file where the computed metrics will be saved.
+- `gen`: A list of SMILES strings representing the de novo generated molecules. Molecules should be found under a column named "SMILES".
+- `ref1`: A list of SMILES strings representing the reference molecules for novelty calculation. (e.g. ChEMBL molecules)
+- `ref2`(optional): A list of SMILES strings representing the reference molecules for novelty calculation. (e.g. selected inhibitors)
+- `output (optional, default: results)`: The output file where the computed metrics will be saved.
+
+The following is a generic example of how to use the evaluation script:
 
 ```bash
-python evaluate.py --gen_smiles "[SMILES FILE]" --ref_smiles_1 "[TRAINING SET FILE]" --ref_smiles_2 "[TEST SET FILE]" --output "[PERFORMANCE RESULTS FILE]"
+python evaluate.py --gen "[SMILES FILE]" --ref1 "[TRAINING SET FILE]" --ref2 "[TEST SET FILE]" --output "[PERFORMANCE RESULTS FILE]"
+```
+
+To evaluate the AKT1 targeted generated molecules used in the paper, run:
+
+```bash
+python evaluate.py --gen "generated_molecules/DrugGEN_generated_molecules_AKT1.csv" --ref1 "../data/chembl_train.smi" --ref2 "../data/akt_train.smi" --output "results_akt1"
+```
+
+To evaluate the CDK2 targeted generated molecules used in the paper, run:
+
+```bash
+python evaluate.py --gen "generated_molecules/DrugGEN_generated_molecules_CDK2.csv" --ref1 "../data/chembl_train.smi" --ref2 "../data/cdk2_train.smi" --output "results_cdk2.csv"
 ```
 
 The script calculates the following metrics:
