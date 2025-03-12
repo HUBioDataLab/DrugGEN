@@ -1238,7 +1238,7 @@ class smi_correct(object):
         self.initialize_source = 'data/papyrus_rnn_S.csv' # change this path
         
     def standardization_pipeline(self, smile):
-        desalter = MolStandardize.fragment.LargestFragmentChooser()
+        desalter = MolStandardize.rdMolStandardize.LargestFragmentChooser()
         std_smile = None
         if not isinstance(smile, str): return None
         m = Chem.MolFromSmiles(smile)
