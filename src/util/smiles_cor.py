@@ -1223,7 +1223,7 @@ class smi_correct(object):
         self.SEED = 42
         random.seed(self.SEED)
         self.model_name = model_name
-        self.folder_out = "DrugGEN/data/"
+        self.folder_out = "data/"
         
         self.trans_file_path = trans_file_path
 
@@ -1235,7 +1235,7 @@ class smi_correct(object):
         self.threshold = 200
         self.data_source = f"PAPYRUS_{self.threshold}"
         os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-        self.initialize_source = 'DrugGEN/data/papyrus_rnn_S.csv' # change this path
+        self.initialize_source = 'data/papyrus_rnn_S.csv' # change this path
         
     def standardization_pipeline(self, smile):
         desalter = MolStandardize.fragment.LargestFragmentChooser()

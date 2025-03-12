@@ -58,12 +58,10 @@ class Train(object):
         self.max_atom = config.max_atom  # Model is based on one-shot generation.
         raw_file_base = os.path.splitext(raw_file_basename)[0]
         drug_raw_file_base = os.path.splitext(drug_raw_file_basename)[0]
-        
+
         # Change extension from .smi to .pt and add max_atom to the filename
         self.dataset_file = f"{raw_file_base}{self.max_atom}.pt"
         self.drugs_dataset_file = f"{drug_raw_file_base}{self.max_atom}.pt"
-        
-        print(f"Inferred dataset files: {self.dataset_file} and {self.drugs_dataset_file}")
 
         self.mol_data_dir = config.mol_data_dir  # Directory where the dataset files are stored.
         self.drug_data_dir = config.drug_data_dir  # Directory where the drug dataset files are stored.
@@ -81,6 +79,10 @@ class Train(object):
             self.drug_raw_file,
             self.max_atom
         )
+        self.atom_encoder = atom_encoder
+        self.atom_decoder = atom_decoder
+        self.bond_encoder = bond_encoder
+        self.bond_decoder = bond_decoder
 
         self.dataset = DruggenDataset(self.mol_data_dir,
                                      self.dataset_file,
@@ -198,19 +200,15 @@ class Train(object):
             @ heads: Number of multihead-attention heads
             @ mlp_ratio: Read-out layer dimension of Transformer'''
 
-        if self.submodel == "DrugGEN":
-            self.D = Discriminator(self.act,
-                                    self.vertexes,
-                                    self.b_dim,
-                                    self.m_dim,
-                                    self.ddropout,
-                                    dim=self.dim,
-                                    depth=self.ddepth,
-                                    heads=self.heads,
-                                    mlp_ratio=self.mlp_ratio)
-
-        elif self.submodel == "NoTarget":
-            self.D = simple_disc(self.act, self.m_dim, self.vertexes, self.b_dim)
+        self.D = Discriminator(self.act,
+                                self.vertexes,
+                                self.b_dim,
+                                self.m_dim,
+                                self.ddropout,
+                                dim=self.dim,
+                                depth=self.ddepth,
+                                heads=self.heads,
+                                mlp_ratio=self.mlp_ratio)
 
         self.g_optimizer = torch.optim.AdamW(self.G.parameters(), self.g_lr, [self.beta1, self.beta2])
         self.d_optimizer = torch.optim.AdamW(self.D.parameters(), self.d_lr, [self.beta1, self.beta2])
@@ -332,8 +330,8 @@ class Train(object):
                     data=drugs,
                     batch_size=self.batch_size,
                     device=self.device,
-                    b_dim=self.drugs_b_dim,
-                    m_dim=self.drugs_m_dim,
+                    b_dim=self.b_dim,
+                    m_dim=self.m_dim,
                 )
 
                 # Training configuration.
@@ -343,8 +341,8 @@ class Train(object):
                     DISC_node = drugs_x_tensor  # Discriminator input node features (annotation matrix of drug molecules)
                     DISC_edge = drugs_a_tensor  # Discriminator input edge features (adjacency matrix of drug molecules)
                 elif self.submodel == "NoTarget":
-                    DISC_node = real_graphs     # Discriminator input node features (annotation matrix of real molecules)
-                    DISC_edge = real_graphs     # Discriminator input edge features (adjacency matrix of real molecules)
+                    DISC_node = x_tensor      # Discriminator input node features (annotation matrix of real molecules)
+                    DISC_edge = a_tensor      # Discriminator input edge features (adjacency matrix of real molecules)
 
                 # =================================================================================== #
                 #                                     2. Train the GAN                                #
@@ -361,8 +359,7 @@ class Train(object):
                                             GEN_node,
                                             self.batch_size,
                                             self.device,
-                                            self.lambda_gp,
-                                            self.submodel)
+                                            self.lambda_gp)
                 d_total = d_loss
                 wandb.log({"d_loss": d_total.item()})
 
@@ -377,8 +374,7 @@ class Train(object):
                                                     self.D,
                                                     GEN_edge,
                                                     GEN_node,
-                                                    self.batch_size,
-                                                    self.submodel)
+                                                    self.batch_size)
                 g_loss, node, edge, node_sample, edge_sample = generator_output
                 g_total = g_loss
                 wandb.log({"g_loss": g_total.item()})
@@ -453,14 +449,14 @@ if __name__ == '__main__':
     parser.add_argument('--parallel', action='store_true', help='Parallelize training')
 
     config = parser.parse_args()
-    
+
     # Check if drug_raw_file is provided when using DrugGEN model
     if config.submodel == "DrugGEN" and not config.drug_raw_file:
         parser.error("--drug_raw_file is required when using DrugGEN model")
-    
+
     # If using NoTarget model and drug_raw_file is not provided, use a dummy file
     if config.submodel == "NoTarget" and not config.drug_raw_file:
-        config.drug_raw_file = config.raw_file  # Use the same file as raw_file for NoTarget
-    
+        config.drug_raw_file = "data/akt_train.smi"  # Use a reference file for NoTarget model (AKT) (not used for training for ease of use and encoder/decoder's)
+
     trainer = Train(config)
     trainer.train(config)

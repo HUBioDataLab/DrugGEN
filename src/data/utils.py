@@ -12,9 +12,12 @@ from rdkit import Chem, RDLogger
 
 
 
-def label2onehot(labels, dim, device):
+def label2onehot(labels, dim, device=None):
     """Convert label indices to one-hot vectors."""
-    out = torch.zeros(list(labels.size())+[dim]).to(device)
+    out = torch.zeros(list(labels.size())+[dim])
+    if device:
+        out = out.to(device)
+
     out.scatter_(len(out.size())-1,labels.unsqueeze(-1),1.)
 
     return out.float()
@@ -43,8 +46,8 @@ def get_encoders_decoders(raw_file1, raw_file2, max_atom):
     suffix = f"{sorted_names[0]}_{sorted_names[1]}"
 
     # Define encoder/decoder directories and file paths
-    enc_dir = os.path.join("DrugGEN", "data", "encoders")
-    dec_dir = os.path.join("DrugGEN", "data", "decoders")
+    enc_dir = os.path.join("data", "encoders")
+    dec_dir = os.path.join("data", "decoders")
     atom_encoder_path = os.path.join(enc_dir, f"atom_{suffix}.pkl")
     atom_decoder_path = os.path.join(dec_dir, f"atom_{suffix}.pkl")
     bond_encoder_path = os.path.join(enc_dir, f"bond_{suffix}.pkl")

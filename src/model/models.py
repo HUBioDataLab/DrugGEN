@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from layers import TransformerEncoder
+from src.model.layers import TransformerEncoder
 
 class Generator(nn.Module):
     """
@@ -222,9 +222,9 @@ class simple_disc(nn.Module):
 
         Args:
             act (str): Activation function type ("relu", "leaky", "sigmoid", or "tanh").
-            m_dim (int): Dimensionality for one set of features.
+            m_dim (int): Dimensionality for atom type features.
             vertexes (int): Number of vertexes.
-            b_dim (int): Dimensionality for the second set of features.
+            b_dim (int): Dimensionality for bond type features.
         """
         super().__init__()
 
@@ -242,7 +242,10 @@ class simple_disc(nn.Module):
 
         # Compute total number of features combining both dimensions
         features = vertexes * m_dim + vertexes * vertexes * b_dim
-
+        print(vertexes)
+        print(m_dim)
+        print(b_dim)
+        print(features)
         self.predictor = nn.Sequential(
             nn.Linear(features, 256), act,
             nn.Linear(256, 128), act,

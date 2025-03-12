@@ -310,7 +310,7 @@ def logging(log_path, start_time, i, idx, loss, save_path, drug_smiles, edge, no
 
     # Compute evaluation metrics: validity, uniqueness, novelty, similarity scores, and average maximum molecule length.
     valid = fraction_valid(gen_smiles_saves)
-    unique = fraction_unique(uniq_smiles_saves, k, check_validity=False)
+    unique = fraction_unique(uniq_smiles_saves, k)
     novel_starting_mol = novelty(gen_smiles_saves, real_smiles)
     novel_akt = novelty(gen_smiles_saves, drug_smiles)
     if len(uniq_smiles_saves) == 0:

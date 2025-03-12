@@ -64,9 +64,7 @@ class Inference(object):
         
         # Change extension from .smi to .pt and add max_atom to the filename
         self.inf_dataset_file = f"{inf_smiles_base}{self.max_atom}.pt"
-        
-        print(f"Inferred dataset file: {self.inf_dataset_file}")
-        
+
         self.inf_batch_size = config.inf_batch_size
         self.train_smiles = config.train_smiles
         self.train_drug_smiles = config.train_drug_smiles
@@ -171,7 +169,7 @@ class Inference(object):
         metric_calc_dr = []
         uniqueness_calc = []
         real_smiles_snn = []
-        nodes_sample = torch.Tensor(size=[1,45,1]).to(self.device)
+        nodes_sample = torch.Tensor(size=[1, self.vertexes, 1]).to(self.device)
         f = open("experiments/inference/{}/inference_drugs.txt".format(self.submodel), "w")
         f.write("SMILES")
         f.write("\n")
@@ -220,7 +218,7 @@ class Inference(object):
                         f.write(molecules)
                         f.write("\n")
                         uniqueness_calc.append(molecules)
-                        nodes_sample = torch.cat((nodes_sample, g_nodes_hat_sample.view(1,45,1)), 0)
+                        nodes_sample = torch.cat((nodes_sample, g_nodes_hat_sample.view(1, self.vertexes, 1)), 0)
                         pbar.update(1)
                     metric_calc_dr.append(molecules)
 
