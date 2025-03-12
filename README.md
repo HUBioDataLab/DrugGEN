@@ -651,7 +651,7 @@ The system is trained to design effective inhibitory molecules against the AKT1 
 Ünlü, A., Çevrim, E., Sarıgün, A., Yiğit, M.G., Çelikbilek, H., Bayram, O., Güvenilir, H.A., Koyaş, A., Kahraman, D.C., Olğaç, A., Rifaioğlu, A., Banoğlu, E., Doğan, T. (2023). Target Specific De Novo Design of Drug Candidate Molecules with Graph Transformer-based Generative Adversarial Networks. *arXiv preprint* arXiv:2302.07868.
 
 
-For the static v2.0 of repository, you can refer to the following DOI: 10.5281/zenodo.15014579 
+For the static v2.0 of repository, you can refer to the following DOI: [10.5281/zenodo.15014579](https://zenodo.org/records/15014579)
 
 </details>
 
