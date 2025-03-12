@@ -213,17 +213,18 @@ dependencies:
   - zeromq=4.3.4=h2531618_0
   - zlib=1.2.13=h166bdaf_4
   - zstd=1.5.2=ha4553b6_0
+  - wandb
   - pip:
     - cairocffi==1.4.0
     - cairosvg==2.6.0
     - cssselect2==0.7.0
     - defusedxml==0.7.1
     - fcd-torch==1.0.7
-    - networkx==2.8.8
     - opencv-python==4.7.0.68
-    - pomegranate==0.14.8
     - pyyaml==6.0
     - regex==2022.10.31
     - tinycss2==1.2.1
     - torchview==0.2.2
     - webencodings==0.5.1
+    - torchtext==0.6.0
+    - chembl_structure_pipeline==1.2.2
