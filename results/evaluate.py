@@ -11,7 +11,7 @@ sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
 import sascorer
 from fcd_torch import FCD  # You'll need to install fcd_torch
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # Add parent directory to path
-from utils import (fraction_valid, fraction_unique, novelty, 
+from src.util.utils import (fraction_valid, fraction_unique, novelty, 
                   internal_diversity,obey_lipinski, obey_veber, load_pains_filters, 
                      is_pains, FragMetric, ScafMetric)
 import torch
@@ -141,43 +141,67 @@ class MoleculeEvaluator:
         
         return results
 
+def read_smi_file(file_path):
+    """
+    Read SMILES strings from a .smi file
+    
+    Args:
+        file_path (str): Path to .smi file
+        
+    Returns:
+        list: List of SMILES strings
+    """
+    smiles_list = []
+    try:
+        with open(file_path, 'r') as f:
+            for line in f:
+                # Handle different .smi formats:
+                # Some .smi files have just SMILES, others have SMILES followed by an identifier
+                parts = line.strip().split()
+                if parts:  # Skip empty lines
+                    smiles = parts[0]  # First part is always the SMILES
+                    smiles_list.append(smiles)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Could not find SMI file: {file_path}")
+    except Exception as e:
+        raise ValueError(f"Error reading SMI file {file_path}: {str(e)}")
+    
+    return smiles_list
+
 def evaluate_molecules_from_files(gen_path, ref_path_1, ref_path_2=None, smiles_col='SMILES', output_prefix="results", n_jobs=8):
     """
-    Main function to evaluate generated molecules against reference sets, reading from CSV files
+    Main function to evaluate generated molecules against reference sets
     
     Args:
         gen_path (str): Path to CSV file containing generated SMILES
-        ref_path_1 (str): Path to CSV file containing first reference set SMILES
-        ref_path_2 (str, optional): Path to CSV file containing second reference set SMILES
-        smiles_col (str): Name of column containing SMILES strings
+        ref_path_1 (str): Path to .smi file containing first reference set SMILES
+        ref_path_2 (str, optional): Path to .smi file containing second reference set SMILES
+        smiles_col (str): Name of column containing SMILES strings in the CSV file
         output_prefix (str): Prefix for output files
         n_jobs (int): Number of parallel jobs
     """
-    # Read SMILES from CSV files
+    # Read generated SMILES from CSV file
     try:
         gen_df = pd.read_csv(gen_path)
-        ref_df_1 = pd.read_csv(ref_path_1)
-        ref_df_2 = pd.read_csv(ref_path_2) if ref_path_2 else None
-    except FileNotFoundError as e:
-        raise FileNotFoundError(f"Could not find one of the input CSV files: {e}")
+        if smiles_col not in gen_df.columns:
+            raise ValueError(f"SMILES column '{smiles_col}' not found in generated dataset")
+        gen_smiles = gen_df[smiles_col].dropna().tolist()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Could not find generated CSV file: {gen_path}")
     except pd.errors.EmptyDataError:
-        raise ValueError("One of the input CSV files is empty")
+        raise ValueError("Generated CSV file is empty")
     
-    # Check if SMILES column exists
-    for df, name in [(gen_df, 'generated'), (ref_df_1, 'reference 1')] + ([(ref_df_2, 'reference 2')] if ref_df_2 is not None else []):
-        if smiles_col not in df.columns:
-            raise ValueError(f"SMILES column '{smiles_col}' not found in {name} dataset")
-    
-    # Extract SMILES lists
-    gen_smiles = gen_df[smiles_col].dropna().tolist()
-    ref_smiles_1 = ref_df_1[smiles_col].dropna().tolist()
-    ref_smiles_2 = ref_df_2[smiles_col].dropna().tolist() if ref_df_2 is not None else None
+    # Read reference SMILES from .smi files
+    ref_smiles_1 = read_smi_file(ref_path_1)
+    ref_smiles_2 = read_smi_file(ref_path_2) if ref_path_2 else None
     
     # Validate that we have SMILES to process
     if not gen_smiles:
         raise ValueError("No valid SMILES found in generated set")
-    if not ref_smiles_1 and not ref_smiles_2:
-        raise ValueError("No valid SMILES found in one or both reference sets")
+    if not ref_smiles_1:
+        raise ValueError("No valid SMILES found in reference set 1")
+    if ref_path_2 and not ref_smiles_2:
+        raise ValueError("No valid SMILES found in reference set 2")
     
     print(f"\nProcessing datasets:")
     print(f"Generated molecules: {len(gen_smiles)}")
@@ -214,9 +238,9 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='Evaluate generated molecules against reference sets')
     parser.add_argument('--gen', required=True, help='Path to CSV file with generated SMILES')
-    parser.add_argument('--ref1', required=True, help='Path to CSV file with first reference set SMILES')
-    parser.add_argument('--ref2', help='Path to CSV file with second reference set SMILES (optional)')
-    parser.add_argument('--smiles-col', default='SMILES', help='Name of SMILES column in CSV files')
+    parser.add_argument('--ref1', required=True, help='Path to .smi file with first reference set SMILES')
+    parser.add_argument('--ref2', help='Path to .smi file with second reference set SMILES (optional)')
+    parser.add_argument('--smiles-col', default='SMILES', help='Name of SMILES column in generated CSV file')
     parser.add_argument('--output', default='results', help='Prefix for output files')
     parser.add_argument('--n-jobs', type=int, default=8, help='Number of parallel jobs')
     

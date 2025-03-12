@@ -228,6 +228,8 @@ Now you're ready to start using DrugGEN for molecule generation or model trainin
  <details open>
 <summary><h2>Training</h2></summary>
 
+> **Note**: The first time you run training or inference, it may take longer than expected as the system needs to create and process the dataset files. Subsequent runs will be faster as they use the cached processed data.
+
 You can use the following commands to train different variants of the DrugGEN model. Select the appropriate example based on your target protein or use case:
 
 <table>
@@ -368,6 +370,8 @@ Below is a comprehensive list of arguments that can be used to customize the tra
 
  <details open>
 <summary><h2>Molecule Generation with Trained Models</h2></summary>
+
+> **Note**: The first time you run inference, it may take longer than expected as the system needs to create and process the dataset files. Subsequent runs will be faster as they use the cached processed data.
 
 ### Using the Hugging Face Interface (Recommended)
 
