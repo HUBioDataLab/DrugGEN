@@ -265,23 +265,23 @@ class Inference(object):
         sa = round(np.mean([sascorer.calculateScore(Chem.MolFromSmiles(x)) for x in gen_smi if Chem.MolFromSmiles(x) is not None]), 3)
 
         print("Uniqueness: ", uniq, "\n")
-        print("Novelty: ", nov, "\n")
-        print("Novelty_test: ", nov_test, "\n")
-        print("Drug_novelty: ", drug_nov, "\n")
-        print("max_len: ", max_len, "\n")
-        print("mean_atom_type: ", mean_atom, "\n")
-        print("snn_chembl: ", snn_chembl, "\n")
-        print("snn_drug: ", snn_drug, "\n")
-        print("IntDiv: ", int_div, "\n")
+        print("Novelty (Train): ", nov, "\n")
+        print("Novelty (Inference): ", nov_test, "\n")
+        print("Novelty (Real Inhibitors): ", drug_nov, "\n")
+        print("Average Length: ", max_len, "\n")
+        print("Mean Atom Type: ", mean_atom, "\n")
+        print("SNN (ChEMBL): ", snn_chembl, "\n")
+        print("SNN (Real Inhibitors): ", snn_drug, "\n")
+        print("Internal Diversity: ", int_div, "\n")
         print("QED: ", qed, "\n")
         print("SA: ", sa, "\n")
 
         print("Metrics are calculated.")
         model_res = pd.DataFrame({"submodel": [self.submodel], "validity": [val],
                         "uniqueness": [uniq], "novelty": [nov],
-                        "novelty_test": [nov_test], "drug_novelty": [drug_nov],
-                        "max_len": [max_len], "mean_atom_type": [mean_atom],
-                        "snn_chembl": [snn_chembl], "snn_drug": [snn_drug], 
+                        "novelty_inference": [nov_test], "novelty_real_inhibitor": [drug_nov],
+                        "ave_len": [max_len], "mean_atom_type": [mean_atom],
+                        "snn_chembl": [snn_chembl], "snn_real_inhibitor": [snn_drug], 
                         "IntDiv": [int_div], "qed": [qed], "sa": [sa]})
         search_res = pd.concat([search_res, model_res], axis=0)
         os.remove("experiments/inference/{}/inference_drugs.txt".format(self.submodel))
