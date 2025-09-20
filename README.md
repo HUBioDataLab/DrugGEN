@@ -82,7 +82,7 @@ Given a random molecule *z*, **the generator** *G* (below) creates annotation an
 
 The DrugGEN repository is organized as follows:
 
-### `data/`
+#### `data/`
 - Contains raw dataset files and processed graph data for model training
 - `encoders/` - Contains encoder files for molecule representation
 - `decoders/` - Contains decoder files for molecule representation
@@ -622,6 +622,7 @@ The system is trained to design effective inhibitory molecules against the AKT1 
  <details open>
 <summary><h2>Updates</h2></summary>
 
+- 15/09/2025: Peer-reviewed DrugGEN [article](https://www.nature.com/articles/s42256-025-01082-y) is published.
 - 12/03/2025: DrugGEN v2.0 is released.
 - 26/07/2024: DrugGEN pre-print is updated for v1.5 release.
 - 04/06/2024: DrugGEN v1.5 is released.
@@ -637,19 +638,18 @@ The system is trained to design effective inhibitory molecules against the AKT1 
 <summary><h2>Citation</h2></summary>
 
 ```bash
-@misc{nl2023target,
-    doi = {10.48550/ARXIV.2302.07868},
-    title={Target Specific De Novo Design of Drug Candidate Molecules with Graph Transformer-based Generative Adversarial Networks},
-    author={Atabey Ünlü and Elif Çevrim and Ahmet Sarıgün and Hayriye Çelikbilek and Heval Ataş Güvenilir and Altay Koyaş and Deniz Cansen Kahraman and Abdurrahman Olğaç and Ahmet Rifaioğlu and Tunca Doğan},
-    year={2023},
-    eprint={2302.07868},
-    archivePrefix={arXiv},
-    primaryClass={cs.LG}
+@article{DrugGEN2025,
+  title={Target-specific de novo design of drug candidate molecules with graph transformer-based generative adversarial networks},
+  author={Ünlü, Atabey and Çevrim, Elif and Sarıgün, Ahmet and Yiğit, Melih Gökay and Çelikbilek, Hayriye and Bayram, Osman and Güvenilir, Heval Ataş and Koyaş, Altay and Kahraman, Deniz Cansen and Olğaç, Abdurrahman and Rifaioğlu, Ahmet Sureyya and Banoğlu, Erden and Doğan, Tunca},
+  journal={Nature Machine Intelligence},
+  pages={1--17},
+  year={2025},
+  publisher={Nature Publishing Group},
+  doi={10.1038/s42256-025-01082-y}
 }
 ```
 
-Ünlü, A., Çevrim, E., Sarıgün, A., Yiğit, M.G., Çelikbilek, H., Bayram, O., Güvenilir, H.A., Koyaş, A., Kahraman, D.C., Olğaç, A., Rifaioğlu, A., Banoğlu, E., Doğan, T. (2023). Target Specific De Novo Design of Drug Candidate Molecules with Graph Transformer-based Generative Adversarial Networks. *arXiv preprint* arXiv:2302.07868.
-
+Ünlü, A., Çevrim, E., Sarıgün, A., Yigit, M.G., Çelikbilek, H., Bayram, O., Güvenilir, H.A., Koyaş, A., Kahraman, D.C., Olğaç, A., Rifaioğlu, A., Banoglu, E., Doğan, T. (2025). Target Specific De Novo Design of Drug Candidate Molecules with Graph Transformer-based Generative Adversarial Networks. *Nature Machine Intelligence*, 1-17.
 
 For the static v2.0 of repository, you can refer to the following DOI: [10.5281/zenodo.15014579](https://zenodo.org/records/15014579)
 
