@@ -10,7 +10,7 @@
 </p>
 
 
-## PublishedArticle (15.10.2025)!
+## Published Article (15.10.2025)
 
 **Please see our article here:**  [NMI journal article link](https://www.nature.com/articles/s42256-025-01082-y)
 
