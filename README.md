@@ -638,8 +638,8 @@ The system is trained to design effective inhibitory molecules against the AKT1 
 
 ```bash
 @article{DrugGEN2025,
-  title={Target-specific de novo design of drug candidate molecules with graph transformer-based generative adversarial networks},
-  author={Ünlü, Atabey and Çevrim, Elif and Sarıgün, Ahmet and Yiğit, Melih Gökay and Çelikbilek, Hayriye and Bayram, Osman and Güvenilir, Heval Ataş and Koyaş, Altay and Kahraman, Deniz Cansen and Olğaç, Abdurrahman and Rifaioğlu, Ahmet Sureyya and Banoğlu, Erden and Doğan, Tunca},
+  title={Target Specific De Novo Design of Drug Candidate Molecules with Graph Transformer-based Generative Adversarial Networks},
+  author={Ünlü, Atabey and Çevrim, Elif and Yiğit, Melih Gökay and Sarıgün, Ahmet and Çelikbilek, Hayriye and Bayram, Osman and Kahraman, Deniz Cansen and Olğaç, Abdurrahman and Rifaioğlu, Ahmet Sureyya and Banoğlu, Erden and Doğan, Tunca},
   journal={Nature Machine Intelligence},
   pages={1--17},
   year={2025},
@@ -648,9 +648,9 @@ The system is trained to design effective inhibitory molecules against the AKT1 
 }
 ```
 
-Ünlü, A., Çevrim, E., Sarıgün, A., Yigit, M.G., Çelikbilek, H., Bayram, O., Güvenilir, H.A., Koyaş, A., Kahraman, D.C., Olğaç, A., Rifaioğlu, A., Banoglu, E., Doğan, T. (2025). Target Specific De Novo Design of Drug Candidate Molecules with Graph Transformer-based Generative Adversarial Networks. *Nature Machine Intelligence*, 1-17.
+Ünlü, A., Çevrim, E., Yigit, M.G., Sarıgün, A., Çelikbilek, H., Bayram, O., Kahraman, D.C., Olğaç, A., Rifaioğlu, A., Banoglu, E., Doğan, T. (2025). Target Specific De Novo Design of Drug Candidate Molecules with Graph Transformer-based Generative Adversarial Networks. *Nature Machine Intelligence*, 1-17.
 
-For the static v2.0 of repository, you can refer to the following DOI: [10.5281/zenodo.15014579](https://zenodo.org/records/15014579)
+For the static v2.0 of the repository, you can refer to the following DOI: [10.5281/zenodo.15014579](https://zenodo.org/records/15014579)
 
 </details>
 
