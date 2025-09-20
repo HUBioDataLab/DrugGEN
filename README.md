@@ -13,6 +13,7 @@
 ## Updated Article!
 
 **Please see our most up-to-date document (article at Nature Machine Intelligence) from 15.10.2025 here:**  [NMI journal article link](https://www.nature.com/articles/s42256-025-01082-y)
+
 **Online read at:** [link](https://rdcu.be/eGoHv)
 
 &nbsp;
@@ -20,9 +21,7 @@
  <details open>
 <summary><h2>Abstract</h2></summary>
 
-Discovering novel drug candidate molecules is one of the most fundamental and critical steps in drug development. Generative deep learning models, which create synthetic data given a probability distribution, offer a high potential for designing de novo molecules. However, for them to be useful in real-life drug development pipelines, these models should be able to design drug-like and target-centric molecules. In this study, we propose an end-to-end generative system, DrugGEN, for the de novo design of drug candidate molecules that interact with intended target proteins. The proposed method represents molecules as graphs and processes them via a generative adversarial network comprising graph transformer layers. The system is trained using a large dataset of drug-like compounds and target-specific bioactive molecules to design effective inhibitory molecules against the AKT1 protein, which is critically important in developing treatments for various types of cancer. We conducted molecular docking and dynamics, to assess the target-centric generation performance of the model, as well as attention score visualisation to examine model interpretability. In parallel, selected compounds were chemically synthesized and evaluated in the context of in vitro enzymatic assays, which identified two bioactive molecules that inhibited AKT1 at low micromolar concentrations. These results indicate that DrugGEN's de novo molecules have a high potential for interacting with the AKT1 protein at the level of its native ligands. Using the open-access DrugGEN codebase, it is possible to easily train models for other druggable proteins, given a dataset of experimentally known bioactive molecules.
-
-Our up-to-date pre-print is shared [here](https://github.com/HUBioDataLab/DrugGEN/files/10828402/2302.07868.pdf)
+Discovering novel drug candidate molecules is a fundamental step in drug development. Generative deep learning models can sample new molecular structures from learned probability distributions; however, their practical use in drug discovery hinges on generating compounds tailored to a specific target molecule. Here we introduce DrugGEN, an end-to-end generative system for the de novo design of drug candidate molecules that interact with a selected protein. The proposed method represents molecules as graphs and processes them using a generative adversarial network that comprises graph transformer layers. Trained on large datasets of drug-like compounds and target-specific bioactive molecules, DrugGEN designed candidate inhibitors for AKT1, a kinase crucial in many cancers. Docking and molecular dynamics simulations suggest that the generated compounds effectively bind to AKT1, and attention maps provide insights into the model’s reasoning. Furthermore, selected de novo molecules were synthesized and shown to inhibit AKT1 at low micromolar concentrations in the context of in vitro enzymatic assays. These results demonstrate the potential of DrugGEN for designing target-specific molecules. Using the open-access DrugGEN codebase, researchers can retrain the model for other druggable proteins, provided a dataset of known bioactive molecules is available.
 
 </details>
 
