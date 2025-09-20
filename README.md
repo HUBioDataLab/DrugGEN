@@ -3,16 +3,17 @@
 
 
 <p align="center">
-  <a href="https://arxiv.org/abs/2302.07868"><img src="https://img.shields.io/badge/Pre--print-%40arXiv-ff0000"/></a>
+  <a href="https://www.nature.com/articles/s42256-025-01082-y"><img src="https://img.shields.io/badge/Article-%40NMI-0096BB"/></a>
   <a href="https://huggingface.co/spaces/HUBioDataLab/DrugGEN"><img src="https://img.shields.io/badge/model-HuggingFace-yellow?labelColor=gray&color=yellow"/></a>
   <a href="http://www.gnu.org/licenses/"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg"/></a>
   
 </p>
 
 
-## Updated Pre-print!
+## Updated Article!
 
-**Please see our most up-to-date document (pre-print) from 26.07.2024 here:**  [arXiv link](https://arxiv.org/abs/2302.07868)
+**Please see our most up-to-date document (article at Nature Machine Intelligence) from 15.10.2025 here:**  [NMI journal article link](https://www.nature.com/articles/s42256-025-01082-y)
+**Online read at:** [link](https://rdcu.be/eGoHv)
 
 &nbsp;
 
@@ -676,7 +677,7 @@ Our initial project repository was [this one](https://github.com/asarigun/DrugGE
 <details open>
 <summary><h2>License</h2></summary>
 
-Copyright (C) 2024 HUBioDataLab
+Copyright (C) 2025 HUBioDataLab
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
