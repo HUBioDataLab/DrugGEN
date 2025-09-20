@@ -16,8 +16,6 @@
 
 **Full-text online read version:** [link](https://rdcu.be/eGoHv)
 
-<a href="https://rdcu.be/eGoHv" target="_blank" rel="noopener noreferrer">link</a>
-
 
  <details open>
 <summary><h2>Abstract</h2></summary>
