@@ -87,7 +87,7 @@ The DrugGEN repository is organized as follows:
 - `decoders/` - Contains decoder files for molecule representation
 - Format of raw dataset files should be text files containing SMILES strings only
 
-### `src/`
+#### `src/`
 Core implementation of the DrugGEN framework:
 - `data/` - Data processing utilities
   - `dataset.py` - Handles dataset creation and loading
@@ -100,18 +100,18 @@ Core implementation of the DrugGEN framework:
   - `utils.py` - Performance metrics and helper functions
   - `smiles_cor.py` - SMILES processing utilities
 
-### `assets/`
+#### `assets/`
 - Graphics and figures used in documentation
 - Contains model architecture diagrams and visualization resources
 - Includes images of generated molecules and model animations
 
-### `results/`
+#### `results/`
 - Contains evaluation results and generated molecules
 - `generated_molecules/` - Storage for molecules produced by the model
 - `docking/` - Results from molecular docking analyses
 - `evaluate.py` - Script for evaluating model performance
 
-### `experiments/`
+#### `experiments/`
 - Directory for storing experimental artifacts
 - `logs/` - Model training logs and performance metrics
 - `models/` - Saved model checkpoints and weights
@@ -119,7 +119,7 @@ Core implementation of the DrugGEN framework:
 - `inference/` - Molecules generated in inference mode
 - `results/` - Experimental results and analyses
 
-### Scripts:
+#### Scripts:
 - `train.py` - Main script for training the DrugGEN model
 - `inference.py` - Script for generating molecules using trained models
 - `setup.sh` - Script for downloading and setting up required resources
