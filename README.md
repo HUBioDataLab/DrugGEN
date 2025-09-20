@@ -10,11 +10,11 @@
 </p>
 
 
-## Updated Article (15.10.2025)!
+## PublishedArticle (15.10.2025)!
 
-**Please see our most up-to-date document (article at *Nature Machine Intelligence*) here:**  [NMI journal article link](https://www.nature.com/articles/s42256-025-01082-y)
+**Please see our article here:**  [NMI journal article link](https://www.nature.com/articles/s42256-025-01082-y)
 
-**Full-text online version:** [link](https://rdcu.be/eGoHv)
+**Full-text online read version:** [link](https://rdcu.be/eGoHv)
 
 
  <details open>
