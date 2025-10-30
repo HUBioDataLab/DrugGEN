@@ -291,6 +291,8 @@ class DruggenDataset(InMemoryDataset):
         # Read raw SMILES from file (assuming CSV with no header)
         smiles_list = pd.read_csv(self.raw_files, header=None)[0].tolist()
         max_length, filtered_smiles = self._filter_smiles(smiles_list)
+        # Use self.max_atom instead of max_length to ensure consistency across datasets
+        max_length = self.max_atom
         data_list = []
         self.m_dim = len(self.atom_decoder_m)
         for smiles in tqdm(filtered_smiles, desc='Processing dataset', total=len(filtered_smiles)):
