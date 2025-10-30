@@ -312,14 +312,14 @@ def logging(log_path, start_time, i, idx, loss, save_path, drug_smiles, edge, no
     valid = fraction_valid(gen_smiles_saves)
     unique = fraction_unique(uniq_smiles_saves, k)
     novel_starting_mol = novelty(gen_smiles_saves, real_smiles)
-    novel_akt = novelty(gen_smiles_saves, drug_smiles)
+    novel_drug = novelty(gen_smiles_saves, drug_smiles)
     if len(uniq_smiles_saves) == 0:
         snn_chembl = 0
-        snn_akt = 0
+        snn_drug = 0
         maxlen = 0
     else:
         snn_chembl = average_agg_tanimoto(np.array(chembl_vecs), np.array(gen_vecs))
-        snn_akt = average_agg_tanimoto(np.array(drug_vecs), np.array(gen_vecs))
+        snn_drug = average_agg_tanimoto(np.array(drug_vecs), np.array(gen_vecs))
         maxlen = Metrics.max_component(uniq_smiles_saves, 45)
 
     # Update loss dictionary with computed metrics
@@ -327,9 +327,9 @@ def logging(log_path, start_time, i, idx, loss, save_path, drug_smiles, edge, no
         'Validity': valid,
         'Uniqueness': unique,
         'Novelty': novel_starting_mol,
-        'Novelty_akt': novel_akt,
+        'Novelty_drug': novel_drug,
         'SNN_chembl': snn_chembl,
-        'SNN_akt': snn_akt,
+        'SNN_drug': snn_drug,
         'MaxLen': maxlen,
         'Atom_types': atom_types_average
     })
@@ -339,9 +339,9 @@ def logging(log_path, start_time, i, idx, loss, save_path, drug_smiles, edge, no
         "Validity": valid,
         "Uniqueness": unique,
         "Novelty": novel_starting_mol,
-        "Novelty_akt": novel_akt,
+        "Novelty_drug": novel_drug,
         "SNN_chembl": snn_chembl,
-        "SNN_akt": snn_akt,
+        "SNN_drug": snn_drug,
         "MaxLen": maxlen,
         "Atom_types": atom_types_average
     })
