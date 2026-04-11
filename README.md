@@ -648,9 +648,9 @@ The system is trained to design effective inhibitory molecules against the AKT1 
 }
 ```
 
-Ünlü, A., Çevrim, E., Yigit, M.G., Sarıgün, A., Çelikbilek, H., Bayram, O., Kahraman, D.C., Olğaç, A., Rifaioğlu, A., Banoglu, E., Doğan, T. (2025). Target Specific De Novo Design of Drug Candidate Molecules with Graph Transformer-based Generative Adversarial Networks. *Nature Machine Intelligence*, 1-17.
+Ünlü, A., Çevrim, E., Yigit, M.G., Sarıgün, A., Çelikbilek, H., Bayram, O., Kahraman, D.C., Olğaç, A., Rifaioğlu, A., Banoglu, E., Doğan, T. (2025). Target Specific De Novo Design of Drug Candidate Molecules with Graph Transformer-based Generative Adversarial Networks. *Nature Machine Intelligence, 7*(9), 1524-1540 [DOI:10.1038/s42256-025-01082-y](https://www.nature.com/articles/s42256-025-01082-y).
 
-For the static v2.0 of the repository, you can refer to the following DOI: [10.5281/zenodo.15014579](https://zenodo.org/records/15014579)
+For the static v2.0 of the repository, you can refer to the following DOI: [10.5281/zenodo.15014579](https://zenodo.org/records/15014579).
 
 </details>
 
@@ -664,9 +664,7 @@ In each file, we indicate whether a function or script is imported from another 
 - Molecule generation GAN schematic was inspired from [MolGAN](https://github.com/yongqyu/MolGAN-pytorch).
 - [MOSES](https://github.com/molecularsets/moses) was used for performance calculation (MOSES Script are directly embedded to our code due to current installation issues related to the MOSES repo).
 - [PyG](https://github.com/pyg-team/pytorch_geometric) was used to construct the custom dataset.
-- Graph Transformer Encoder architecture was taken from [Dwivedi & Bresson (2021)](https://arxiv.org/abs/2012.09699) and [Vignac et al. (2022)](https://github.com/cvignac/DiGress) and modified. 
-
-Our initial project repository was [this one](https://github.com/asarigun/DrugGEN).
+- Graph Transformer Encoder architecture was adopted from [Dwivedi & Bresson (2021)](https://arxiv.org/abs/2012.09699) and [Vignac et al. (2022)](https://github.com/cvignac/DiGress) and modified. 
 
 </details>
 
@@ -675,7 +673,7 @@ Our initial project repository was [this one](https://github.com/asarigun/DrugGE
 <details open>
 <summary><h2>License</h2></summary>
 
-Copyright (C) 2025 HUBioDataLab
+Copyright (C) 2026 HUBioDataLab
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
