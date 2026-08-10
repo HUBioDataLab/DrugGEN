@@ -570,7 +570,7 @@ To evaluate the bioactivity of generated molecules against the AKT1 and CDK2 pro
 ### Setting up DEEPScreen
 
 1. **Download the DEEPScreen model**:
-   Download the pre-trained model from [this link](https://drive.google.com/file/d/1aG9oYspCsF9yG1gEGtFI_E2P4qlITqio/view?usp=drive_link)
+   Download the pre-trained model from [this link](https://drive.google.com/file/d/1K-ddYU4jlhR9LFTxIZsFt-EL1YyAC9K-/view?usp=sharing)
 
 2. **Extract the model files**:
 ```bash
